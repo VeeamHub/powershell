@@ -1,4 +1,15 @@
-﻿$Jobs = get-vbrjob |Where-Object {$_.JobType -eq "Backup"}
+﻿<# 
+   .Synopsis 
+    Allows you to schedule active full on different jobs randomly during the year
+   .Example 
+	Run the code on the backup server
+   .Notes 
+    NAME: AlternatActiveFull
+    AUTHOR: Preben Berg, Veeam
+    LASTEDIT: 01-07-2016 
+    KEYWORDS: Scheduling, Veeam
+ #> 
+$Jobs = get-vbrjob |Where-Object {$_.JobType -eq "Backup"}
 
 $patterns = @(
     ("January","April","July","October"),
