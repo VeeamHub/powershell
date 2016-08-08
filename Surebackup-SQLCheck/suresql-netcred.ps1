@@ -1,3 +1,15 @@
+<# 
+   .Synopsis 
+    Allows you to verifiy if Sharepoint is succesfully working in your Virtual Lab (Surebackup)
+   .Example 
+	Schedule the script via the Application Group or via the "Surebackup" job > "Linked Job" section. Configure credentials in the application group. Use the -server parameter to pass the ip of the server
+   .Notes 
+    NAME: Surebackup Sharepoint Check
+    AUTHOR: Timothy Dewin, Veeam
+    LASTEDIT: 01-07-2016 
+    KEYWORDS: Surebackup, Sharepoint, Veeam
+ #> 
+
 param(
 	$server = "localhost",
     $instance = "MSSQLSERVER",
