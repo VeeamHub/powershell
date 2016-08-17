@@ -2,6 +2,7 @@
 # Import all Veeam Cloud Connect backups
 #
 # v 1.0 - Luca Dell'Oca
+# v 1.1 - Preben Berg - optimized for loops
 #
 # Run this script on the Veeam server
 #
