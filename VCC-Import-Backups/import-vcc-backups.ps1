@@ -26,18 +26,18 @@ asnp VeeamPSSnapIn -ErrorAction SilentlyContinue
 $winrepos = Get-VBRBackupRepository | where Type -eq "WinLocal" | ForEach-Object { (echo $($_.FindHost().name)) }
 
 ForEach ($winrepo in $winrepos) {
+    $winreponame = $winrepo.GetHost().Name;
+
     #obtain the full unc path of the repository to be passed to get-childitem
-    $winrepopath = Get-VBRBackupRepository | where Type -eq "WinLocal" | ForEach-Object { (echo \\$($_.FindHost().name)\$($_.path)).Replace(":","$") }
-    
+    $winrepopath = "\\{0}\{1}" -f ($winreponame, $winrepo.Path.Replace(":", "$"));
+
     #browse recursively the repository to find any backup chain, by identifying all the .vbm files
-    $winvbms = Get-ChildItem -Path $winrepopath -Filter "*.vbm" -Recurse -ErrorAction SilentlyContinue -Force | ForEach-Object { echo $($_.FullName).replace("$",":") }
-    
-    #remove the server part from the unc path so we have the complete local path of the vbm
-    $winvbms = $winvbms -replace '^\\\\[^\\]+\\'
-    
+    $winvbms = Get-ChildItem -Path $winrepopath -Filter "*.vbm" -Recurse -ErrorAction SilentlyContinue -Force | `
+        Select-Object FullName, @{ Name="LocalPath"; Expression={$_.FullName.Replace("$",":").Replace("\\$winreponame\","")} }
+
     # Import the backup chains into Veeam server
     ForEach ($winvbm in $winvbms) {
-        Get-VBRServer –Name $winrepo | Import-VBRBackup -Filename $winvbm
+        $winrepo.GetHost() | Import-VBRBackup -Filename $winvbm.LocalPath
     }
 }
 
