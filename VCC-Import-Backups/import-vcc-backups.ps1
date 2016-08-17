@@ -2,6 +2,7 @@
 # Import all Veeam Cloud Connect backups
 #
 # v 1.0 - Luca Dell'Oca
+# v 1.1 - Preben Berg - optimized for loops
 #
 # Run this script on the Veeam server
 #
@@ -23,21 +24,21 @@ asnp VeeamPSSnapIn -ErrorAction SilentlyContinue
 ## Process Windows repositories
 
 # Retrieve the list of windows repositories
-$winrepos = Get-VBRBackupRepository | where Type -eq "WinLocal" | ForEach-Object { (echo $($_.FindHost().name)) }
+$winrepos = Get-VBRBackupRepository | where Type -eq "WinLocal"
 
 ForEach ($winrepo in $winrepos) {
+    $winreponame = $winrepo.GetHost().Name;
+
     #obtain the full unc path of the repository to be passed to get-childitem
-    $winrepopath = Get-VBRBackupRepository | where Type -eq "WinLocal" | ForEach-Object { (echo \\$($_.FindHost().name)\$($_.path)).Replace(":","$") }
-    
+    $winrepopath = "\\{0}\{1}" -f ($winreponame, $winrepo.Path.Replace(":", "$"));
+
     #browse recursively the repository to find any backup chain, by identifying all the .vbm files
-    $winvbms = Get-ChildItem -Path $winrepopath -Filter "*.vbm" -Recurse -ErrorAction SilentlyContinue -Force | ForEach-Object { echo $($_.FullName).replace("$",":") }
-    
-    #remove the server part from the unc path so we have the complete local path of the vbm
-    $winvbms = $winvbms -replace '^\\\\[^\\]+\\'
-    
+    $winvbms = Get-ChildItem -Path $winrepopath -Filter "*.vbm" -Recurse -ErrorAction SilentlyContinue -Force | `
+        Select-Object FullName, @{ Name="LocalPath"; Expression={$_.FullName.Replace("$",":").Replace("\\$winreponame\","")} }
+
     # Import the backup chains into Veeam server
     ForEach ($winvbm in $winvbms) {
-        Get-VBRServer –Name $winrepo | Import-VBRBackup -Filename $winvbm
+        $winrepo.GetHost() | Import-VBRBackup -Filename $winvbm.LocalPath
     }
 }
 
@@ -45,21 +46,26 @@ ForEach ($winrepo in $winrepos) {
 ## Process Linux repositories
 
 # Retrieve the list of linux repositories
-$linuxrepos = Get-VBRBackupRepository | where Type -eq "LinuxLocal" | ForEach-Object { (echo $($_.FindHost().name)) }
+$linuxrepos = Get-VBRBackupRepository | where Type -eq "LinuxLocal"
 
-ForEach ($linuxrepo in $linuxrepos) {
+if (Get-Command -Name "New-SSHSession" -ErrorAction SilentlyContinue) {
+    ForEach ($linuxrepo in $linuxrepos) {
+        $linuxreponame = $linuxrepo.GetHost().Name;
 
-    # Login via ssh into the linux repository (interactive username and password request)
-    New-SSHSession -ComputerName $linuxrepo -Credential (Get-Credential) -AcceptKey
+        # Login via ssh into the linux repository (interactive username and password request)
+        New-SSHSession -ComputerName�$linuxreponame -Credential (Get-Credential) -AcceptKey
 
-    # find all .vbm files in the linux repository, output has full path
-    $linuxvbms = Invoke-SSHCommand -SessionId 0 -Command "find / -type f -name *.vbm" | select -ExpandProperty Output
+        # find all .vbm files in the linux repository, output has full path
+        $linuxvbms = Invoke-SSHCommand -SessionId 0 -Command "find / -type f -name *.vbm" | select -ExpandProperty Output
 
-    # close the SSH session
-    Remove-SSHSession -SessionId 0
+        # close the SSH session
+        Remove-SSHSession -SessionId 0
 
-    # Import the backup chains into Veeam server
-    ForEach ($linuxvbm in $linuxvbms) {
-        Get-VBRServer –Name $linuxrepo | Import-VBRBackup -Filename $linuxvbm
+        # Import the backup chains into Veeam server
+        ForEach ($linuxvbm in $linuxvbms) {
+            $linuxrepo.GetHost() | Import-VBRBackup -Filename $linuxvbm
+        }
     }
+} else {
+    Write-Host "Found Linux repositories, but missing PoSSH";
 }
