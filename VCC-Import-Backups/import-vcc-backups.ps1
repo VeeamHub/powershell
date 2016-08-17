@@ -45,21 +45,26 @@ ForEach ($winrepo in $winrepos) {
 ## Process Linux repositories
 
 # Retrieve the list of linux repositories
-$linuxrepos = Get-VBRBackupRepository | where Type -eq "LinuxLocal" | ForEach-Object { (echo $($_.FindHost().name)) }
+$linuxrepos = Get-VBRBackupRepository | where Type -eq "LinuxLocal"
 
-ForEach ($linuxrepo in $linuxrepos) {
+if (Get-Command -Name "New-SSHSession" -ErrorAction SilentlyContinue) {
+    ForEach ($linuxrepo in $linuxrepos) {
+        $linuxreponame = $linuxrepo.GetHost().Name;
 
-    # Login via ssh into the linux repository (interactive username and password request)
-    New-SSHSession -ComputerName $linuxrepo -Credential (Get-Credential) -AcceptKey
+        # Login via ssh into the linux repository (interactive username and password request)
+        New-SSHSession -ComputerName�$linuxreponame -Credential (Get-Credential) -AcceptKey
 
-    # find all .vbm files in the linux repository, output has full path
-    $linuxvbms = Invoke-SSHCommand -SessionId 0 -Command "find / -type f -name *.vbm" | select -ExpandProperty Output
+        # find all .vbm files in the linux repository, output has full path
+        $linuxvbms = Invoke-SSHCommand -SessionId 0 -Command "find / -type f -name *.vbm" | select -ExpandProperty Output
 
-    # close the SSH session
-    Remove-SSHSession -SessionId 0
+        # close the SSH session
+        Remove-SSHSession -SessionId 0
 
-    # Import the backup chains into Veeam server
-    ForEach ($linuxvbm in $linuxvbms) {
-        Get-VBRServer –Name $linuxrepo | Import-VBRBackup -Filename $linuxvbm
+        # Import the backup chains into Veeam server
+        ForEach ($linuxvbm in $linuxvbms) {
+            $linuxrepo.GetHost() | Import-VBRBackup -Filename $linuxvbm
+        }
     }
+} else {
+    Write-Host "Found Linux repositories, but missing PoSSH";
 }
