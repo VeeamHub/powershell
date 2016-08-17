@@ -23,7 +23,7 @@ asnp VeeamPSSnapIn -ErrorAction SilentlyContinue
 ## Process Windows repositories
 
 # Retrieve the list of windows repositories
-$winrepos = Get-VBRBackupRepository | where Type -eq "WinLocal" | ForEach-Object { (echo $($_.FindHost().name)) }
+$winrepos = Get-VBRBackupRepository | where Type -eq "WinLocal"
 
 ForEach ($winrepo in $winrepos) {
     $winreponame = $winrepo.GetHost().Name;
