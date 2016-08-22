@@ -6,15 +6,15 @@
 	This Script will Report Cloud Connect Tenant Statistics
         
 	.EXAMPLE
-	VCC-UsageReport.ps1 -Server VeeamEM.lan.local -HTTPS:$True -Port 9398 -Authentication <yourBase64>
+	VCC-UsageReport.ps1 -Server VeeamEM.lan.local -HTTPS:$True -Authentication <yourBase64>
 
 	.EXAMPLE
-	VCC-UsageReport.ps1 -Server VeeamEM.lan.local -HTTPS:$False -Port 9399 -Authentication <yourBase64>
+	VCC-UsageReport.ps1 -Server VeeamEM.lan.local -HTTPS:$False -Authentication <yourBase64>
 	
 	.Notes
 	NAME:  VCC-UsageReport.ps
 	LASTEDIT: 08/22/2016
-	VERSION: 1.0
+	VERSION: 1.2
 	KEYWORDS: Veeam, Cloud Connect
     BASED ON: http://mycloudrevolution.com/2016/08/16/prtg-veeam-cloud-connect-monitoring/
    
