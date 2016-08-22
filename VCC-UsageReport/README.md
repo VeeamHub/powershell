@@ -12,7 +12,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ## Project Notes
-**Author:** Markus Kraus
+**Author:** Markus Kraus (@vMarkus_K)
 
 **Function:** This Script will Report Cloud Connect Tenant Statistics
 
@@ -29,6 +29,9 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 * -Authentication
 	* What is your Base64 Authentication String
     * How to generate Base64 Authentication String: 
+
     [String] $User		= "DOM\User"
-    [String] $Password	= "Passw0rd!"	
+
+    [String] $Password	= "Passw0rd!"
+    	
     Write-Host "Basic String: " $([Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("$($User):$($Password)")))
