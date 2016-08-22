@@ -3,13 +3,13 @@
 	Veeam Cloud Connect Usage Report
   
 	.DESCRIPTION
-	This Scropt will Report Cloud Connect Tenant Statistics
+	This Script will Report Cloud Connect Tenant Statistics
         
 	.EXAMPLE
-	VCC-UsageReport.ps -Server VeeamEM.lan.local -HTTPS:$True -Port 9398 -Authentication Vk9QXHN2Yy12cm6tY2MwMTp2XltKNUNiS2dlIUp6dkQxbkdiZnky
+	VCC-UsageReport.ps1 -Server VeeamEM.lan.local -HTTPS:$True -Port 9398 -Authentication Vk9QXHN2Yy12cm6tY2MwMTp2XltKNUNiS2dlIUp6dkQxbkdiZnky
 
 	.EXAMPLE
-	VCC-UsageReport.ps -Server VeeamEM.lan.local -HTTPS:$False -Port 9399 -Authentication Vk9QXHN2Yy12cm6tY2MwMTp2XltKNUNiS2dlIUp6dkQxbkdiZnky
+	VCC-UsageReport.ps1 -Server VeeamEM.lan.local -HTTPS:$False -Port 9399 -Authentication Vk9QXHN2Yy12cm6tY2MwMTp2XltKNUNiS2dlIUp6dkQxbkdiZnky
 	
 	.Notes
 	NAME:  VCC-UsageReport.ps
@@ -105,16 +105,16 @@ for ( $i = 0; $i -lt $Hrefs.Count; $i++){
 [Int] $BackupQuota = (($BackupQuota) | Measure-Object -Sum).Sum
 # Customer DRaaS Quotas
 [Array]  $ReplicaMemoryUsageMb = $TenantsDetailsXML.CloudTenant.ComputeResources.CloudTenantComputeResource.ComputeResourceStats.MemoryUsageMb
-if ($ReplicaMemoryUsageMb -eq $null) {$ReplicaMemoryUsageMb = 0}
+if ($null -eq $ReplicaMemoryUsageMb) {$ReplicaMemoryUsageMb = 0}
 [Int] $ReplicaMemoryUsageMb = (($ReplicaMemoryUsageMb) | Measure-Object -Sum).Sum
 [Array]  $ReplicaCPUCount = $TenantsDetailsXML.CloudTenant.ComputeResources.CloudTenantComputeResource.ComputeResourceStats.CPUCount
-if ($ReplicaCPUCount -eq $null) {$ReplicaCPUCount = 0}
+if ($null -eq $ReplicaCPUCount) {$ReplicaCPUCount = 0}
 [Int] $ReplicaCPUCount = (($ReplicaCPUCount) | Measure-Object -Sum).Sum
 [Array]  $ReplicaStorageUsageGb = $TenantsDetailsXML.CloudTenant.ComputeResources.CloudTenantComputeResource.ComputeResourceStats.StorageResourceStats.StorageResourceStat.StorageUsageGb
-if ($ReplicaStorageUsageGb -eq $null) {$ReplicaStorageUsageGb = 0}
+if ($null -eq $ReplicaStorageUsageGb) {$ReplicaStorageUsageGb = 0}
 [Int] $ReplicaStorageUsageGb = (($ReplicaStorageUsageGb) | Measure-Object -Sum).Sum
 [Array]  $ReplicaStorageLimitGb = $TenantsDetailsXML.CloudTenant.ComputeResources.CloudTenantComputeResource.ComputeResourceStats.StorageResourceStats.StorageResourceStat.StorageLimitGb
-if ($ReplicaStorageLimitGb -eq $null) {$ReplicaStorageLimitGb = 0; $ReplicaStorageUsedPerc = 0}
+if ($null -eq $ReplicaStorageLimitGb) {$ReplicaStorageLimitGb = 0; $ReplicaStorageUsedPerc = 0}
 [Int] $ReplicaStorageLimitGb = (($ReplicaStorageLimitGb) | Measure-Object -Sum).Sum
 
 if ($ReplicaStorageLimitGb -gt 0) {
@@ -139,5 +139,5 @@ $VCCBillings += $VCCObject
 #endregion
 
 #region: Report Output
-$VCCBillings | ft * -Autosize
+$VCCBillings | Format-Table * -Autosize
 #endregion
