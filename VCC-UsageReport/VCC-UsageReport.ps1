@@ -6,10 +6,10 @@
 	This Script will Report Cloud Connect Tenant Statistics
         
 	.EXAMPLE
-	VCC-UsageReport.ps1 -Server VeeamEM.lan.local -HTTPS:$True -Port 9398 -Authentication Vk9QXHN2Yy12cm6tY2MwMTp2XltKNUNiS2dlIUp6dkQxbkdiZnky
+	VCC-UsageReport.ps1 -Server VeeamEM.lan.local -HTTPS:$True -Port 9398 -Authentication <yourBase64>
 
 	.EXAMPLE
-	VCC-UsageReport.ps1 -Server VeeamEM.lan.local -HTTPS:$False -Port 9399 -Authentication Vk9QXHN2Yy12cm6tY2MwMTp2XltKNUNiS2dlIUp6dkQxbkdiZnky
+	VCC-UsageReport.ps1 -Server VeeamEM.lan.local -HTTPS:$False -Port 9399 -Authentication <yourBase64>
 	
 	.Notes
 	NAME:  VCC-UsageReport.ps
@@ -25,14 +25,13 @@
  #>
 [cmdletbinding()]
 param(
-    [Parameter(Position=0, Mandatory=$false)]
-    	[String] $Server = "VeeamEM.lan.local",
-	[Parameter(Position=1, Mandatory=$false)]
-		[Boolean] $HTTPS = $True,
+    [Parameter(Position=0, Mandatory=$true)]
+    	[String] $Server,
+	[Parameter(Position=1, Mandatory=$true)]
+		[String] $Authentication,
 	[Parameter(Position=2, Mandatory=$false)]
-		[String] $Port = "9398",
-	[Parameter(Position=3, Mandatory=$false)]
-		[String] $Authentication = "Vk9QXHN2Yy12cm6tY2MwMTp2XltKNUNiS2dlIUp6dkQxbkdiZnky"
+		[Boolean] $HTTPS = $True
+
 
 )
 
@@ -52,7 +51,7 @@ add-type @"
 #endregion
 
 #region: Switch Http/s
-if ($HTTPS -eq $True) {$Proto = "https"} else {$Proto = "http"}
+if ($HTTPS -eq $True) {$Proto = "https"; $Port = "9398"} else {$Proto = "http"; $Port = "9399"}
 #endregion
 
 #region: POST - Authorization
