@@ -6,18 +6,18 @@
     This Script will Report Statistics about Session during a given windows (default: last 24 Hours) and Actual Repository usage.
         
     .EXAMPLE
-    B&R-SessionReport.ps1 -BRHost "veeam01.lan.local"
+    BR-SessionReport.ps1 -BRHost "veeam01.lan.local"
     .EXAMPLE
-    B&R-SessionReport.ps1 -BRHost "veeam01.lan.local" -reportMode Weekly
+    BR-SessionReport.ps1 -BRHost "veeam01.lan.local" -reportMode Weekly
 
     .EXAMPLE
-    B&R-SessionReport.ps1 -BRHost "veeam01.lan.local" -reportMode 12
+    BR-SessionReport.ps1 -BRHost "veeam01.lan.local" -reportMode 12
 
     .EXAMPLE
-    B&R-SessionReport.ps1 -BRHost "veeam01.lan.local" -reportMode Monthly -repoCritical 5 -repoWarn 10
+    BR-SessionReport.ps1 -BRHost "veeam01.lan.local" -reportMode Monthly -repoCritical 5 -repoWarn 10
 
     .Notes
-    NAME:  PRTG-VeeamBRStats.ps1
+    NAME:  BR-SessionReport.ps1
     LASTEDIT: 08/23/2016
     VERSION: 1.0
     KEYWORDS: Veeam, Sessions
