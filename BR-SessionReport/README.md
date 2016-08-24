@@ -18,7 +18,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 **Example:** 
 
-![Alternative text](.(Media/ReportExample.png)
+![Alternative text](./Media/ReportExample.png)
 
 **Requires:** Veeam Backup & Replication v9
 
