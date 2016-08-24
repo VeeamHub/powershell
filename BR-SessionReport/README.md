@@ -16,9 +16,19 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 **Function:** This Script will Report Statistics during a given windows (default: last 24 Hours) and Actual Repository usage.
 
+**Example:** 
+
+![Alternative text](.(Media/ReportExample.png)
+
 **Requires:** Veeam Backup & Replication v9
 
-**Usage:** B&R-SessionReport.ps1 -BRHost "veeam01.lan.local"
+**Usage:** 
+
+B&R-SessionReport.ps1 -BRHost "veeam01.lan.local"
+
+B&R-SessionReport.ps1 -BRHost "veeam01.lan.local" -reportMode 24
+
+B&R-SessionReport.ps1 -BRHost "veeam01.lan.local" -reportMode Monthly
 
 **Parameters:**
 
