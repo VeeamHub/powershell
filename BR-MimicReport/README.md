@@ -29,11 +29,23 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 **Parameters:**
 
 * -JobName
-	* Name of Job
+	* Name of Job. If empty, it will take the newest session for every Backup Job (-JobType)
+* -JobType
+	* Only Relevant when not supplying any JobName (Backup,BackupSync,Replica)
 * -Max
-	* Max session, by default 0 which means infinite number of sessions
+	* Only Relevent when supplying a JobName. Last <max> sessions. By default 0 which means infinite number of sessions
 * -File
     * Filename for html, by default generated with a timestamp/jobname
+* -RPOHours
+	* Specifies the RPO in hours. For one day specify (24), for two days specify (24*2), etc. Not specifying RPO, will disable the RPO header (Mimics more the default report)
+
 
 **Sample:**
+
+Mimicing:
+
 ![Mimic Report](./Media/mimic.png)
+
+RPO Report 
+
+![Mimic Report](./Media/mimicrpo.png)
