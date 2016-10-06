@@ -1,11 +1,15 @@
 ﻿param(
- [Parameter(Mandatory=$true)][string]$JobName=$null,
+ [string]$JobName=$null,
+ [string]$JobType="Backup",
  [int]$Max=0,
  $date=(get-date),
- [string]$File=("mr_{0,4:D4}{1,2:D2}{2,2:D2}-{3,2:D2}{4,2:D2}{5,2:D2}_{6}.html" -f $date.Year,$date.Month,$date.Day,$date.Hour,$date.Minute,$date.Second,($jobname -replace [regex]"[^a-zA-Z0-9]+","_"))
+ [string]$File=("mr_{0,4:D4}{1,2:D2}{2,2:D2}-{3,2:D2}{4,2:D2}{5,2:D2}_{6}.html" -f $date.Year,$date.Month,$date.Day,$date.Hour,$date.Minute,$date.Second,($jobname -replace [regex]"[^a-zA-Z0-9]+","_")),
+ $RPOHours=(24*365*100)
 )
 
-#uncomment for smaller names
+$defrpo = (24*365*100)
+
+#uncomment for smaller names or replace the param structure
 #$file = ("{0}.html" -f ($jobname -replace [regex]"[^a-zA-Z0-9]+","_"))
 
 Add-PSSnapin VeeamPSSnapin
@@ -30,11 +34,14 @@ function write-reportmimicheadertable {
 }
 
 function write-reportmimicfootertable {
- param([System.Text.StringBuilder]$stringbuilder)
+ param([System.Text.StringBuilder]$stringbuilder,$server)
  [void]$stringbuilder.Append(@"
 			<tr>
 				<td style="font-size:12px;color:#626365;padding: 2px 3px 2px 3px;vertical-align: top;font-family: Tahoma;">
-                  Generated with Report Mimic</td>
+"@)
+ [void]$stringbuilder.Append($server)
+ [void]$stringbuilder.Append(@"
+                   <br>Generated with Report Mimic</td>
 			</tr>
 		</table>
 "@)
@@ -54,14 +61,38 @@ function write-reportmimicrecordheader {
 
 
  [void]$stringbuilder.Append(@"
- <tr><td style="border:none; padding: 0px;font-family: Tahoma;font-size: 12px;"><table cellspacing="0" cellpadding="0" width="100%" border="0" style="border-collapse: collapse;"><tr style="height:70px"><td style="width: 80%;border: none;background-color: 
+ <tr><td style="border:none; padding: 0px;font-family: Tahoma;font-size: 12px;"><table cellspacing="0" cellpadding="0" width="100%" border="0" style="border-collapse: collapse;">
+"@)
+
+if (((get-member -InputObject $calcs -Name "RPOColor") -ne $null) -and $calcs.RPOColor -ne $null) {
+     [void]$stringbuilder.Append(@" 
+            <tr style="height:16px"><td style="width: 80%;border: none;background-color: 
+"@)
+ [void]$stringbuilder.Append($calcs.RPOColor)
+      [void]$stringbuilder.Append(@" 
+            ;"><td style="width: 20%;border: none;background-color: 
+"@)
+ [void]$stringbuilder.Append($calcs.RPOColor)
+     [void]$stringbuilder.Append(@" 
+            ;color: White;font-family: Tahoma;font-size: 12px;padding: 0 15px 0px 15px;">
+"@)
+ [void]$stringbuilder.Append($calcs.RPOText)
+     [void]$stringbuilder.Append(@"
+</td></tr>
+"@)
+} else {
+
+}
+
+ [void]$stringbuilder.Append(@" 
+ <tr style="height:70px"><td style="width: 80%;border: none;background-color: 
 "@)
  [void]$stringbuilder.Append($calcs.Color)
  [void]$stringbuilder.Append(@"
 ;color: White;font-weight: bold;font-size: 16px;height: 70px;vertical-align: bottom;padding: 0 0 17px 15px;font-family: Tahoma;">
 "@)
  [void]$stringbuilder.Append($calcs.Jobtype)
- [void]$stringbuilder.Append(" Job : ")
+ [void]$stringbuilder.Append(" job: ")
  [void]$stringbuilder.Append($calcs.Jobname)
 
  [void]$stringbuilder.Append(@"
@@ -83,7 +114,7 @@ function write-reportmimicrecordheader {
  [void]$stringbuilder.Append(" of ")
  [void]$stringbuilder.Append($calcs.TotalObjects)
  [void]$stringbuilder.Append(@"
-</div></td></tr><tr><td colspan="2" style="border: none; padding: 0px;font-family: Tahoma;font-size: 12px;"><table width="100%" cellspacing="0" cellpadding="0" class="inner" border="0" style="margin: 0px;border-collapse: collapse;"><tr style="height: 17px;">
+ VMs processed</div></td></tr><tr><td colspan="2" style="border: none; padding: 0px;font-family: Tahoma;font-size: 12px;"><table width="100%" cellspacing="0" cellpadding="0" class="inner" border="0" style="margin: 0px;border-collapse: collapse;"><tr style="height: 17px;">
 <td colspan="9" class="sessionDetails" style="border-style: solid; border-color:#a7a9ac; border-width: 1px 1px 0 1px;height: 35px;background-color: #f3f4f4;font-size: 16px;vertical-align: middle;padding: 5px 0 0 15px;color: #626365; font-family: Tahoma;"><span>
 "@)
  [void]$stringbuilder.Append($calcs.LongStartDateTime)
@@ -317,17 +348,33 @@ function write-reportmimicrecordfooter {
 
 
 function write-reportmimicrecord {
- param([System.Text.StringBuilder]$stringbuilder,$job,$session)
+ param([System.Text.StringBuilder]$stringbuilder,$job,$session,$rpo,$rpodate,$rpohours)
 
- $calcs = calculate-job -session $session -job $job
+ $calcs = calculate-job -session $session -job $job -rpo $rpo -rpodate $rpodate  -rpohours $rpohours
 
- write-reportmimicrecordheader -stringbuilder $stringbuilder -job $job -session $session -calcs $calcs
+ write-reportmimicrecordheader -stringbuilder $stringbuilder -job $job -session $session -calcs $calcs 
  foreach ($vm in $calcs.vms) {
     write-reportmimicrecordvm -stringbuilder $stringbuilder -vm $vm
  }
 
  write-reportmimicrecordfooter -stringbuilder $stringbuilder
 }
+
+function write-reportmimicrecordempty {
+ param([System.Text.StringBuilder]$stringbuilder,$job)
+ [void]$stringbuilder.Append(@"
+ <tr><td style="border:none; padding: 0px;font-family: Tahoma;font-size: 12px;"><table cellspacing="0" cellpadding="0" width="100%" border="0" style="border-collapse: collapse;">
+"@)
+
+ [void]$stringbuilder.Append(@" 
+            <tr style="height:16px"><td colspan=2 style="width: 100%;border: none;background-color:#fb9895 ;color: White;font-family: Tahoma;font-size: 18px;padding: 17px 0px 17px 15px;">Could not find any session for: 
+"@)
+ [void]$stringbuilder.Append(("{0}<br>({1})" -f $job.Name,$job.description))
+     [void]$stringbuilder.Append(@"
+</td></tr><tr><td> </td></tr>
+"@)
+}
+
 
 
 
@@ -344,7 +391,7 @@ function get-humanreadable {
   $i++
  }
 
- return ("{0:N1} {1}B" -f $num,$trailing[$i])
+ return ("{0:f1} {1}B" -f $num,$trailing[$i])
 }
 
 function get-rpmcolor {
@@ -362,6 +409,59 @@ function get-rpmcolor {
  return $colors[("{0}red" -f $prefix)]
 }
 
+function get-diffstring {
+    param([System.TimeSpan]$diff)
+    
+    if ($diff -ne $null) {
+        $days = ""
+        if($diff.days -gt 0) {
+         $days = ("{0}." -f $diff.Days)
+        }
+
+        return ("{3}{0}:{1,2:D2}:{2,2:D2}" -f $diff.Hours,$diff.Minutes,$diff.Seconds,$days);
+    } else {
+        Write-Error "Null diff"
+    }
+}
+
+function get-timestring {
+    param([System.DateTime]$time,$prev=$null)
+    
+    if ($time -ne $null) {
+        $days = ""
+
+        if(($prev -ne $null) -and ($time -gt $prev)) {
+         $diff = ($time - $prev)
+         $daysnum = $diff.Days
+
+         $nextdaytest = $time.AddDays(-$daysnum)
+         if ($nextdaytest.DayOfYear -ne $prev.DayOfYear) {
+            $daysnum += 1
+         }
+
+         if ($daysnum -gt 0) {
+            $days = (" (+{0}) " -f $daysnum)
+         }
+        }
+
+        return ("{0,2:D2}:{1,2:D2}:{2,2:D2}{3}" -f $time.Hour,$time.Minute,$time.Second,$days);
+    } else {
+        Write-Error "Null diff"
+    }
+}
+
+function translate-status {
+     param($text) 
+ 
+
+     if ($text -ieq "success") {
+       return "Success"
+     } elseif ($text -ieq "warning") {
+       return "Warning"
+     } 
+     return "Error"
+}
+
 function calculate-vms {
     param($session)
     $tasks = $session.GetTaskSessions()
@@ -377,14 +477,14 @@ function calculate-vms {
 
 
          $vm = New-Object -TypeName psobject -Property @{"Name"=$task.Name;
-            "Status"=$text;
+            "Status"=(translate-status -text $text);
             "Color"=(get-rpmcolor -text $text -isbg $false);
-            "StartTime"=$task.Progress.StartTime.ToLongTimeString();
-            "EndTime"=$task.Progress.StopTime.ToLongTimeString();
+            "StartTime"=(get-timestring -time $task.Progress.StartTime);
+            "EndTime"=(get-timestring -time $task.Progress.StopTime -prev $task.Progress.StartTime);
             "Size"=(get-humanreadable -num $task.Progress.ProcessedSize);
             "Read"=(get-humanreadable -num $task.Progress.ReadSize);
             "Transferred"=(get-humanreadable -num $task.Progress.TransferedSize);
-            "Duration"=("{0,2:D2}:{1,2:D2}:{2,2:D2}" -f [long]($diff.TotalHours),$diff.Minutes,$diff.Seconds);
+            "Duration"=(get-diffstring -diff $task.Progress.Duration);
             "Details"=$task.GetDetails()
 }
 
@@ -402,18 +502,45 @@ function calculate-vms {
 
     
 }
+function get-veeamserver {
+    $versionstring = "Unknown Version"
+
+    $pssversion = (Get-PSSnapin VeeamPSSnapin -ErrorAction SilentlyContinue)
+    if ($pssversion -ne $null) {
+        $versionstring = ("{0}.{1}" -f $pssversion.Version.Major,$pssversion.Version.Minor)
+    }
+
+    
+
+   
+    $corePath = Get-ItemProperty -Path "HKLM:\Software\Veeam\Veeam Backup and Replication\" -Name "CorePath" -ErrorAction SilentlyContinue
+    if ($corePath -ne $null) {
+        $depDLLPath = Join-Path -Path $corePath.CorePath -ChildPath "Packages\VeeamDeploymentDll.dll" -Resolve -ErrorAction SilentlyContinue
+        if ($depDLLPath -ne $null -and (Test-Path -Path $depDLLPath)) {
+            $file = Get-Item -Path $depDLLPath -ErrorAction SilentlyContinue
+            if ($file -ne $null) {
+                $versionstring = $file.VersionInfo.ProductVersion
+            }
+        }
+    }
+
+    $servsession = Get-VBRServerSession
+    $str = ("Server {0} : Veeam Backup & Replication {1}" -f $servsession.server,$versionstring)
+
+    return $str
+}
 function calculate-job {
-     param($session,$job)
+     param($session,$job,$rpo,$rpodate,$rpohours)
 
      
      
-     $diff= $session.Progress.Duration;
+
      
     
      $obj = New-Object -TypeName psobject -Property @{Jobname=$session.Name;
         Jobtype=$session.JobType;
         Jobdescription=$job.Description;
-        Status=$session.Result;
+        Status=(translate-status -text $session.Result);
         Color=(get-rpmcolor -text $session.Result);
 
         "CreationTime"=$session.CreationTime;
@@ -424,14 +551,32 @@ function calculate-job {
         "TotalObjects"=$session.Progress.TotalObjects;
         "TotalSize"=(get-humanreadable -num $session.Progress.TotalSize);
         "BackupSize"=(get-humanreadable -num $session.BackupStats.BackupSize);
-        "LongCreationTime"=$session.CreationTime.ToLongTimeString();
-        "LongEndTime"=$session.EndTime.ToLongTimeString();
+        "LongCreationTime"=(get-timestring -time $session.CreationTime);
+        "LongEndTime"=(get-timestring -time $session.EndTime -prev $session.CreationTime);
         "DataRead"=(get-humanreadable -num $session.Progress.ReadSize);
-        "Dedupe"=("{0:N1}x" -f $session.BackupStats.GetDedupeX())
-        "Duration"=("{0,2:D2}:{1,2:D2}:{2,2:D2}" -f [long]($diff.TotalHours),$diff.Minutes,$diff.Seconds);
+        "Dedupe"=("{0:N1}x" -f $session.BackupStats.GetDedupeX());
+        "Duration"=(get-diffstring -diff $session.Progress.Duration);
         "TransferSize"=(get-humanreadable -num $Session.Progress.TransferedSize);
         "Compression"=("{0:N1}x" -f $session.BackupStats.GetCompressX());
-        "Details"=$session.GetDetails()
+        "Details"=$session.GetDetails();
+        
+    }
+
+    if($rpo -ne $null) {
+        $rpocolor = "#fb9895"
+        $rpodiff = ($rpodate - $session.CreationTime)
+        $rpodiffhours = ("{0,2:D2}h{1,2:D2}" -f [int]([Math]::Floor($rpodiff.TotalHours)),$rpodiff.minutes)
+
+        $rpotext = ""
+        if ($rpo -lt $session.CreationTime) {
+            $rpocolor = "#00B050"
+            $rpotext = ("Session started {0} ago (Valid RPO {1}h) " -f $rpodiffhours,$rpohours)
+        } else {
+            $rpotext = ("Session started {0} ago (Breaks RPO {1}h) " -f $rpodiffhours,$rpohours)
+        }
+        $obj | Add-Member -Name "RPOColor" -Value $rpocolor -MemberType NoteProperty 
+        $obj | Add-Member -Name "RPOText" -Value $rpotext -MemberType NoteProperty 
+
     }
 
     #bug where GetTaskSessions() modifies TotalSize (doubles the number)
@@ -443,40 +588,53 @@ function calculate-job {
     $obj | Add-Member -Name Success -Value $calcs.success -MemberType NoteProperty
     $obj | Add-Member -Name Vms -Value $calcs.vms -MemberType NoteProperty
 
+
+
     return $obj
 }
 
+<#
+            #for manual testing, you can run the following lines. You can then use $job & $session (if there is a session to run the functions above)
+            $job = get-vbrjob -name "Backup Job 1"
+            $sessions = Get-VBRBackupSession -Name ("{0}*" -f $Job.Name) | ? { $_.jobname -eq $Job.Name } 
+            $orderdedsess = $sessions | Sort-Object -Property CreationTimeUTC -Descending
+            $session = $orderdedsess[0]
+#>
 
+$wrotesessions = $false;
+$sb = New-Object -TypeName "System.Text.StringBuilder";
+write-reportmimicheader $sb
+write-reportmimicheadertable $sb
 
-if ($JobName -ne $null) {
+if ($JobName -ne $null -and $JobName -ne "") {
     $Jobs = @(Get-VBRJob -Name $JobName)
     if ($Jobs.Count -gt 0) {
         $Job = $Jobs[0];
         $jt = $job.JobType;
 
         if ($jt -eq "Backup" -or $jt -eq "Replication" -or $jt -eq "BackupSync") {
-            $sb = New-Object -TypeName "System.Text.StringBuilder";
-            write-reportmimicheader $sb
-            write-reportmimicheadertable $sb
+            
 
             $sessions = Get-VBRBackupSession -Name ("{0}*" -f $Job.Name) | ? { $_.jobname -eq $Job.Name } 
             $orderdedsess = $sessions | Sort-Object -Property CreationTimeUTC -Descending
-            #$session = $orderdedsess[0]
+
 
             if ($Max -gt 0 -and $Max -lt $orderdedsess.Count) {
                 $orderdedsess = $orderdedsess | select -First $Max
             }
 
+            
+            $rpo = $null
+            if ($RPOHours -ne $defrpo) {
+                $rpo = $date.AddHours(-$RPOHours)
+            }
+
             foreach($sess in $orderdedsess) {
-                #write-host ("start {0}" -f ([long]($sess.Progress.TotalSize)))
-                write-reportmimicrecord -stringbuilder $sb -job $Job -session $sess
-                #write-host ("stop {0}" -f ([long]($sess.Progress.TotalSize)))
+                write-reportmimicrecord -stringbuilder $sb -job $Job -session $sess -rpo $rpo -rpodate $date -rpohours $RPOHours
                 
             }
-            write-reportmimicfootertable $sb
-            write-reportmimicfooter $sb
+            $wrotesessions = $true;
 
-            $sb.ToString() | Out-File -FilePath $File
         } else {
           Write-Error "Job can only be backup, backup copy or replication job. Cannot be $jt"  
         }
@@ -484,6 +642,41 @@ if ($JobName -ne $null) {
        Write-Error "Can not find Job with name $JobName"
     }
 } else {
-  Write-Error "JobName is null"
+  if ($jobtype -ieq "Backup" -or $jobtype -ieq "Replication" -or $jobtype -ieq "BackupSync") {
+      $Jobs = @(Get-VBRJob | ? { $_.JobType -ieq $jobtype }) | Sort-Object -Property Name
+      if ($Jobs.Count -ne 0) {
+            $wrotesessions = $true;
+            $allsessions = Get-VBRBackupSession | ? { $_.jobtype -ieq $JobType } 
+            $allorderdedsess = $allsessions | Sort-Object -Property CreationTimeUTC -Descending  
+ 
+            $rpo = $null
+            if ($RPOHours -ne $defrpo) {
+                $rpo = $date.AddHours(-$RPOHours)
+            }
+            
+            foreach ($Job in $Jobs) {
+                $lastsession = $allorderdedsess | ? { $_.jobname -eq $Job.Name } | select -First 1
+                if ($lastsession -ne $null) {
+                   write-reportmimicrecord -stringbuilder $sb -job $Job -session $lastsession -rpo $rpo  -rpodate $date  -rpohours $RPOHours
+                } else {
+                   write-reportmimicrecordempty -stringbuilder $sb  -job $Job
+                }
+            }      
+      } else {
+       Write-Error "Can not find Jobs with type $jobtype"
+      }
+  } else {
+        Write-Error "Job can only be backup (Backup), backup copy (BackupSync) or replication job (Replica). Cannot be $jt"  
+  }
 }
 
+if ($wrotesessions) {
+    write-reportmimicfootertable $sb -server (get-veeamserver)
+    write-reportmimicfooter $sb
+
+    #If you want to send the html as an email, you can use $content = $sb.ToString() to put the content in a variable. You should be able to use Send-MailMessage -BodyAsHtml -Body $content to actually send the message
+    $sb.ToString() | Out-File -FilePath $File
+} else {
+    "<html><head><title>Error!</title></head><body><span style='font-size:40px;color:red;'>Something went wrong<br> Report has not been made</span><br>Error var<br><pre>($error)</pre></body>"  | Out-File -FilePath $File
+    Write-Error "Did not write anything"
+}
