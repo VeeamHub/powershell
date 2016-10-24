@@ -399,13 +399,13 @@ function get-rpmcolor {
  
  $prefix = "text"
  if ($isbg) { $prefix = "" }
- $colors = @{green="#00B050";textgreen="#00B050";orange="#E0A251";textorange="#E0A251";red="#fb9895";textred="#ff0000"}
-
+ $colors = @{green="#00B050";textgreen="#00B050";orange="#ffd96c";textorange="#E0A251";red="#fb9895";textred="#ff0000"}
  if ($text -ieq "success") {
    return $colors[("{0}green" -f $prefix)]
- } elseif ($text -ieq "warning") {
+ } elseif ($text -ieq "warning" -or $text -ieq "none" -or $text -ieq "pending") {
    return $colors[("{0}orange" -f $prefix)]
  } 
+ 
  return $colors[("{0}red" -f $prefix)]
 }
 
@@ -456,9 +456,11 @@ function translate-status {
 
      if ($text -ieq "success") {
        return "Success"
-     } elseif ($text -ieq "warning") {
+     } elseif ($text -ieq "warning" -or $text -ieq "none") {
        return "Warning"
-     } 
+     } elseif ($text -ieq "pending") {
+       return "Pending"
+     }
      return "Error"
 }
 
@@ -470,7 +472,8 @@ function calculate-vms {
     $failed = 0;
     $warning = 0;
     $allvms = @()
-
+    $glerr = "ERRSTR";
+	
     foreach($task in $tasks) {
          $text = $task.Status;
          $diff= $task.Progress.Duration;
@@ -490,16 +493,16 @@ function calculate-vms {
 
          if ($text -ieq "success") {
            $success = $success +1 
-         } elseif ($text -ieq "warning") {
+         } elseif ($text -ieq "warning" -or $text -ieq "pending" -or $text -ieq "none") {
            $warning = $warning +1
          } else {
            
            $failed = $failed +1
          }
         $allvms += $vm
+        $glerr += $messages
     }
-    return New-Object -TypeName psobject -Property @{vms=$allvms;failed=$failed;success=$success;warning=$warning}
-
+    return New-Object -TypeName psobject -Property @{vms=$allvms;failed=$failed;success=$success;warning=$warning;glerr=$glerr}
     
 }
 function get-veeamserver {
@@ -589,6 +592,14 @@ function calculate-job {
     $obj | Add-Member -Name Vms -Value $calcs.vms -MemberType NoteProperty
 
 
+    if ($session.Result -eq "None" -and $session.JobType -eq "BackupSync") {
+        if($lastsession.State -eq "Idle" -and $calcs.failed -eq 0 -and $calcs.warning -eq 0 -and $calcs.glerr -eq "ERRSTR" -and $obj.Details -eq "" ) {
+            if ($session.Progress.Percents -eq 100) {
+                $obj.Status=(translate-status -text "Success");
+                $obj.Color=(get-rpmcolor -text "Success");
+            } 
+        } 
+    }
 
     return $obj
 }
