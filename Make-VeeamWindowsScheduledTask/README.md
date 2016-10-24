@@ -44,7 +44,7 @@ if ((get-date).DayOfWeek -eq [System.DayOfWeek]::Friday -and ($week%2) -eq 1) {
 
 **Example:**
 
-![Script working](./Media/screen.png)
+![Script working](./Media/Screen.png)
 
 **Requires:** Veeam Backup & Replication v9
 
