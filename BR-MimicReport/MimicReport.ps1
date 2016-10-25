@@ -593,7 +593,7 @@ function calculate-job {
 
 
     if ($session.Result -eq "None" -and $session.JobType -eq "BackupSync") {
-        if($lastsession.State -eq "Idle" -and $calcs.failed -eq 0 -and $calcs.warning -eq 0 -and $calcs.glerr -eq "ERRSTR" -and $obj.Details -eq ""  -and $session.EndTime -gt $session.CreationTime ) {
+        if($session.State -eq "Idle" -and $calcs.failed -eq 0 -and $calcs.warning -eq 0 -and $calcs.glerr -eq "ERRSTR" -and $obj.Details -eq ""  -and $session.EndTime -gt $session.CreationTime ) {
             if ($session.Progress.Percents -eq 100) {
                 $obj.Status=(translate-status -text "Success");
                 $obj.Color=(get-rpmcolor -text "Success");
