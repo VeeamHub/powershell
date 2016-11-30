@@ -8,7 +8,7 @@ function Dump-VBRObject {
         
         [void]$sb.AppendLine(("## Dump of '{0}'" -f $header))
     }
-    if ($level -gt 5) {
+    if ($level -gt 6) {
         [void]$issue.AppendLine("Detected to deep level with $prefix")
         return
 
@@ -92,12 +92,12 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 **Result:** Is actually this file
 
-## Actual Dump
+# Actual Dump
 Updated on {0}
 
 "@ -f (get-date -UFormat "+%y/%m/%d - %H:%M:%S")))
 
-
+[void]$sb.AppendLine("# Job Related")
 
 $job = @(Get-VBRJob | where { $_.JobType -eq "Backup" })[0]
 
@@ -121,8 +121,23 @@ $JobObject = @(Get-VBRJobObject -job $Job)[0]
 $VBRJobObjectVssOptions = Get-VBRJobObjectVssOptions -ObjectInJob $JobObject 
 Dump-VBRObject -object $VBRJobObjectVssOptions -header '$VBRJobObjectVssOptions = Get-VBRJobObjectVssOptions -ObjectInJob $JobObject ' -prefix '$VBRJobObjectVssOptions' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
 
+
+
+[void]$sb.AppendLine("# Backup Related")
+
 $VBRBackup = @(Get-VBRBackup)[0]
 Dump-VBRObject -object $VBRBackup -header '$VBRBackup = @(Get-VBRBackup)[0]' -prefix '$VBRBackup' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
+
+$VBRBackupStorage = @($VBRBackup.GetAllStorages())[0]
+Dump-VBRObject -object $VBRBackupStorage -header '$VBRBackupStorage = @($VBRBackup.GetAllStorages())[0]' -prefix '$VBRBackupStorage' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
+
+$VBRBackupOib = @($VBRBackup.GetOibs())[0]
+Dump-VBRObject -object $VBRBackupOib -header '$VBRBackupOib = @($VBRBackup.GetOibs())[0]' -prefix '$VBRBackupOib' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
+
+
+$VBRBackupPoint = @($VBRBackup.GetPoints())[0]
+Dump-VBRObject -object $VBRBackupPoint -header '$VBRBackupPoint = @($VBRBackup.GetPoints())[0]' -prefix '$VBRBackupPoint' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
+
 
 $sb.ToString() | out-file -FilePath $dumpfile
 write-host $issue.ToString()
