@@ -43,7 +43,7 @@ function Dump-VBRObject {
 
                 $memreal = $($object."$member")
                 if($memreal) {
-                    [void]$sb.AppendLine(("{0}* {1}.{2} [{3}]" -f $ident,$prefix,$member,$t ))
+                    [void]$sb.AppendLine(("{0}* {1}.{2} \[{3}\]" -f $ident,$prefix,$member,$t ))
                     if($emitval) { [void]$sb.AppendLine(("{0}  * Live Value : {1}" -f $ident,$memreal)) }
 
                     if ($member -notin $blacklist -and $t -notin $blacklisttype) {
@@ -52,8 +52,8 @@ function Dump-VBRObject {
                     
                 } else {
          
-                    [void]$sb.AppendLine(("{0}* {1}.{2} [{3}] (`$null)" -f $ident,$prefix,$member,$t))
-                    if($emitval) { [void]$sb.AppendLine(("{0}  * Live Value : `$null" -f $ident)) }
+                    [void]$sb.AppendLine(("{0}* {1}.{2} \[{3}\] (\`$null)" -f $ident,$prefix,$member,$t))
+                    if($emitval) { [void]$sb.AppendLine(("{0}  * Live Value : `\$null" -f $ident)) }
                 }
             
               
@@ -109,20 +109,20 @@ $blacklist = @("Date","Length","Equals","GetHashCode","GetTypeCode","GetType","T
 $blacklisttype = @("System.String","System.String[]","System.TimeSpan","System.Date","System.DateTime","System.Xml.XmlElement")
 
 $VBRJobOptions  = Get-VBRJobOptions -job $job
-Dump-VBRObject -object $VBRJobOptions  -header '$VBRJobOptions  = Get-VBRJobOptions -job $job' -prefix ' $VBRJobOptions' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
+Dump-VBRObject -object $VBRJobOptions  -header '\$VBRJobOptions  = Get-VBRJobOptions -job \$job' -prefix ' \$VBRJobOptions' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
 
 $VBRJobScheduleOptions = Get-VBRJobScheduleOptions -job $job
-Dump-VBRObject -object $VBRJobScheduleOptions -header '$VBRJobScheduleOptions = Get-VBRJobScheduleOptions -job $job' -prefix '$VBRJobScheduleOptions' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
+Dump-VBRObject -object $VBRJobScheduleOptions -header '\$VBRJobScheduleOptions = Get-VBRJobScheduleOptions -job \$job' -prefix '\$VBRJobScheduleOptions' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
 
 $VBRJobVSSOptions = Get-VBRJobVSSOptions -job $job
-Dump-VBRObject -object $VBRJobVSSOptions -header '$VBRJobVSSOptions = Get-VBRJobVSSOptions -job $job' -prefix '$VBRJobVSSOptions' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
+Dump-VBRObject -object $VBRJobVSSOptions -header '\$VBRJobVSSOptions = Get-VBRJobVSSOptions -job \$job' -prefix '\$VBRJobVSSOptions' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
 
 $JobObject = @(Get-VBRJobObject -job $Job)[0]
 $VBRJobObjectVssOptions = Get-VBRJobObjectVssOptions -ObjectInJob $JobObject 
-Dump-VBRObject -object $VBRJobObjectVssOptions -header '$VBRJobObjectVssOptions = Get-VBRJobObjectVssOptions -ObjectInJob $JobObject ' -prefix '$VBRJobObjectVssOptions' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
+Dump-VBRObject -object $VBRJobObjectVssOptions -header '\$VBRJobObjectVssOptions = Get-VBRJobObjectVssOptions -ObjectInJob \$JobObject ' -prefix '\$VBRJobObjectVssOptions' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
 
 $VBRBackup = @(Get-VBRBackup)[0]
-Dump-VBRObject -object $VBRBackup -header '$VBRBackup = @(Get-VBRBackup)[0]' -prefix '$VBRBackup' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
+Dump-VBRObject -object $VBRBackup -header '\$VBRBackup = @(Get-VBRBackup)[0]' -prefix '\$VBRBackup' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
 
 $sb.ToString() | out-file -FilePath $dumpfile
 write-host $issue.ToString()
