@@ -1,12 +1,24 @@
 ﻿asnp veeampssnapin
 
-$dumpfile = ("{0}\README.md" -f [Environment]::GetFolderPath("Desktop"))
+#alter function if you want different location
+function mdfile {
+    param($name)
+    return ("{0}\{1}.md" -f [Environment]::GetFolderPath("Desktop"),$name)
+}
+$dumpfile = (mdfile -name "README")
 
 function Dump-VBRObject {
-    param($object,[int]$level=0,[string]$header="",$prefix="$opt.",[System.Text.StringBuilder]$sb,[System.Text.StringBuilder]$issue,[String[]]$blacklist,[String[]]$blacklisttype,$func=$false,$emitval=$false)
+    param($object,[int]$level=0,[string]$header="",[String[]]$objectcode=@(),$prefix="$opt.",[System.Text.StringBuilder]$sb,[System.Text.StringBuilder]$issue,[String[]]$blacklist,[String[]]$blacklisttype,$func=$false,$emitval=$false)
     if ($level -eq 0) {
         
-        [void]$sb.AppendLine(("## Dump of '{0}'" -f $header))
+        [void]$sb.AppendLine(("# {0}" -f $header))
+        if ($objectcode.Length -gt 0) {
+            [void]$sb.AppendLine(('``` powershell'))
+            foreach($c in $objectcode) {
+                [void]$sb.AppendLine(("{0}" -f $c))
+            }
+            [void]$sb.AppendLine(('```'))
+        }
     }
     if ($level -gt 6) {
         [void]$issue.AppendLine("Detected to deep level with $prefix")
@@ -23,7 +35,7 @@ function Dump-VBRObject {
             $funcs = $object | gm -MemberType Method
             foreach ($f in $funcs) {
                 if ($f.Name -notin $blacklist -and -not ($f.Name -match "^To")) {
-                   [void]$sb.AppendLine(("{0}* Funccall : {1}.{2}()  Def : {3}" -f $ident,$prefix,$f.Name,$f.Definition )) 
+                   [void]$sb.AppendLine(("* {1}.{2}()  Def [{3}]" -f $ident,$prefix,$f.Name,$f.Definition )) 
                 }
             }
         }
@@ -43,8 +55,8 @@ function Dump-VBRObject {
 
                 $memreal = $($object."$member")
                 if($memreal) {
-                    [void]$sb.AppendLine(("{0}* {1}.{2} \[{3}\]" -f $ident,$prefix,$member,$t ))
-                    if($emitval) { [void]$sb.AppendLine(("{0}  * Live Value : {1}" -f $ident,$memreal)) }
+                    [void]$sb.AppendLine(("* {1}.{2} \[{3}\]" -f $ident,$prefix,$member,$t ))
+                    if($emitval) { [void]$sb.AppendLine(("  * Live Value : {1}" -f $ident,$memreal)) }
 
                     if ($member -notin $blacklist -and $t -notin $blacklisttype) {
                          Dump-VBRObject -object $memreal -level $($level+1) -prefix ("{0}.{1}" -f $prefix,$member) -sb $sb -issue $issue -blacklist $blacklist  -func $func -emitval $emitval -blacklisttype $blacklisttype
@@ -52,8 +64,8 @@ function Dump-VBRObject {
                     
                 } else {
          
-                    [void]$sb.AppendLine(("{0}* {1}.{2} \[{3}\] \(`$null\)" -f $ident,$prefix,$member,$t))
-                    if($emitval) { [void]$sb.AppendLine(("{0}  * Live Value : `$null" -f $ident)) }
+                    [void]$sb.AppendLine(("* {1}.{2} \[{3}\] \(`$null\)" -f $ident,$prefix,$member,$t))
+                    if($emitval) { [void]$sb.AppendLine(("  * Live Value : `$null" -f $ident)) }
                 }
             
               
@@ -92,52 +104,86 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 **Result:** Is actually this file
 
+## QA
+
+**What is this strange syntax @(..)[0]**
+
+The code inside is executed and expected to return an array. For analysis, we only need one object thus we force the return value to be an array and take the first object.
+
+This does mean that you need to have actually one Job defined and have one Backup etc..
+
 # Actual Dump
 Updated on {0}
 
+
+
 "@ -f (get-date -UFormat "+%y/%m/%d - %H:%M:%S")))
 
-[void]$sb.AppendLine("# Job Related")
-
-$job = @(Get-VBRJob | where { $_.JobType -eq "Backup" })[0]
 
 
 
 $issue = New-Object -TypeName "System.Text.StringBuilder";
-
 $blacklist = @("Date","Length","Equals","GetHashCode","GetTypeCode","GetType","ToString","CompareTo","value__","HasFlag")
 $blacklisttype = @("System.String","System.String[]","System.TimeSpan","System.Date","System.DateTime","System.Xml.XmlElement")
 
-$VBRJobOptions  = Get-VBRJobOptions -job $job
-Dump-VBRObject -object $VBRJobOptions  -header '$VBRJobOptions  = Get-VBRJobOptions -job $job' -prefix ' $VBRJobOptions' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
-
-$VBRJobScheduleOptions = Get-VBRJobScheduleOptions -job $job
-Dump-VBRObject -object $VBRJobScheduleOptions -header '$VBRJobScheduleOptions = Get-VBRJobScheduleOptions -job $job' -prefix '$VBRJobScheduleOptions' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
-
-$VBRJobVSSOptions = Get-VBRJobVSSOptions -job $job
-Dump-VBRObject -object $VBRJobVSSOptions -header '$VBRJobVSSOptions = Get-VBRJobVSSOptions -job $job' -prefix '$VBRJobVSSOptions' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
-
-$JobObject = @(Get-VBRJobObject -job $Job)[0]
-$VBRJobObjectVssOptions = Get-VBRJobObjectVssOptions -ObjectInJob $JobObject 
-Dump-VBRObject -object $VBRJobObjectVssOptions -header '$VBRJobObjectVssOptions = Get-VBRJobObjectVssOptions -ObjectInJob $JobObject ' -prefix '$VBRJobObjectVssOptions' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
 
 
+$dumps = @()
+$dumps += New-Object -TypeName psobject -ArgumentList @{
+    Prefix="VBRJobOptions";
+    ObjectCode=@('$job = @(Get-VBRJob | where { $_.JobType -eq "Backup" })[0]','$VBRJobOptions  = Get-VBRJobOptions -job $job');
+}
+$dumps += New-Object -TypeName psobject -ArgumentList @{
+    Prefix="VBRJobScheduleOptions";
+    ObjectCode=@('$job = @(Get-VBRJob | where { $_.JobType -eq "Backup" })[0]','$VBRJobScheduleOptions = Get-VBRJobScheduleOptions -job $job');
+}
+$dumps += New-Object -TypeName psobject -ArgumentList @{
+    Prefix="VBRJobVSSOptions";
+    ObjectCode=@('$job = @(Get-VBRJob | where { $_.JobType -eq "Backup" })[0]','$VBRJobVSSOptions = Get-VBRJobVSSOptions -job $job');
+}
+$dumps += New-Object -TypeName psobject -ArgumentList @{
+    Prefix="VBRJobObjectVssOptions";
+    ObjectCode=@('$job = @(Get-VBRJob | where { $_.JobType -eq "Backup" })[0]','$JobObject = @(Get-VBRJobObject -job $Job)[0]','$VBRJobObjectVssOptions = Get-VBRJobObjectVssOptions -ObjectInJob $JobObject');
+}
 
-[void]$sb.AppendLine("# Backup Related")
+$dumps += New-Object -TypeName psobject -ArgumentList @{
+    Prefix="VBRBackup";
+    ObjectCode=@('$VBRBackup = @(Get-VBRBackup)[0]');
+}
 
-$VBRBackup = @(Get-VBRBackup)[0]
-Dump-VBRObject -object $VBRBackup -header '$VBRBackup = @(Get-VBRBackup)[0]' -prefix '$VBRBackup' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
+$dumps += New-Object -TypeName psobject -ArgumentList @{
+    Prefix="VBRBackupStorage";
+    ObjectCode=@('$VBRBackup = @(Get-VBRBackup)[0]','$VBRBackupStorage = @($VBRBackup.GetAllStorages())[0]');
+}
 
-$VBRBackupStorage = @($VBRBackup.GetAllStorages())[0]
-Dump-VBRObject -object $VBRBackupStorage -header '$VBRBackupStorage = @($VBRBackup.GetAllStorages())[0]' -prefix '$VBRBackupStorage' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
+$dumps += New-Object -TypeName psobject -ArgumentList @{
+    Prefix="VBRBackupOib";
+    ObjectCode=@('$VBRBackup = @(Get-VBRBackup)[0]','$VBRBackupOib = @($VBRBackup.GetOibs())[0]');
+}
 
-$VBRBackupOib = @($VBRBackup.GetOibs())[0]
-Dump-VBRObject -object $VBRBackupOib -header '$VBRBackupOib = @($VBRBackup.GetOibs())[0]' -prefix '$VBRBackupOib' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
+$dumps += New-Object -TypeName psobject -ArgumentList @{
+    Prefix="VBRBackupPoint";
+    ObjectCode=@('$VBRBackup = @(Get-VBRBackup)[0]','$VBRBackupPoint = @($VBRBackup.GetPoints())[0]');
+}
 
 
-$VBRBackupPoint = @($VBRBackup.GetPoints())[0]
-Dump-VBRObject -object $VBRBackupPoint -header '$VBRBackupPoint = @($VBRBackup.GetPoints())[0]' -prefix '$VBRBackupPoint' -sb $sb -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
 
 
-$sb.ToString() | out-file -FilePath $dumpfile
-write-host $issue.ToString()
+foreach ($dump in $dumps) {
+    $sbfile = New-Object -TypeName "System.Text.StringBuilder";
+    $dump.ObjectCode | % {
+     invoke-expression $_
+    }
+    Invoke-Expression ('$o = ${0}' -f $dump.Prefix)
+
+   
+    Dump-VBRObject -object $o -header ("{0} [{1}]" -f $dump.Prefix,$o.GetType().Fullname) -objectcode $dump.ObjectCode -prefix ("`${0}" -f $dump.Prefix) -sb $sbfile -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
+
+    $fname =  (mdfile -name $dump.Prefix)
+    $sbfile.ToString() | Out-File -FilePath $fname
+
+    [void]$sb.AppendLine(("* [{0}](./{1}.md)" -f $dump.Prefix,$dump.Prefix))
+}
+
+
+$sb.ToString() | Out-File -FilePath $dumpfile
