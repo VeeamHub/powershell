@@ -1,11 +1,30 @@
 # Veeam-vCHA-Backup
 Pre- and post-backup scripts for Veeam designed to find and protect only the active node in a vCenter High Availability configuration.
-######
-######
+
 This is a set of pre- and post-backup Powershell scripts that get called on a job that backs up the vCenter Server Appliance 6.5 (vCSA) when it is in a vCenter High Availability (vCHA) configuration. VMware supports VADP-based backups of only the active node in a vCHA configuration. The script uses the vCenter API to detect which node has the active role, then excludes from the job the node with the passive role. At the conclusion of the job, the script removes this exclusion essentially "resetting" the job until its next run when it reruns the process. By using these scripts, one can ensure only the correct node is backed up each time, which has the added benefit of reducing the amount of backup storage data required to protect a vCSA and reducing backup times.
 
-# PREREQUISITES
+## LICENSE
+Distributed under MIT license
+
+Copyright (c) 2017 VeeamHub
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+## PROJECT NOTES
+
+**Author**: [Chip Zoller](https://github.com/chipzoller)
+
+### Prerequisites
 These scripts will require vCenter 6.5 and PowerCLI 6.5.1. PowerCLI 6.5.1 should be installed on the VBR server. They have been tested with vCenter 6.5d, PowerCLI 6.5.1, and Veeam Backup & Replication 9.5.
 
-# INSTRUCTIONS
+### Usage instructions
 Create a Veeam backup job and add a vCenter container object where your vCHA nodes are listed. For example, if you have them all in a folder called "Management" in vCenter's inventory, add that folder to the job. Assuming the Management folder contains all three of the vCHA nodes (active, passive, and witness), manually exclude from your job the witness node. These scripts assume the witness has already been excluded. Download and store these scripts somewhere local to the VBR server, and edit the variables section at the top of each to customize appropriately to your environment. Edit your job and add these scripts to the appropriate pre- and post-job sections. When the job runs next, it should call out to vCenter to determine the state of the cluster, find the name of the VM that holds the passive role, and edit the job to exclude that passive vCHA node thereby only protecting the active node. When the job is complete, the post-job script runs and removes this passive node from the job configuration. Since nodes can fail over at any time and assume an active role, this ensures the next run of the job rediscovers the vCHA topology and only protects the VM that holds the active role at that time.
+
+### Examples
+1. Edit the Pre and Post scripts and change lines 2 and 3 to match your environment.
+2. Edit the backup job protecting the vCSA. Go to Storage -> Advanced -> Scripts. 
+3. Browse for each of the scripts in the appropraite Job scripts section. Leave the defaults to "run scripts every 1 backup session".
