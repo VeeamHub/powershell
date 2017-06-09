@@ -26,7 +26,7 @@ if ($localconfig -ne $null -and $localconfig.config -ne $null) {
     $xmlstring = $xmlobj.OuterXml
 }
 
-Publish-VeeamHubWindowsAgent -credentials $credentials -server $server -binary $binary -license $license -md5 $md5 -progressbar $true -verbose -installhelper $installhelper -rebootonfirstfail $true -xmlstring $xmlstring
+Install-VeeamHubWindowsAgent -credentials $credentials -server $server -binary $binary -license $license -md5 $md5 -progressbar $true -verbose -installhelper $installhelper -rebootonfirstfail $true -xmlstring $xmlstring
 
 
 #>
@@ -320,7 +320,7 @@ function Get-VeeamHubDotNet4Version {
 <#
     2) Silent install of the agent (reboot might still be required) 
 #>
-function Install-VeeamHubWindowsAgent {
+function Install-VeeamHubWindowsAgentSimple {
     [CmdletBinding()]
     param([Parameter(Mandatory=$true)][System.Management.Automation.Runspaces.PSSession]$session,
         [Parameter(Mandatory=$true)][string]$RemoteBinary,
@@ -603,7 +603,7 @@ function Get-VeeamHubWindowsAgentConfig {
 
 
 
-function Publish-VeeamHubWindowsAgent {
+function Install-VeeamHubWindowsAgent {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory=$true)][string]$binary,
@@ -628,7 +628,7 @@ function Publish-VeeamHubWindowsAgent {
         $waresult = Copy-VeeamHubWindowsAgentFiles -session $session -binary $binary -license $license -md5 $md5 -installhelper $installhelper -Verbose -progressbar $progressbar
         if($waresult.success) {
             Write-Verbose "Succesfull copy"
-            $iaresult = Install-VeeamHubWindowsAgent -session $session -Verbose  -RemoteBinary $waresult.RemoteBinary -RemoteInstallHelper $waresult.remoteinstallhelper -progressbar $progressbar -nofailondotnet $rebootonfirstfail
+            $iaresult = Install-VeeamHubWindowsAgentSimple -session $session -Verbose  -RemoteBinary $waresult.RemoteBinary -RemoteInstallHelper $waresult.remoteinstallhelper -progressbar $progressbar -nofailondotnet $rebootonfirstfail
            
             #if reboot is required and reboot is allowed, reboot it and try to redeploy after reboot           
             if ( -not $iaresult.success -and $iaresult.Mightneedreboot -and $rebootonfirstfail) {
@@ -656,7 +656,7 @@ function Publish-VeeamHubWindowsAgent {
                     Write-Error "Could not reconnect"
                     return -1
                 } else {
-                    $iaresult = Install-VeeamHubWindowsAgent -session $session -Verbose  -RemoteBinary $waresult.RemoteBinary -RemoteInstallHelper $waresult.remoteinstallhelper -progressbar $progressbar
+                    $iaresult = Install-VeeamHubWindowsAgentSimple -session $session -Verbose  -RemoteBinary $waresult.RemoteBinary -RemoteInstallHelper $waresult.remoteinstallhelper -progressbar $progressbar
                 }
 
             }
@@ -682,9 +682,9 @@ function Publish-VeeamHubWindowsAgent {
     }
 }
 
-Export-ModuleMember -Function Publish-VeeamHubWindowsAgent
-Export-ModuleMember -Function Copy-VeeamHubWindowsAgentFiles
 Export-ModuleMember -Function Install-VeeamHubWindowsAgent
+Export-ModuleMember -Function Copy-VeeamHubWindowsAgentFiles
+Export-ModuleMember -Function Install-VeeamHubWindowsAgentSimple
 Export-ModuleMember -Function Set-VeeamHubWindowsAgentLicense
 Export-ModuleMember -Function Set-VeeamHubWindowsAgentConfig
 Export-ModuleMember -Function Get-VeeamHubWindowsAgentConfig

@@ -24,7 +24,7 @@ import-Module .\VeeamHubWindowsAgentDeploy.psm1
 ```
 
 ```powershell  
-Publish-VeeamHubWindowsAgent -credentials $credentials -server $server -binary $binary -license $license -md5 $md5 -progressbar $true -verbose -installhelper $installhelper -rebootonfirstfail $true -xmlstring $xmlstring
+Install-VeeamHubWindowsAgent -credentials $credentials -server $server -binary $binary -license $license -md5 $md5 -progressbar $true -verbose -installhelper $installhelper -rebootonfirstfail $true -xmlstring $xmlstring
 ```
 
 *Parameters*
