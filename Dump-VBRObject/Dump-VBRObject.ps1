@@ -157,15 +157,21 @@ $dumps += New-Object -TypeName psobject -ArgumentList @{
 }
 
 $dumps += New-Object -TypeName psobject -ArgumentList @{
-    Prefix="VBRBackupOib";
-    ObjectCode=@('$VBRBackup = @(Get-VBRBackup)[0]','$VBRBackupOib = @($VBRBackup.GetOibs())[0]');
-}
-
-$dumps += New-Object -TypeName psobject -ArgumentList @{
     Prefix="VBRBackupPoint";
     ObjectCode=@('$VBRBackup = @(Get-VBRBackup)[0]','$VBRBackupPoint = @($VBRBackup.GetPoints())[0]');
 }
-
+$dumps += New-Object -TypeName psobject -ArgumentList @{
+    Prefix="VBRRestorePoint";
+    ObjectCode=@('$VBRBackup = @(Get-VBRBackup)[0]','$VBRRestorePoint = @($VBRBackup | Get-VBRRestorePoint )[0]');
+}
+$dumps += New-Object -TypeName psobject -ArgumentList @{
+    Prefix="VBRBackupSession";
+    ObjectCode=@('$VBRBackupSession = @(Get-VBRBackupSession | ? {$_.JobType -eq "Backup"})[0]');
+}
+$dumps += New-Object -TypeName psobject -ArgumentList @{
+    Prefix="VBRBackupSessionTaskSession";
+    ObjectCode=@('$VBRBackupSession = @(Get-VBRBackupSession | ? {$_.JobType -eq "Backup"})[0]','$VBRBackupSessionTaskSession = @($VBRBackupSession.GetTaskSessions())[0]');
+}
 
 
 
@@ -176,13 +182,16 @@ foreach ($dump in $dumps) {
     }
     Invoke-Expression ('$o = ${0}' -f $dump.Prefix)
 
-   
-    Dump-VBRObject -object $o -header ("{0} [{1}]" -f $dump.Prefix,$o.GetType().Fullname) -objectcode $dump.ObjectCode -prefix ("`${0}" -f $dump.Prefix) -sb $sbfile -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
+    if ($o -ne $null) {
+        Dump-VBRObject -object $o -header ("{0} [{1}]" -f $dump.Prefix,$o.GetType().Fullname) -objectcode $dump.ObjectCode -prefix ("`${0}" -f $dump.Prefix) -sb $sbfile -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
 
-    $fname =  (mdfile -name $dump.Prefix)
-    $sbfile.ToString() | Out-File -FilePath $fname
+        $fname =  (mdfile -name $dump.Prefix)
+        $sbfile.ToString() | Out-File -FilePath $fname
 
-    [void]$sb.AppendLine(("* [{0}](./{1}.md)" -f $dump.Prefix,$dump.Prefix))
+        [void]$sb.AppendLine(("* [{0}](./{1}.md)" -f $dump.Prefix,$dump.Prefix))
+    } else {
+        write-host "No object was really made for "$dump.Prefix
+    }
 }
 
 
