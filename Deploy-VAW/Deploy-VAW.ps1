@@ -41,14 +41,17 @@ VAWInstall.ps1 -TenantAccount "MyTaccount" -TenantPassword "MyP@ssword"
 VAWInstall.ps1 -TenantAccount "MyTaccount" -TenantPassword "MyP@ssword" -Configfile "C:\VAW\ExportedConfig.xml"
 
 .NOTES
-Version 1.0
+Version 1.0.1
 Author: Clint Wyckoff @ Veeam
+Updated October 12, 2017
+Fixed:
+Parameter change from Beta to GA version of VAW - This has been validated to work with VAW 2.0.700
 #>
 
 Param (
-    [string]$Installer = "\\phx-dc1.phx.aperaturelabs.biz\VAW\2.0.0.677\Source\VeeamAgentWindows_2.0.0.677.exe",
-    [string]$LicenseFile = "\\phx-dc1.phx.aperaturelabs.biz\VAW\2.0.0.677\Extras\veeam_agent_windows_trial_10_new.lic",
-    [string]$ConfigFile = "\\phx-dc1.phx.aperaturelabs.biz\VAW\2.0.0.677\Extras\Config.xml",
+    [string]$Installer = "\\phx-dc1.phx.aperaturelabs.biz\VAW\2.0.0.700\Source\VeeamAgentWindows_2.0.0.700.exe",
+    [string]$LicenseFile = "\\phx-dc1.phx.aperaturelabs.biz\VAW\2.0.0.700\Extras\veeam_agent_windows_nfr_2_5.lic",
+    [string]$ConfigFile = "\\phx-dc1.phx.aperaturelabs.biz\VAW\2.0.0.700\Extras\Config.xml",
     [string]$TenantAccount = "backup",
     [string]$TenantPassword = "password",
     [string]$VeeamAgentInstallDirectory = "C:\Program Files\Veeam\Endpoint Backup"
@@ -84,9 +87,9 @@ Stop-Process -Name "Veeam.EndPoint.Tray" -Force -ErrorAction SilentlyContinue
 
 Write-Host -ForegroundColor Green "Step #2: Applying your License File to the Protected Host"
 Set-Location $VeeamAgentInstallDirectory
-Start-Process Veeam.Agent.Configurator.exe -ArgumentList "-license /f:'$LicenseFile'"
+./Veeam.Agent.Configurator.exe -license /f:"$LicenseFile"
 
 Write-Host -ForegroundColor Green "Step #3: Applying your Desired Configuration to the Protected Host"
-Start-Process Veeam.Agent.Configurator.exe -ArgumentList "-import /f:'$ConfigFile'"
+.\Veeam.Agent.Configurator.exe -import /f:"$ConfigFile"
 
 Start-Process "$VeeamAgentInstallDirectory\Veeam.EndPoint.Tray.exe"
