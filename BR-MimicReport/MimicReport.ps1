@@ -623,7 +623,7 @@ if ($JobName -ne $null -and $JobName -ne "") {
         $Job = $Jobs[0];
         $jt = $job.JobType;
 
-        if ($jt -eq "Backup" -or $jt -eq "Replication" -or $jt -eq "BackupSync") {
+        if ($jt -eq "Backup" -or $jt -eq "Replica" -or $jt -eq "BackupSync") {
             
 
             $sessions = Get-VBRBackupSession -Name ("{0}*" -f $Job.Name) | ? { $_.jobname -eq $Job.Name } 
@@ -653,7 +653,7 @@ if ($JobName -ne $null -and $JobName -ne "") {
        Write-Error "Can not find Job with name $JobName"
     }
 } else {
-  if ($jobtype -ieq "Backup" -or $jobtype -ieq "Replication" -or $jobtype -ieq "BackupSync") {
+  if ($jobtype -ieq "Backup" -or $jobtype -ieq "Replica" -or $jobtype -ieq "BackupSync") {
       $Jobs = @(Get-VBRJob | ? { $_.JobType -ieq $jobtype }) | Sort-Object -Property Name
       if ($Jobs.Count -ne 0) {
             $wrotesessions = $true;
