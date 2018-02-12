@@ -16,7 +16,6 @@ LIMITATIONS:
 
 - Not aware of multiple SOBR extents so limited to single repository for Base Path
 - No checking if entered in value for tenant is correct. Incorrect value will exit.
-- Need to round storage costs down to two decimal places
 
 KEY VARIABLES
 
