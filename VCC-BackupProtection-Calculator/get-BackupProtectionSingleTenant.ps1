@@ -16,7 +16,6 @@ LIMITATIONS:
 
 - Not aware of multiple SOBR extents so limited to single repository for Base Path
 - No checking if entered in value for tenant is correct. Incorrect value will exit.
-- Need to round storage costs down to two decimal places
 
 KEY VARIABLES
 
@@ -82,6 +81,6 @@ $folder = Get-ChildItem $basePath -Directory -Force | Where-Object {($_.BaseName
      write-host""
      write-host "Tenant Account   : $folderBaseName"
      write-host "Size in GB       :"$([math]::round(($folderSizeInGB),2))""
-     write-host "Storage Costs    :"$([math]::Abs(($folderSizeInGB * $StorageCost)))""
-     write-host "Billable Amount  :"$([math]::Abs(($folderSizeInGB * $StorageCharge)))""
+     write-host "Storage Costs    :"$([math]::round(($StorageCost*$folderSizeInGB),2))""
+     write-host "Billable Amount  :"$([math]::round(($StorageCharge*$folderSizeInGB),2))""
      write-host "Retention Period :"$tenant.BackupProtectionPeriod
