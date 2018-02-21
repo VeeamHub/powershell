@@ -1,3 +1,4 @@
+# Plink Check
 ## VeeamHub
 Veeamhub projects are community driven projects, and are not created by Veeam R&D nor validated by Veeam Q&A. They are maintained by community members which might be or not be Veeam employees. 
 
@@ -17,6 +18,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 **Requires:** Tested against VBR 9.5 but might work with any version. Tested with plink 0.62 but might work with any version
 
+**Usage:** Schedule the script via the Application Group or via the "Surebackup" job > "Linked Job" section. This example tests if a file exists or not but you can of course alter the example. Will automatically send "yes" to stdin so that the "new ssl signature" (masked ip) is automatically accepted. This does not seems to cause issue on subsequent runs. The wrapper makes sure that a proper exit code is propagated to Surebackup
 
 **Parameters:**
 * -plink "C:\bin\plink.exe"
