@@ -1,4 +1,4 @@
-﻿$baseurl = "https://raw.githubusercontent.com/tdewin/powershell"
+
 $versionurl = "http://dewin.me/veeamhubmodule/version.json"
 
 $installversion = $null
@@ -46,12 +46,18 @@ if ($acceptcheck.ToLower().Trim() -eq "yes") {
 
 
 function Install-VeeamHubWebFile {
-    param($url,$dest)
+    param($url,$dest,$fixnl=$false)
     
     if ($url -ne $null -and $dest -ne $null) {
         $fdest = (Join-Path $dest -ChildPath (Split-Path $url -Leaf))
-        write-host "Downloading $fdest"
-        Invoke-WebRequest -Uri $url -OutFile $fdest
+        write-host "Downloading $url > $fdest"
+        if(-not $fixnl) {
+            Invoke-WebRequest -Uri $url -OutFile $fdest
+        } else {
+            Invoke-WebRequest -Uri $url -OutFile "$fdest.tmp"
+            (Get-Content "$fdest.tmp") -replace "`r(?!`n)","`r`n" | Set-Content $fdest
+        }
+        
     }
 }
 
@@ -60,8 +66,8 @@ if ($allowfire) {
     $r = Invoke-WebRequest $versionurl
     if ($r.StatusCode -eq 200) {
         $versions = $r.Content | ConvertFrom-Json
-        if ($versions -ne $null -and $versions.Stable -ne $null) {
-            
+        if ($versions -ne $null -and $versions.stable -ne $null -and $versions.baseurl -ne $null) {
+            $baseurl = $versions.baseurl
             #Ask for version
             while($installversion -eq $null) {
                 $answerversion = (read-host "Which version do you want to install - stable (default), latest, <version>, list").ToLower().trim()
@@ -121,8 +127,9 @@ if ($allowfire) {
                         $canoverwrite = $true
                     }
                     if($canoverwrite) {
-                        Install-VeeamHubWebFile -url ($installversion.psd -replace "baseurl:/","$baseurl") -dest $installbase
-                        Install-VeeamHubWebFile -url ($installversion.psm -replace "baseurl:/","$baseurl") -dest $installbase
+                        write-host "Downloading from $baseurl"
+                        Install-VeeamHubWebFile -url ($installversion.psd -replace "baseurl:/",$baseurl) -dest $installbase -fixnl $true
+                        Install-VeeamHubWebFile -url ($installversion.psm -replace "baseurl:/",$baseurl) -dest $installbase -fixnl $true
 
                         Import-Module "$veeamhubmodulename" -ErrorAction SilentlyContinue
                         if ((Get-Module "$veeamhubmodulename") -ne $null) {

@@ -1,4 +1,5 @@
 {
+	"baseurl": "https://raw.githubusercontent.com/tdewin/powershell",
 	"stable": {
 		psd: "baseurl://master/BR-VeeamHubModule/veeamhubmodule.psd1",
 		psm: "baseurl://master/BR-VeeamHubModule/veeamhubmodule.psm1",
