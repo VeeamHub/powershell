@@ -1,10 +1,10 @@
-$script:VeeamHubVersion = "0.0.1"
+
 
 <#
     Version cmdlets
 #>
 function Get-VHMVersion {
-	return $script:VeeamHubVersion
+	return (Get-Module VeeamHubModule).Version.ToString()
 }
 function Get-VHMVBRVersion {
 	$versionstring = "Unknown Version"
