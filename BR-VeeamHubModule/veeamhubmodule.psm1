@@ -21,6 +21,16 @@ function Get-VHMVBRVersion {
             }
         }
     }
+    $clientPath = Get-ItemProperty -Path "HKLM:\Software\Veeam\Veeam Mount Service\" -name "installationpath" -ErrorAction SilentlyContinue
+    if ($clientPath -ne $null) {
+        $depDLLPath = Join-Path -Path $clientPath.installationpath -ChildPath  "Packages\VeeamDeploymentDll.dll" -Resolve -ErrorAction SilentlyContinue
+        if ($depDLLPath -ne $null -and (Test-Path -Path $depDLLPath)) {
+            $file = Get-Item -Path $depDLLPath -ErrorAction SilentlyContinue
+            if ($file -ne $null) {
+                $versionstring = $file.VersionInfo.ProductVersion
+            }
+        }
+    }
 	return $versionstring
 }
 Export-ModuleMember -Function Get-VHMVersion
