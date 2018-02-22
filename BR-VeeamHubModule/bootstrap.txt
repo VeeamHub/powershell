@@ -1,5 +1,5 @@
 
-$versionurl = "http://dewin.me/veeamhubmodule/version.json"
+$versionurl = "http://veeamhub.io/veeamhubmodule/version.json"
 
 $installversion = $null
 $installmode = $null
@@ -7,9 +7,13 @@ $installmode = $null
 
 $veeamhubmodulename = "VeeamHubModule"
 
+function ln {
+    write-host (,'#'*80 -join "")
+}
 clear-host
+
 write-host "Welcome to the VeeamHub Module Bootstrap Installer"
-write-host "##################################################"
+ln
 
 $allowfire = $false
 write-host @"
@@ -33,7 +37,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 "@
-write-host ""
+ln
 write-host "Before we continue, please take notice that this module is released under MIT License"
 write-host "Basically, this module is released in an opensource module, but we do not take any responsibility in any case"
 write-host "Do you agree to this before installing?"
@@ -43,14 +47,14 @@ if ($acceptcheck.ToLower().Trim() -eq "yes") {
 } else {
     write-error "You didn't agree, refusing to continue"
 }
-
+ln
 
 function Install-VeeamHubWebFile {
     param($url,$dest,$fixnl=$false)
     
     if ($url -ne $null -and $dest -ne $null) {
         $fdest = (Join-Path $dest -ChildPath (Split-Path $url -Leaf))
-        write-host "Downloading $url > $fdest"
+        write-host "Downloading $url `r`n   > $fdest"
         if(-not $fixnl) {
             Invoke-WebRequest -Uri $url -OutFile $fdest
         } else {
@@ -70,7 +74,8 @@ if ($allowfire) {
             $baseurl = $versions.baseurl
             #Ask for version
             while($installversion -eq $null) {
-                $answerversion = (read-host "Which version do you want to install - stable (default), latest, <version>, list").ToLower().trim()
+                write-host "Which version do you want to install?"
+                $answerversion = (read-host "stable (default) / latest / <version> / list").ToLower().trim()
                 if ($answerversion -eq "") {
                     $installversion = $versions.stable
                 } elseif ($answerversion -eq "stable") {
@@ -80,13 +85,16 @@ if ($allowfire) {
                 } elseif ($answerversion -match "^([0-9]+\.?)+$") {
                     $installversion = $versions.all | ? { $_.version -eq $answerversion }
                 } elseif ($answerversion -eq "list") {
+                    ln
                     $versions.all | % { write-host ("{0:6} - {1}" -f $_.version,$_.description )}
+                    ln
                 }
             }
             write-host ("Installing {0:6} - {1}" -f $installversion.version,$installversion.description )
-
+            ln
             while($installmode -eq $null) {
-                $answermode = (read-host "Do you want to install for this user, or for all users - user (default), all (need to be admin)").ToLower().Trim()
+                write-host "Do you want to install for this user, or for all users?"
+                $answermode = (read-host "user (default) / all (need to be admin)").ToLower().Trim()
                 if ($answermode -in "user","all") {
                     $installmode = $answermode
                 } elseif($answermode -eq "") {
@@ -94,7 +102,7 @@ if ($allowfire) {
                 }
             }
             write-host ("Installing for {0}" -f $installmode)
-
+            ln
             $pspaths = $env:PSModulePath -split ";" 
             $installbase = $null
             
@@ -117,12 +125,14 @@ if ($allowfire) {
                     $alreadyinstalled = @(Get-childItem $installbase).count
                     $canoverwrite = $false
                     if ($alreadyinstalled -gt 0) {
-                        $answeroverwrite = (read-host "Seems there is already a version installed, do you want to overwrite? - yes/no").ToLower().Trim()
+                        write-host "Seems there is already a version installed, do you want to overwrite?"
+                        $answeroverwrite = (read-host "yes / no").ToLower().Trim()
                         if ($answeroverwrite -eq "yes") {
                             $canoverwrite = $true
                         } else {
                             write-error "You answered negative to overwriting the current module, stopping"
                         }
+                        ln
                     } else {
                         $canoverwrite = $true
                     }
@@ -134,11 +144,11 @@ if ($allowfire) {
                         Import-Module "$veeamhubmodulename" -ErrorAction SilentlyContinue
                         if ((Get-Module "$veeamhubmodulename") -ne $null) {
                             try { 
-                                $vhv = Invoke-Expression "Get-VeeamHubVersion"
+                                $vhv = Invoke-Expression "Get-VHMVersion"
                                 write-host "Installed and loaded $vhv"
                                 write-host "Next time, please use 'import-module $veeamhubmodulename' to load the module"
                             } catch { 
-                                write-error "Could not run Get-VeeamHubVersion"
+                                write-error "Could not run Get-VHMVersion"
                             }
                         } else {
                             Write-Error "Something must have gone wrong because I was not able to load the module, please validate $installbase"

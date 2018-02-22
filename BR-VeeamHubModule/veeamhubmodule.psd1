@@ -12,7 +12,7 @@
 RootModule = 'veeamhubmodule.psm1'
 
 # Version number of this module.
-ModuleVersion = '0.0.1'
+ModuleVersion = '0.0.2'
 
 # Supported PSEditions
 # CompatiblePSEditions = @()
@@ -69,7 +69,16 @@ PowerShellHostVersion = '5.0'
 # NestedModules = @()
 
 # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
-FunctionsToExport = @('Get-VeeamHubVersion')
+FunctionsToExport = @(
+        'Get-VHMVersion',
+        'Get-VHMVBRVersion',
+        'Format-VHMVBRScheduleInfo',
+        'New-VHMVBRScheduleInfo',
+        'Get-VHMVBRTrafficRule',
+        'Update-VHMVBRTrafficRule',
+        'New-VHMVBRTrafficRule',
+        'Remove-VHMVBRTrafficRule'
+)
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
 CmdletsToExport = @()
