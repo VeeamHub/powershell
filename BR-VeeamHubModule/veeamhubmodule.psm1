@@ -201,7 +201,7 @@ function New-VHMVBRTrafficRule {
     return $nttr
 }
 
-function Delete-VHMVBRTrafficRule {
+function Remove-VHMVBRTrafficRule {
     [cmdletbinding()]
     param(
         [parameter(ValueFromPipeline)][Veeam.Backup.Model.CTrafficThrottlingRule]$TrafficRule
@@ -236,4 +236,4 @@ Export-ModuleMember -Function New-VHMVBRScheduleInfo
 Export-ModuleMember -Function Get-VHMVBRTrafficRule
 Export-ModuleMember -Function Update-VHMVBRTrafficRule
 Export-ModuleMember -Function New-VHMVBRTrafficRule
-Export-ModuleMember -Function Delete-VHMVBRTrafficRule
+Export-ModuleMember -Function Remove-VHMVBRTrafficRule
