@@ -144,11 +144,11 @@ if ($allowfire) {
                         Import-Module "$veeamhubmodulename" -ErrorAction SilentlyContinue
                         if ((Get-Module "$veeamhubmodulename") -ne $null) {
                             try { 
-                                $vhv = Invoke-Expression "Get-VHUVersion"
+                                $vhv = Invoke-Expression "Get-VHMVersion"
                                 write-host "Installed and loaded $vhv"
                                 write-host "Next time, please use 'import-module $veeamhubmodulename' to load the module"
                             } catch { 
-                                write-error "Could not run Get-VHUVersion"
+                                write-error "Could not run Get-VHMVersion"
                             }
                         } else {
                             Write-Error "Something must have gone wrong because I was not able to load the module, please validate $installbase"

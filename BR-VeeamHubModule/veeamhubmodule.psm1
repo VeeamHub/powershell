@@ -1,9 +1,9 @@
 $script:VeeamHubVersion = "0.0.1"
 
-function Get-VHUVersion {
+function Get-VHMVersion {
 	return $script:VeeamHubVersion
 }
-function Get-VHUVBRVersion {
+function Get-VHMVBRVersion {
 	$versionstring = "Unknown Version"
 
     $pssversion = (Get-PSSnapin VeeamPSSnapin -ErrorAction SilentlyContinue)
@@ -23,5 +23,5 @@ function Get-VHUVBRVersion {
     }
 	return $versionstring
 }
-Export-ModuleMember -Function Get-VHUVersion
-Export-ModuleMember -Function Get-VHUVBRVersion
+Export-ModuleMember -Function Get-VHMVersion
+Export-ModuleMember -Function Get-VHMVBRVersion
