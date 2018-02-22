@@ -1,5 +1,5 @@
 
-$versionurl = "http://dewin.me/veeamhubmodule/version.json"
+$versionurl = "http://veeamhub.io/veeamhubmodule/version.json"
 
 $installversion = $null
 $installmode = $null
