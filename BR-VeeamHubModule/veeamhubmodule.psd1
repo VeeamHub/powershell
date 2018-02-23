@@ -72,12 +72,20 @@ PowerShellHostVersion = '5.0'
 FunctionsToExport = @(
         'Get-VHMVersion',
         'Get-VHMVBRVersion',
+        'Get-VHMVBRWinServer',
         'Format-VHMVBRScheduleInfo',
         'New-VHMVBRScheduleInfo',
         'Get-VHMVBRTrafficRule',
         'Update-VHMVBRTrafficRule',
         'New-VHMVBRTrafficRule',
-        'Remove-VHMVBRTrafficRule'
+        'Remove-VHMVBRTrafficRule',
+        'Add-VHMVBRViGuestProxy',
+        'Remove-VHMVBRViGuestProxy',
+        'Set-VHMVBRViGuestProxy',
+        'Get-VHMVBRViGuestProxy',
+        'Add-VHMVBRUserRoleMapping',
+        'Remove-VHMVBRUserRoleMapping',
+        'Get-VHMVBRUserRoleMapping'
 )
 
 # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.

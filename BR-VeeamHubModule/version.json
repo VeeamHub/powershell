@@ -1,8 +1,8 @@
 {
 	"baseurl": "https://raw.githubusercontent.com/veeamhub/powershell",
 	"stable": {
-		"psd": "baseurl://master/BR-VeeamHubModule/veeamhubmodule.psd1",
-		"psm": "baseurl://master/BR-VeeamHubModule/veeamhubmodule.psm1",
+		"psd": "baseurl://1cade11c539bb275cc181384b355f672280ca7e1/BR-VeeamHubModule/veeamhubmodule.psd1",
+		"psm": "baseurl://1cade11c539bb275cc181384b355f672280ca7e1/BR-VeeamHubModule/veeamhubmodule.psm1",
 		"version": "0.0.2",
 		"description": "Initial VeeamHub Release"
 	},
@@ -13,8 +13,8 @@
 		"description": "Latest master branch release"
 	},
 	"all": [{
-		"psd": "baseurl://master/BR-VeeamHubModule/veeamhubmodule.psd1",
-		"psm": "baseurl://master/BR-VeeamHubModule/veeamhubmodule.psm1",
+		"psd": "baseurl://1cade11c539bb275cc181384b355f672280ca7e1/BR-VeeamHubModule/veeamhubmodule.psd1",
+		"psm": "baseurl://1cade11c539bb275cc181384b355f672280ca7e1/BR-VeeamHubModule/veeamhubmodule.psm1",
 		"version": "0.0.2",
 		"description": "Initial VeeamHub Release"
 	}]
