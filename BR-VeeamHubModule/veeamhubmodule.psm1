@@ -38,6 +38,13 @@ function Get-VHMVBRVersion {
 }
 
 <#
+    Generic functions
+#>
+function Get-VHMVBRWinServer {
+    return [Veeam.Backup.Core.CWinServer]::GetAll($true)
+}
+
+<#
     Schedule Info  
 #>
 
@@ -226,14 +233,93 @@ function Remove-VHMVBRTrafficRule {
 }
 
 
+<#
+    Guest interaction proxies
+    //Implementing hacks from Tom Sightler on :  https://forums.veeam.com/powershell-f26/set-guest-interaction-proxy-server-t35234.html#p272191
+#>
+
+
+function Add-VHMVBRViGuestProxy {
+    param(
+        [Parameter(Mandatory=$True)][Veeam.Backup.Core.CBackupJob]$job,
+        [Parameter(Mandatory=$True)][Veeam.Backup.Core.CWinServer[]]$proxies= $null
+    )  
+    $gipspids = [Veeam.Backup.Core.CJobProxy]::GetJobProxies($job.id) | ? { $_.Type -eq "EGuest" } | % { $_.ProxyId }
+    foreach($proxy in $proxies) {
+            if($proxy.Id -notin $gipspids) {
+                [Veeam.Backup.Core.CJobProxy]::Create($job.id,$proxy.Id,"EGuest")
+            }
+    }
+}
+function Remove-VHMVBRViGuestProxy {
+    param(
+        [Parameter(Mandatory=$True)][Veeam.Backup.Core.CBackupJob]$job,
+        [Parameter(Mandatory=$True)][Veeam.Backup.Core.CWinServer[]]$proxies= $null
+    )    
+    $gips = [Veeam.Backup.Core.CJobProxy]::GetJobProxies($job.id) | ? { $_.Type -eq "EGuest" }
+    $pids = $proxies.id
+
+    foreach($gip in $gips) {
+        if($gip.ProxyId -in $pids) {
+            [Veeam.Backup.Core.CJobProxy]::Delete($gip.id)           
+        }
+    } 
+}
+function Set-VHMVBRViGuestProxy {
+    [CmdletBinding(DefaultParameterSetName='Auto')]
+    param(
+        [Parameter(Mandatory=$True)][Veeam.Backup.Core.CBackupJob]$job,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Auto')][switch]$auto,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Manual')][switch]$manual,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Manual')][Veeam.Backup.Core.CWinServer[]]$proxies= $null
+    )
+    if($manual) {
+        $o = $job.GetVssOptions()
+        $o.GuestProxyAutoDetect = $false
+        $job.SetVssOptions($o)
+    }
+    if($auto) {
+        $o = $job.GetVssOptions()
+        $o.GuestProxyAutoDetect = $true
+        $job.SetVssOptions($o)
+    }
+    if($proxies -ne $null) {
+        $gips = [Veeam.Backup.Core.CJobProxy]::GetJobProxies($job.id) | ? { $_.Type -eq "EGuest" }
+        $pids = $proxies.id
+
+        foreach($gip in $gips) {
+            if($gip.ProxyId -notin $pids) {
+                [Veeam.Backup.Core.CJobProxy]::Delete($gip.id)           
+            }
+        }
+        $gipspids = [Veeam.Backup.Core.CJobProxy]::GetJobProxies($job.id) | ? { $_.Type -eq "EGuest" } | % { $_.ProxyId }
+        foreach($proxy in $proxies) {
+            if($proxy.Id -notin $gipspids) {
+                [Veeam.Backup.Core.CJobProxy]::Create($job.id,$proxy.Id,"EGuest")
+            }
+        }
+
+    }
+}
+function Get-VHMVBRViGuestProxy {
+    param(
+        [Parameter(Mandatory=$True)][Veeam.Backup.Core.CBackupJob]$job
+    )
+    return [Veeam.Backup.Core.CJobProxy]::GetJobProxies($job.id) | ? { $_.Type -eq "EGuest" }
+}
 
 # gc .\veeamhubmodule.psm1 | Select-String "^function (.*) {"  | % { "Export-ModuleMember -Function {0}" -f $_.Matches.groups[1].value }
 # gc .\veeamhubmodule.psm1 | Select-String "^Export-ModuleMember -Function (.*)"  | % { "`t'{0}'," -f $_.Matches.groups[1].value }
 Export-ModuleMember -Function Get-VHMVersion
 Export-ModuleMember -Function Get-VHMVBRVersion
+Export-ModuleMember -Function Get-VHMVBRWinServer
 Export-ModuleMember -Function Format-VHMVBRScheduleInfo
 Export-ModuleMember -Function New-VHMVBRScheduleInfo
 Export-ModuleMember -Function Get-VHMVBRTrafficRule
 Export-ModuleMember -Function Update-VHMVBRTrafficRule
 Export-ModuleMember -Function New-VHMVBRTrafficRule
 Export-ModuleMember -Function Remove-VHMVBRTrafficRule
+Export-ModuleMember -Function Add-VHMVBRViGuestProxy
+Export-ModuleMember -Function Remove-VHMVBRViGuestProxy
+Export-ModuleMember -Function Set-VHMVBRViGuestProxy
+Export-ModuleMember -Function Get-VHMVBRViGuestProxy
