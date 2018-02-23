@@ -38,6 +38,13 @@ function Get-VHMVBRVersion {
 }
 
 <#
+    Generic functions
+#>
+function Get-VHMVBRWinServer {
+    return [Veeam.Backup.Core.CWinServer]::GetAll($true)
+}
+
+<#
     Schedule Info  
 #>
 
@@ -226,14 +233,192 @@ function Remove-VHMVBRTrafficRule {
 }
 
 
+<#
+    Guest interaction proxies
+    //Implementing hacks from Tom Sightler on :  https://forums.veeam.com/powershell-f26/set-guest-interaction-proxy-server-t35234.html#p272191
+#>
 
-# gc .\veeamhubmodule.psm1 | Select-String "^function (.*) {"  | % { "Export-ModuleMember -Function {0}" -f $_.Matches.groups[1].value }
-# gc .\veeamhubmodule.psm1 | Select-String "^Export-ModuleMember -Function (.*)"  | % { "`t'{0}'," -f $_.Matches.groups[1].value }
+
+function Add-VHMVBRViGuestProxy {
+    param(
+        [Parameter(Mandatory=$True)][Veeam.Backup.Core.CBackupJob]$job,
+        [Parameter(Mandatory=$True)][Veeam.Backup.Core.CWinServer[]]$proxies= $null
+    )  
+    $gipspids = [Veeam.Backup.Core.CJobProxy]::GetJobProxies($job.id) | ? { $_.Type -eq "EGuest" } | % { $_.ProxyId }
+    foreach($proxy in $proxies) {
+            if($proxy.Id -notin $gipspids) {
+                [Veeam.Backup.Core.CJobProxy]::Create($job.id,$proxy.Id,"EGuest")
+            }
+    }
+}
+function Remove-VHMVBRViGuestProxy {
+    param(
+        [Parameter(Mandatory=$True)][Veeam.Backup.Core.CBackupJob]$job,
+        [Parameter(Mandatory=$True)][Veeam.Backup.Core.CWinServer[]]$proxies= $null
+    )    
+    $gips = [Veeam.Backup.Core.CJobProxy]::GetJobProxies($job.id) | ? { $_.Type -eq "EGuest" }
+    $pids = $proxies.id
+
+    foreach($gip in $gips) {
+        if($gip.ProxyId -in $pids) {
+            [Veeam.Backup.Core.CJobProxy]::Delete($gip.id)           
+        }
+    } 
+}
+function Set-VHMVBRViGuestProxy {
+    [CmdletBinding(DefaultParameterSetName='Auto')]
+    param(
+        [Parameter(Mandatory=$True)][Veeam.Backup.Core.CBackupJob]$job,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Auto')][switch]$auto,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Manual')][switch]$manual,
+        [Parameter(Mandatory = $true, ParameterSetName = 'Manual')][Veeam.Backup.Core.CWinServer[]]$proxies= $null
+    )
+    if($manual) {
+        $o = $job.GetVssOptions()
+        $o.GuestProxyAutoDetect = $false
+        $job.SetVssOptions($o)
+    }
+    if($auto) {
+        $o = $job.GetVssOptions()
+        $o.GuestProxyAutoDetect = $true
+        $job.SetVssOptions($o)
+    }
+    if($proxies -ne $null) {
+        $gips = [Veeam.Backup.Core.CJobProxy]::GetJobProxies($job.id) | ? { $_.Type -eq "EGuest" }
+        $pids = $proxies.id
+
+        foreach($gip in $gips) {
+            if($gip.ProxyId -notin $pids) {
+                [Veeam.Backup.Core.CJobProxy]::Delete($gip.id)           
+            }
+        }
+        $gipspids = [Veeam.Backup.Core.CJobProxy]::GetJobProxies($job.id) | ? { $_.Type -eq "EGuest" } | % { $_.ProxyId }
+        foreach($proxy in $proxies) {
+            if($proxy.Id -notin $gipspids) {
+                [Veeam.Backup.Core.CJobProxy]::Create($job.id,$proxy.Id,"EGuest")
+            }
+        }
+
+    }
+}
+function Get-VHMVBRViGuestProxy {
+    param(
+        [Parameter(Mandatory=$True)][Veeam.Backup.Core.CBackupJob]$job
+    )
+    return [Veeam.Backup.Core.CJobProxy]::GetJobProxies($job.id) | ? { $_.Type -eq "EGuest" }
+}
+
+
+<#
+    User Roles
+    //Implementing hacks from Tom Sightler on : https://forums.veeam.com/powershell-f26/add-user-to-users-and-roles-per-ps-t41011.html#p271679
+#>
+
+function Add-VHMVBRUserRoleMapping {
+    Param (
+        [string]$UserOrGroupName, 
+        [ValidateSet('Veeam Restore Operator','Veeam Backup Operator','Veeam Backup Administrator','Veeam Backup Viewer')][string]$RoleName
+     )
+
+    $CDBManager = [Veeam.Backup.DBManager.CDBManager]::CreateNewInstance()
+
+    # Find the SID for the named user/group
+    $AccountSid = [Veeam.Backup.Common.CAccountHelper]::FindSid($UserOrGroupName)
+
+    # Detect if account is a User or Group
+    If ([Veeam.Backup.Common.CAccountHelper]::IsUser($AccountSid)) {
+        $AccountType = [Veeam.Backup.Model.AccountTypes]::User
+    } Else {
+        $AccountType = [Veeam.Backup.Model.AccountTypes]::Group
+    }
+
+    # Parse out full name (with domain component) and short name
+    $FullAccountName = [Veeam.Backup.Common.CAccountHelper]::GetNtAccount($AccountSid).Value;
+    $ShortAccountName = [Veeam.Backup.Common.CAccountHelper]::ParseUserName($FullAccountName);
+
+    # Check if account already exist in Veeam DB, add if required
+    If ($CDBManager.UsersAndRoles.FindAccount($AccountSid.Value)) {
+        $Account = $CDBManager.UsersAndRoles.FindAccount($AccountSid.Value)
+    } else {
+        $Account = $CDBManager.UsersAndRoles.CreateAccount($AccountSid.Value, $ShortAccountName, $FullAccountName, $AccountType);
+    }
+
+    # Get the Role object for the named Role
+    $Role = $CDBManager.UsersAndRoles.GetRolesAll() | ?{$_.Name -eq $RoleName}
+
+    # Check if account is already assigned to Role and assign if not
+    if ($CDBManager.UsersAndRoles.GetRolesByAccountId($Account.Id)) {
+        write-host "Account $UserOrGroupName is already assigned to role $RoleName"
+    } else {
+        $CDBManager.UsersAndRoles.CreateRoleAccount($Role.Id,$Account.Id)
+    }
+
+    $CDBManager.Dispose()
+}
+
+function Remove-VHMVBRUserRoleMapping {
+    Param ([string]$UserOrGroupName, 
+    [ValidateSet('Veeam Restore Operator','Veeam Backup Operator','Veeam Backup Administrator','Veeam Backup Viewer')][string]$RoleName)
+    $CDBManager = [Veeam.Backup.DBManager.CDBManager]::CreateNewInstance()
+
+    # Find the SID for the named user/group
+    $AccountSid = ([Veeam.Backup.Common.CAccountHelper]::FindSid($UserOrGroupName)).Value
+
+    # Get the Veeam account ID using the SID
+    $Account = $CDBManager.UsersAndRoles.FindAccount($AccountSid)
+
+    # Get the Role ID for the named Role
+    $Role = $CDBManager.UsersAndRoles.GetRolesAll() | ?{$_.Name -eq $RoleName}
+
+    # Check if name user/group is assigned to role and delete if so
+    if ($CDBManager.UsersAndRoles.GetRoleAccountByAccountId($Account.Id)) {
+        $CDBManager.UsersAndRoles.DeleteRoleAccount($Role.Id,$Account.Id)
+    } else {
+        write-host "Account $UserOrGroupName is not assigned to role $RoleName"
+    }
+
+    $CDBManager.Dispose()
+}
+
+function Get-VHMVBRUserRoleMapping {
+    $CDBManager = [Veeam.Backup.DBManager.CDBManager]::CreateNewInstance()
+
+    $mappings = @()
+    $accounts = $CDBManager.UsersAndRoles.GetAccountsAll()
+
+    foreach( $r in ($CDBManager.UsersAndRoles.GetRolesAll())) {
+        $roleaccounts = $CDBManager.UsersAndRoles.GetRoleAccountByRoleId($r.Id)
+        foreach($ra in $roleaccounts) {
+            $account = $accounts | ? { $ra.AccountId -eq $_.Id }
+            $mappings += (New-Object -TypeName psobject -Property @{
+                AccountName=$account.Nt4Name
+                RoleName=$r.Name;
+                RoleAccount=$ra;
+                Role=$r;
+                Account=$account
+            })
+        }
+    }
+    return $mappings
+}
+
+<#
+gc .\veeamhubmodule.psm1 | Select-String "^function (.*) {"  | % { "Export-ModuleMember -Function {0}" -f $_.Matches.groups[1].value }
+gc .\veeamhubmodule.psm1 | Select-String "^Export-ModuleMember -Function (.*)"  | % { "`t'{0}'," -f $_.Matches.groups[1].value }
+#>
 Export-ModuleMember -Function Get-VHMVersion
 Export-ModuleMember -Function Get-VHMVBRVersion
+Export-ModuleMember -Function Get-VHMVBRWinServer
 Export-ModuleMember -Function Format-VHMVBRScheduleInfo
 Export-ModuleMember -Function New-VHMVBRScheduleInfo
 Export-ModuleMember -Function Get-VHMVBRTrafficRule
 Export-ModuleMember -Function Update-VHMVBRTrafficRule
 Export-ModuleMember -Function New-VHMVBRTrafficRule
 Export-ModuleMember -Function Remove-VHMVBRTrafficRule
+Export-ModuleMember -Function Add-VHMVBRViGuestProxy
+Export-ModuleMember -Function Remove-VHMVBRViGuestProxy
+Export-ModuleMember -Function Set-VHMVBRViGuestProxy
+Export-ModuleMember -Function Get-VHMVBRViGuestProxy
+Export-ModuleMember -Function Add-VHMVBRUserRoleMapping
+Export-ModuleMember -Function Remove-VHMVBRUserRoleMapping
+Export-ModuleMember -Function Get-VHMVBRUserRoleMapping
