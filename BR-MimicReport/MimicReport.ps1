@@ -478,12 +478,22 @@ function calculate-vms {
          $text = $task.Status;
          $diff= $task.Progress.Duration;
 
+         #v9.5 u3
+         $tstart = $null
+         $tstop = $null
+         if($task.Progress.StartTime -eq $null) {
+            $tstart = $task.Progress.StartTimeLocal
+            $tstop = $task.Progress.StopTimeLocal
+         } else {
+            $tstart = $task.Progress.StartTime
+            $tstop = $task.Progress.StopTime
+         }
 
          $vm = New-Object -TypeName psobject -Property @{"Name"=$task.Name;
             "Status"=(translate-status -text $text);
             "Color"=(get-rpmcolor -text $text -isbg $false);
-            "StartTime"=(get-timestring -time $task.Progress.StartTime);
-            "EndTime"=(get-timestring -time $task.Progress.StopTime -prev $task.Progress.StartTime);
+            "StartTime"=(get-timestring -time $tstart);
+            "EndTime"=(get-timestring -time $tstop -prev $tstart);
             "Size"=(get-humanreadable -num $task.Progress.ProcessedSize);
             "Read"=(get-humanreadable -num $task.Progress.ReadSize);
             "Transferred"=(get-humanreadable -num $task.Progress.TransferedSize);
