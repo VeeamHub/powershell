@@ -463,7 +463,13 @@ function translate-status {
      }
      return "Error"
 }
-
+<#
+for fast troubleshooting
+$js = Get-VBRJob;$j = $js[0]
+$s = $j.FindLastSession()
+$ts = $s.GetTaskSessions();$t = $ts[0]
+$t.Progress
+#>
 function calculate-vms {
     param($session)
     $tasks = $session.GetTaskSessions()
@@ -481,7 +487,7 @@ function calculate-vms {
          #v9.5 u3
          $tstart = $null
          $tstop = $null
-         if($task.Progress.StartTime -eq $null) {
+         if((Get-Member -InputObject $task.Progress -Name "StartTime") -eq $null) {
             $tstart = $task.Progress.StartTimeLocal
             $tstop = $task.Progress.StopTimeLocal
          } else {
@@ -510,11 +516,12 @@ function calculate-vms {
            $failed = $failed +1
          }
         $allvms += $vm
-        $glerr += $messages
+        $glerr += $task.GetDetails()
     }
     return New-Object -TypeName psobject -Property @{vms=$allvms;failed=$failed;success=$success;warning=$warning;glerr=$glerr}
     
 }
+
 function get-veeamserver {
     $versionstring = "Unknown Version"
 
