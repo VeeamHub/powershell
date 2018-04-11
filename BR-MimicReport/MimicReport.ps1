@@ -463,7 +463,13 @@ function translate-status {
      }
      return "Error"
 }
-
+<#
+for fast troubleshooting
+$js = Get-VBRJob;$j = $js[0]
+$s = $j.FindLastSession()
+$ts = $s.GetTaskSessions();$t = $ts[0]
+$t.Progress
+#>
 function calculate-vms {
     param($session)
     $tasks = $session.GetTaskSessions()
@@ -478,12 +484,22 @@ function calculate-vms {
          $text = $task.Status;
          $diff= $task.Progress.Duration;
 
+         #v9.5 u3
+         $tstart = $null
+         $tstop = $null
+         if((Get-Member -InputObject $task.Progress -Name "StartTime") -eq $null) {
+            $tstart = $task.Progress.StartTimeLocal
+            $tstop = $task.Progress.StopTimeLocal
+         } else {
+            $tstart = $task.Progress.StartTime
+            $tstop = $task.Progress.StopTime
+         }
 
          $vm = New-Object -TypeName psobject -Property @{"Name"=$task.Name;
             "Status"=(translate-status -text $text);
             "Color"=(get-rpmcolor -text $text -isbg $false);
-            "StartTime"=(get-timestring -time $task.Progress.StartTime);
-            "EndTime"=(get-timestring -time $task.Progress.StopTime -prev $task.Progress.StartTime);
+            "StartTime"=(get-timestring -time $tstart);
+            "EndTime"=(get-timestring -time $tstop -prev $tstart);
             "Size"=(get-humanreadable -num $task.Progress.ProcessedSize);
             "Read"=(get-humanreadable -num $task.Progress.ReadSize);
             "Transferred"=(get-humanreadable -num $task.Progress.TransferedSize);
@@ -500,11 +516,12 @@ function calculate-vms {
            $failed = $failed +1
          }
         $allvms += $vm
-        $glerr += $messages
+        $glerr += $task.GetDetails()
     }
     return New-Object -TypeName psobject -Property @{vms=$allvms;failed=$failed;success=$success;warning=$warning;glerr=$glerr}
     
 }
+
 function get-veeamserver {
     $versionstring = "Unknown Version"
 
