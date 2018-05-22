@@ -21,5 +21,11 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 **Requires:** Veeam Backup & Replication v9 or v9.5 Data Mover (VeeamAgent.exe). Needs to be run wherever the backup data is stored.
 
 **Usage:** 
+[-Folder]: source folder containing backup files to be extracted
+[-File]: source backup file to be extracted
+-Extension: file extension of content from backup files to be extracted
+-Destination: destination folder with enough free space for extracted files
 
-.\BR-ExtractBackup.ps1
+.\BR-ExtractBackup.ps1 -Folder D:\ -Extension ".xml" -Destination D:\Restored\
+or
+.\BR-ExtractBackup.ps1 -File D:\Backup-Job\backup-job.20180522.vbk -Extension "*" -Destination D:\Restored\
