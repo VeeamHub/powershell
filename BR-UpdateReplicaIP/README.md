@@ -14,7 +14,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ## Project Notes
 **Author:** Johan Huttenga (@johanhuttenga)
 
-**Version:** 0.3
+**Version:** 0.1.0.3
 
 **Function:** Starts a PowerShell background process that watches a Veeam Backup & Replication Failover Plan. This in turn waits for virtual machines to failover and changes their IP Addresses (for Red Hat and CentOs) based on source Replication Job settings. In total this consists of three parts:
 
