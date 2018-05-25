@@ -45,7 +45,7 @@ function New-VHMSQLConnection {
     #>
     [cmdletbinding()]
     param(
-        [string]$SQLLogin=$null,
+        [string]$SQLLogin="",
         [System.Security.SecureString]$SQLPassword=$null,
         [string]$SQLServer="localhost",
         [string]$SQLInstance="VEEAMSQL2012",
@@ -60,7 +60,7 @@ function New-VHMSQLConnection {
     #>
     $connstring = ("Persist Security Info=true;Integrated Security=true;Initial Catalog={2};server={0}\{1}" -f $SQLServer,$SQLInstance,$SQLDB)
 
-    if($SQLLogin -eq $null) {
+    if($SQLLogin -eq "") {
         write-Verbose "Login not set, trying Integrated Security"
         $conn = [System.Data.SqlClient.SqlConnection]::new($connstring)
     } else {
