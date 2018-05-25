@@ -72,7 +72,12 @@ PowerShellHostVersion = '5.0'
 FunctionsToExport = @(
         'Get-VHMVersion',
         'Get-VHMVBRVersion',
+        'New-VHMSQLConnection',
+        'Invoke-VHMSQLQuery',
+        'Get-VHMSQLRepository',
+        'Get-VHMSQLStoragesOnRepository',
         'Get-VHMVBRWinServer',
+        'New-VHM24x7Array',
         'Format-VHMVBRScheduleInfo',
         'New-VHMVBRScheduleInfo',
         'Get-VHMVBRTrafficRule',
