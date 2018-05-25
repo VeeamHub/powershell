@@ -77,6 +77,7 @@ FunctionsToExport = @(
         'Get-VHMSQLRepository',
         'Get-VHMSQLStoragesOnRepository',
         'Get-VHMVBRWinServer',
+        'New-VHM24x7Array',
         'Format-VHMVBRScheduleInfo',
         'New-VHMVBRScheduleInfo',
         'Get-VHMVBRTrafficRule',

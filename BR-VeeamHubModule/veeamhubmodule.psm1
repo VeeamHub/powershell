@@ -586,9 +586,7 @@ function Get-VHMVBRUserRoleMapping {
     return $mappings
 }
 
-<<<<<<< HEAD
 
-=======
 function Export-VHMVBRJob
 {
     Param(
@@ -727,7 +725,9 @@ function Compare-VHMVBRJob {
             "$($compare) `n"
         }
     }
-}function Find-VHMVBRRepository {
+}
+
+function Find-VHMVBRRepository {
     Param($Id, $Name)
     $result = $null
     try { $result = [Veeam.Backup.Core.CBackupRepository]::Get([Guid]::new($Id)) } catch {}
@@ -891,7 +891,6 @@ function Import-VHMVBRJob {
 
     #return $j
 }
->>>>>>> refs/remotes/VeeamHub/master
 
 <#
 gc .\veeamhubmodule.psm1 | Select-String "^function (.*) {"  | % { "Export-ModuleMember -Function {0}" -f $_.Matches.groups[1].value }
