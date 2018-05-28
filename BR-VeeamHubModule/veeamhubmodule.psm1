@@ -39,6 +39,49 @@ function Get-VHMVBRVersion {
     SQL Direct Query support
 #>
 
+<#
+.SYNOPSIS
+Builds up the connection to the SQL server
+
+.DESCRIPTION
+Uses underlying Dotnet calls to directly connect to the database. Use this to build the session. Later you can use the result (connection) to query from the db
+
+.PARAMETER SQLLogin
+The login if you want to use SQL authentication. In case you leave the parameter blank, the connection will use Windows Basic Authentication (works well on the local server if you are admin)
+
+.PARAMETER SQLPassword
+Password for SQL authentication as a SecureString
+
+.PARAMETER SQLPlainTextPassword
+Converts this plaintext into a SecureString and overrides SQL Password. Do not use in production or in script, but can be convenient on the command line
+
+.PARAMETER SQLServer
+The SQL server hosting the VeeamBackup DB
+
+.PARAMETER SQLINSTANCE
+The instance the database is hosted on. The default is VEEAMSQL2012
+
+.PARAMETER SQLDB
+The default the database is hosted on
+
+.EXAMPLE 
+$conn = New-VHMSQLConnection
+Get-VHMSQLRepository -VHMSQLConnection $conn | Format-VHMSQLQuery
+
+On a local server
+
+.EXAMPLE
+$conn = New-VHMSQLConnection -SQLLogin veeamquery -SQLPlainTextPassword mysupersecretpassword -SQLServer 10.1.1.1
+Get-VHMSQLRepository -VHMSQLConnection $conn | Format-VHMSQLQuery
+
+On a remote server, with sqlauthentication
+
+.NOTES
+If you use SQL Authentication, remember that by default mixed mode is not enabled.
+
+Also create a seperate user with only view right on the server to lower the security risk. 
+
+#>
 function New-VHMSQLConnection {
     <#
         securestring from plaintext : ConvertTo-SecureString -String "mypassword" -AsPlainText -Force
@@ -47,11 +90,15 @@ function New-VHMSQLConnection {
     param(
         [string]$SQLLogin="",
         [System.Security.SecureString]$SQLPassword=$null,
+        [string]$SQLPlainTextPassword="",
         [string]$SQLServer="localhost",
         [string]$SQLInstance="VEEAMSQL2012",
         [string]$SQLDB="VeeamBackup"
     )
 
+    if ($SQLPlainTextPassword -ne "") {
+        $SQLPassword = ConvertTo-SecureString -String $SQLPlainTextPassword -AsPlainText -Force
+    }
 
     $VHMSQLConnection = $null
     $conn = $null
@@ -91,14 +138,31 @@ function New-VHMSQLConnection {
     }
     return $VHMSQLConnection
 }
+<#
+.SYNOPSIS
+Helper function that runs queries against the connection
 
+.DESCRIPTION
+Helper function that does queries for the get function. Avoid using. If you have a use case for using invoke-vhmsqlquery, you most likely have a use case to build your own get-vhmsql... function
+
+In that case, fork veeamhub, and contribute 
+
+.PARAMETER VHMSQLConnection
+Connection you make with New-VHMSQLConnection
+
+.PARAMETER scalar
+Means you only expect one row, one column, single value result
+
+.PARAMETER query
+The query you want to execute
+
+#>
 function Invoke-VHMSQLQuery {
     [cmdletbinding()]
     param(
         [Parameter(Mandatory=$true)]$VHMSQLConnection=$null,
         [Parameter(Mandatory=$true)][string]$query=$null,
-        [switch]$scalar=$false,
-        $columns=@("id","name")
+        [switch]$scalar=$false
     )
 
     $result = $null
@@ -112,14 +176,16 @@ function Invoke-VHMSQLQuery {
         <#if you just one to have a single value (1row/1column) returned#>
         $result = $command.ExecuteScalar()
     } else {
-        $result = @()
+        [System.Collections.ArrayList]$result = new-object -type System.Collections.ArrayList
         $reader = $command.ExecuteReader()
-        $c = 0
+       
+        $result = new-object -Type System.Collections.ArrayList
+
         while($reader.Read()) {
            $row = [object[]]::new($reader.FieldCount)
            $colcount = $reader.getvalues($row)
            <#Wrapping so that powershell does not try to convert it to one large array#>
-           $result += New-Object -TypeName psobject -Property @{row=$c++;colcount=$colcount;rowdata=$row}
+           $result.Add($row) | out-null
            
         }
         $reader.Close()
@@ -129,6 +195,80 @@ function Invoke-VHMSQLQuery {
 }
 
 <#
+.SYNOPSIS
+Reformats the SQL query output that you will get with Get-VHMSQL... commands.
+
+.DESCRIPTION
+Reformating takes a lot of processing power. If you need to extract data in scripts, using the format function might slow down the script significantly.
+
+However if you want to see the output on screen or you want to dump to a file, this can prettify the output
+
+.PARAMETER names
+Instead of using COLXXXXX as a column name, you can specifiy alternative names. Might be prettier on screens and for exporting
+
+.PARAMETER select
+Array of Integers. Tells Format-VHMSQLQuery to select only those colums specified
+
+.EXAMPLE
+Get-VHMSQLStoragesOnRepository -VHMSQLConnection $sql | Format-VHMSQLQuery
+
+.EXAMPLE 
+Get-VHMSQLStoragesOnRepository -VHMSQLConnection $sql | Format-VHMSQLQuery -select 8,6,9 -names "Server","Repository","File"
+
+Selecting only certain columns and naming them instead of using COLXXXXX approach
+
+.NOTES
+#>
+function Format-VHMSQLQuery {
+    param(
+        [Parameter(Mandatory=$True,ValueFromPipeline=$True)]
+        $row,
+        $names = @(),
+        $select = @()
+    )
+    begin {
+    }
+    process {
+        $eo = New-Object -type psobject -Property @{}
+        if ($select.count -eq 0) {
+            for($i=0;$i -lt $row.count;$i++) {
+                $name = ("COL{0:D5}" -f $i)
+                if($names.count -gt $i) {
+                    $name = $names[$i]
+                }
+                $eo | Add-Member -NotePropertyName $name -NotePropertyValue $row[$i]
+            }
+        } else {
+            for($i=0;$i -lt $select.count;$i++) {
+                $selector = $select[$i]
+                if ($selector -lt $row.count) {
+                    $name = ("COL{0:D5}" -f $i)
+                    if($names.count -gt $i) {
+                        $name = $names[$i]
+                    }
+                    $eo | Add-Member -NotePropertyName $name -NotePropertyValue $row[$selector]
+                } else {
+                    write-error "Selector $selector out of range"
+                }
+            }
+        }
+        $eo
+    }
+    end {
+    }
+}
+
+<#
+.SYNOPSIS
+Gets the list of repositories
+
+.DESCRIPTION
+The object return is a multidimensional array (technically an arraylist of array)
+
+Every item at the toplevel is a row
+
+Every item at the second level is a column
+
     0 id - id of repo
     1 name - name of repository
     2 host_id - server hosting the repository
@@ -136,6 +276,49 @@ function Invoke-VHMSQLQuery {
     4 meta_repo_id - id of the cluster, this means this repository is an extent
     5 type - if type is 10, it seems to be a scale-out backup repository
     6 custom - if is sobr cluster or not, instead of checking type, use this so changes can be checked in this module
+
+.PARAMETER VHMSQLConnection
+Connection you make with New-VHMSQLConnection
+
+.PARAMETER name
+Name if you want to return a specific repository
+
+.PARAMETER id
+Id if you want to return a specific repository
+
+.PARAMETER columns
+Is a predefined list of parameters that will be select from the query. Try to avoid overridding the columns parameter unless you check the DB structure and you know for sure what you need
+
+.EXAMPLE
+Get-VHMSQLRepository -VHMSQLConnection $conn 
+
+Raw Query
+
+.EXAMPLE
+$query = Get-VHMSQLRepository -VHMSQLConnection $conn
+foreach($row in $query) {
+    write-host ("{0,-30} | {1,-30} | {2}" -f $row[1],$row[3],$row[4])
+}
+
+Making your own table (show you how you can foreach the query result). Use this kind of setup if you are planning to use the query in a script
+
+.EXAMPLE
+Get-VHMSQLRepository -VHMSQLConnection $conn | Format-VHMSQLQuery
+
+Format to show on screen
+
+
+.EXAMPLE
+Get-VHMSQLRepository -VHMSQLConnection $conn | Format-VHMSQLQuery -select 1,3,4 -names "Repo","Server","Path" | ft
+
+Format but select only certain columns
+
+.EXAMPLE
+Get-VHMSQLRepository -VHMSQLConnection $conn | Format-VHMSQLQuery -select 1,3,4 -names "Repo","Server","Path" | Convertto-csv
+
+Format and pipe it to converto-csv if you want to make a dump
+
+Selecting only certain columns and naming them instead of using COLXXXXX approach
 #>
 function Get-VHMSQLRepository {
     [cmdletbinding()]
@@ -162,6 +345,16 @@ LEFT JOIN [VeeamBackup].[dbo].[Hosts] as host ON [repo].[host_id] = [host].[id]
 }
 
 <#
+.SYNOPSIS
+Gets the list of repositories
+
+.DESCRIPTION
+The object return is a multidimensional array (technically an arraylist of array)
+
+Every item at the toplevel is a row
+
+Every item at the second level is a column
+
     0 id - file_id
     1 file_path - as in db, please use scripted path for sobr overview
     2 dir_path - as in db, please use scripted path for sobr overview
@@ -172,6 +365,53 @@ LEFT JOIN [VeeamBackup].[dbo].[Hosts] as host ON [repo].[host_id] = [host].[id]
     7 physical_repo_host_id - id of the host hosting the physical repo, in case of cifs, will be empty
     8 physical_repo_host_name - name of the host hosting the physical repo, in case of cifs, will be empty
     9 full_file_path - scripted full path that should work on both regular repositories as extends
+
+.PARAMETER VHMSQLConnection
+Connection you make with New-VHMSQLConnection
+
+.PARAMETER physrepoid
+ID of the repository that host the file (not the cluster but the extent)
+
+.PARAMETER physreponame
+name of the repository that host the file (not the cluster but the extent)
+
+.PARAMETER hostid
+name of the server on which the repository that host the file (not the cluster but the extent) is hosted
+
+null in case of cifs share
+
+.PARAMETER hostname
+name of the server on which the repository that host the file (not the cluster but the extent) is hosted
+
+null in case of cifs share
+
+.PARAMETER WHERE
+Custom where clase, try to avoid unless you know what you are doing
+
+.PARAMETER columns
+Is a predefined list of parameters that will be select from the query. Try to avoid overridding the columns parameter unless you check the DB structure and you know for sure what you need
+
+.EXAMPLE
+Get-VHMSQLStoragesOnRepository -VHMSQLConnection $conn
+
+.EXAMPLE
+Get-VHMSQLStoragesOnRepository -VHMSQLConnection $conn -physreponame "Backup Repository 1"  | Format-VHMSQLQuery
+
+.EXAMPLE
+$res = Get-VHMSQLStoragesOnRepository -VHMSQLConnection $conn
+foreach($row in $res) {
+    write-host ("{0,-20} | {1,-20} | {2}" -f $row[8],$row[6],$row[9])
+}
+
+.EXAMPLE
+Get-VHMSQLStoragesOnRepository -VHMSQLConnection $conn | Format-VHMSQLQuery
+
+.EXAMPLE
+Get-VHMSQLStoragesOnRepository -VHMSQLConnection $conn | Format-VHMSQLQuery
+
+.EXAMPLE 
+Get-VHMSQLStoragesOnRepository -VHMSQLConnection $conn | Format-VHMSQLQuery -select 8,6,9 -names "Server","Repository","File"
+
 #>
 function Get-VHMSQLStoragesOnRepository {
        [cmdletbinding()]
@@ -215,12 +455,7 @@ LEFT JOIN [VeeamBackup].[dbo].[Hosts] AS physrepohost ON physrepo.host_id = phys
 }
 
 
-<#
-    Remove-Module veeamhubmodule;Import-Module .\veeamhubmodule.psd1
-    $vhmsql = New-VHMSQLConnection -SQLLogin "veeamquery" -SQLPassword (ConvertTo-SecureString -String "mypassword" -AsPlainText -Force) -SQLServer "127.0.0.1" -Verbose
-    Get-VHMSQLRepository -VHMSQLConnection $vhmsql -verbose | % { write-host ("{0} | {1}" -f $_.rowdata[0],$_.rowdata[1] )}
-    Get-VHMSQLStoragesOnRepository -VHMSQLConnection $vhmsql -physreponame sobr02 -verbose | % { write-host ("{0,-20} | {1}" -f $_.rowdata[8],$_.rowdata[9] )}
-#>
+
 <#
     Generic functions
 #>
@@ -901,6 +1136,7 @@ Export-ModuleMember -Function Get-VHMVersion
 Export-ModuleMember -Function Get-VHMVBRVersion
 Export-ModuleMember -Function New-VHMSQLConnection
 Export-ModuleMember -Function Invoke-VHMSQLQuery
+Export-ModuleMember -Function Format-VHMSQLQuery
 Export-ModuleMember -Function Get-VHMSQLRepository
 Export-ModuleMember -Function Get-VHMSQLStoragesOnRepository
 Export-ModuleMember -Function Get-VHMVBRWinServer
