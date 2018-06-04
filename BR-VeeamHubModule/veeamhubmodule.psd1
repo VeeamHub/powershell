@@ -74,6 +74,7 @@ FunctionsToExport = @(
         'Get-VHMVBRVersion',
         'New-VHMSQLConnection',
         'Invoke-VHMSQLQuery',
+        'Format-VHMSQLQuery',
         'Get-VHMSQLRepository',
         'Get-VHMSQLStoragesOnRepository',
         'Get-VHMVBRWinServer',
