@@ -846,7 +846,9 @@ function Export-VHMVBRJob
         $r = [Veeam.Backup.Core.CBackupRepository]::Get([Guid]::new($j.Info.TargetRepositoryId))
         if ([System.Guid]::new($r.HostId) -ne [System.Guid]::Empty) {
             $rh = [Veeam.Backup.Core.Common.CHost]::Get([System.Guid]::new($r.HostId))
-            $rhd = [Veeam.Backup.Core.CPhysicalHost]::Get([System.Guid]::new($rh.PhysHostId))
+            if ($rh -ne [System.Guid]::Empty) {
+                $rhd = [Veeam.Backup.Core.CPhysicalHost]::Get([System.Guid]::new($rh.PhysHostId))
+            }
         }
     }
     $p = @{
