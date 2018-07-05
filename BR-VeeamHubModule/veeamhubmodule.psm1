@@ -832,7 +832,20 @@ function Export-VHMVBRJob
     ## initialize config object
     $v = Get-VHMVBRVersion
     $j = [Veeam.Backup.Core.CBackupJob]::Get($Name)
-    $jo = $j.GetObjectsInJob()
+    $jo = @()
+    $cids = $j.LinkedJobIds
+    $lj = @()
+    if ($j.IsBackupSync) {
+        foreach($cid in $cids)
+        {
+            $c = [Veeam.Backup.Core.CBackupJob]::Get($cid)
+            $jo += $c.GetObjectsInJob()
+            $lj += $c
+        }
+    }
+    else {
+        $jo += $j.GetObjectsInJob()
+    }
     $h = $null
     $hd = $null
     if ([System.Guid]::new($j.TargetHostId) -ne [System.Guid]::Empty) {
@@ -846,7 +859,7 @@ function Export-VHMVBRJob
         $r = [Veeam.Backup.Core.CBackupRepository]::Get([Guid]::new($j.Info.TargetRepositoryId))
         if ([System.Guid]::new($r.HostId) -ne [System.Guid]::Empty) {
             $rh = [Veeam.Backup.Core.Common.CHost]::Get([System.Guid]::new($r.HostId))
-            if ($rh -ne [System.Guid]::Empty) {
+            if ($rh.PhysHostId -ne [System.Guid]::Empty) {
                 $rhd = [Veeam.Backup.Core.CPhysicalHost]::Get([System.Guid]::new($rh.PhysHostId))
             }
         }
@@ -855,6 +868,7 @@ function Export-VHMVBRJob
         'Version'=$v
         'Job'=$j
         'JobObjects'=$jo
+        'LinkedJobs'=$lj
         'TargetHost'=$h
         'TargetHostDetails'=$hd
         'TargetRepository'=$r
@@ -863,16 +877,17 @@ function Export-VHMVBRJob
     }
 
     $o = New-Object -TypeName PSObject -Prop $p
-
     ## cleanup config object
-    $_json = ($o | ConvertTo-Json -Depth 99).Split("`n")
+    $_json = ($o | ConvertTo-Json -Depth 9).Split("`n")
     $json = [System.Text.StringBuilder]::new()
     $skip = $false
+    ## need to eventually write proper json parser
+    ## to exclude specific objects (PublicKey -> Key -> CspKeyContainerInfo -> CryptoKeySecurity)
     for($i = 0; $i -lt $_json.count; $i++) { 
         if ($_json[$i] -like "*RootNode*") { $skip = $true } elseif ($skip -and $_json[$i] -like '*"*') { $skip = $false; $json.Append("},") | Out-Null; }; 
         if (!$skip) { $json.Append(($_json[$i] + "`n")) | Out-Null }
     }
-
+    
     if ($Path.length -gt 0) { $json.ToString() | Out-File -FilePath "$Path\$Name.bcx" }
     else { return $json.ToString() }
 }
