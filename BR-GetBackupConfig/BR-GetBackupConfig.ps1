@@ -18,7 +18,7 @@ $s = @{
 $Server = New-Object -TypeName PSObject -Prop $s
 $SQLConnection = Connect-SQL -Server $SQLServer -Credential $SQLCredential
 InitializeSQLDatabase -Connection $SQLConnection -Database $SQLDatabase
-$CollectionMode = ([ECollectionMode]$Mode).ToString()
+$CollectionMode = $Mode
 $CollectionKeepMinutesIfIncremental = $Interval
 $CollectionStart = "$((Get-Date).ToString('yyyyMMddHHmmss'))"
 

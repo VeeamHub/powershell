@@ -305,8 +305,8 @@ Function Write-Log {
 }
 
 Function Connect-SQL {
-    Param($Server, $Credential, $Database = $null)
-    $ConnectionString = "server=$($Server);uid=$($Credential.GetNetworkCredential().UserName);pwd=$($Credential.GetNetworkCredential().Password)"
+    Param($Server, $Credential, $Database = $null, $Port = 3306)
+    $ConnectionString = "server=$($Server);port=$Port;uid=$($Credential.GetNetworkCredential().UserName);pwd=$($Credential.GetNetworkCredential().Password)"
     if ($Database -ne $null) {
         $ConnectionString += ";database=$($Database)"
     }
@@ -328,16 +328,16 @@ Function InitializeSQLDatabase {
     param($Connection, $Database)
     Invoke-SQLNonQuery -Connection $Connection -String "CREATE DATABASE IF NOT EXISTS ``$($Database)`` DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;"
     Invoke-SQLNonQuery -Connection $Connection -String "USE ``$($Database)``"
-    Invoke-SQLNonQuery -Connection $Connection -String "CREATE TABLE IF NOT EXISTS ``vbr_servers`` (``InstanceId`` varchar(36) NOT NULL,``ParentHostId`` varchar(36) NOT NULL,``HostName`` text NOT NULL,``HostType`` text NOT NULL,``HostOSType`` text NOT NULL,``HostOSInfo`` text NOT NULL,``HostRAM`` int NOT NULL,``HostCpuCount`` int NOT NULL,``HostCpuCores`` int NOT NULL, PRIMARY KEY (``InstanceId``)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;"
-    Invoke-SQLNonQuery -Connection $Connection -String "CREATE TABLE IF NOT EXISTS ``vbr_proxies`` (``InstanceId`` varchar(36) NOT NULL, ``ParentHostId`` varchar(36) NOT NULL, ``ParentHostName`` text NOT NULL, ``ParentHostOSInfo`` text NOT NULL, ``ParentHostRAM`` int NOT NULL, ``ParentHostCpuCount`` int NOT NULL, ``ParentHostCpuCores`` int NOT NULL, ``ProxyName`` text NOT NULL, ``ProxyType`` text NOT NULL, ``ProxyTransportMode`` text NOT NULL, ``ProxyTransportAllowNbdFailover`` text NOT NULL, ``ProxyConcurrentJobs`` text NOT NULL, ``ProxyVersion`` text NOT NULL, ``ProxyVersionIsLatest`` text NOT NULL, ``ProxyThrottlingEnabled`` text NOT NULL, ``ProxyEnabled`` text NOT NULL, PRIMARY KEY (``InstanceId``)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;"
-    Invoke-SQLNonQuery -Connection $Connection -String "CREATE TABLE IF NOT EXISTS ``vbr_repositories`` (``InstanceId`` varchar(36) NOT NULL,``ParentHostId`` varchar(36) NOT NULL,``ParentHostName`` text NOT NULL,``ParentHostOSInfo`` text NOT NULL,``ParentHostRAM`` int NOT NULL,``ParentHostCpuCount`` int NOT NULL,``ParentHostCpuCores`` int NOT NULL,``RepositoryName`` text NOT NULL,``RepositoryType`` text NOT NULL,``RepositoryState`` text NOT NULL,``RepositoryConcurrentJobs`` text NOT NULL,``RepositoryVersionIsLatest`` text NOT NULL,``RepositoryDiskSize`` long NOT NULL,``RepositoryDiskFree`` long NOT NULL,``RepositoryUsePerObjectChains`` text NOT NULL,``RepositoryAvailable`` text NOT NULL, PRIMARY KEY (``InstanceId``)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;"
-    Invoke-SQLNonQuery -Connection $Connection -String "CREATE TABLE IF NOT EXISTS ``vbr_backupjobs`` (``InstanceId`` varchar(36) NOT NULL,``JobName`` text NOT NULL,``JobType`` text NOT NULL,``JobPlatform`` text NOT NULL,``JobRestorePointsToKeep`` text NOT NULL,``JobResult`` text NOT NULL,``CreatedBy`` text NOT NULL,``CreatedOn`` timestamp NOT NULL,``JobNextRunTime`` timestamp NOT NULL,``JobLastRunTime`` timestamp NOT NULL,``JobEnabled`` text NOT NULL,``JobObjects`` text NOT NULL,``JobObjectNames`` text NOT NULL,``JobObjectIds`` text NOT NULL,``JobRestorePoints`` text NOT NULL,``JobSizeOnDisk`` long NOT NULL,``TargetRepositoryId`` varchar(36) NOT NULL, PRIMARY KEY (``InstanceId``)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;"
-    Invoke-SQLNonQuery -Connection $Connection -String "CREATE TABLE IF NOT EXISTS ``vbr_copyjobs`` (``InstanceId`` varchar(36) NOT NULL,``JobName`` text NOT NULL,``JobType`` text NOT NULL,``JobPlatform`` text NOT NULL,``JobRestorePointsToKeep`` text NOT NULL,``JobResult`` text NOT NULL,``CreatedBy`` text NOT NULL,``CreatedOn`` timestamp NOT NULL,``JobNextRunTime`` timestamp NOT NULL,``JobLastRunTime`` timestamp NOT NULL,``JobEnabled`` text NOT NULL,``JobObjects`` text NOT NULL,``JobObjectNames`` text NOT NULL,``JobObjectIds`` text NOT NULL,``JobRestorePoints`` text NOT NULL,``JobSizeOnDisk`` long NOT NULL,``TargetRepositoryId`` varchar(36) NOT NULL, PRIMARY KEY (``InstanceId``)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;"
-    Invoke-SQLNonQuery -Connection $Connection -String "CREATE TABLE IF NOT EXISTS ``vbr_replicajobs`` (``InstanceId`` varchar(36) NOT NULL,``JobName`` text NOT NULL,``JobType`` text NOT NULL,``JobPlatform`` text NOT NULL,``JobRestorePointsToKeep`` text NOT NULL,``JobResult`` text NOT NULL,``CreatedBy`` text NOT NULL,``CreatedOn`` timestamp NOT NULL,``JobNextRunTime`` timestamp NOT NULL,``JobLastRunTime`` timestamp NOT NULL,``JobEnabled`` text NOT NULL,``JobObjects`` text NOT NULL,``JobObjectNames`` text NOT NULL,``JobObjectIds`` text NOT NULL,``JobRestorePoints`` text NOT NULL,``JobSizeOnDisk`` long NOT NULL,``TargetRepositoryId`` varchar(36) NOT NULL, PRIMARY KEY (``InstanceId``)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;"
-    Invoke-SQLNonQuery -Connection $Connection -String "CREATE TABLE IF NOT EXISTS ``vbr_jobobjects`` (``InstanceId`` varchar(36) NOT NULL, ``ObjectName`` text NOT NULL,``ObjectPlatform`` text NOT NULL,``ObjectType`` text NOT NULL,``ObjectSource`` text NOT NULL,``ParentJobId`` varchar(36) NOT NULL, ``ParentJobName`` text NOT NULL,``ParentHostId`` varchar(36) NOT NULL, ``ParentHostName`` text NOT NULL,``ParentHostHierarchyRef`` text NOT NULL, PRIMARY KEY (``InstanceId``)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;"
-    Invoke-SQLNonQuery -Connection $Connection -String "CREATE TABLE IF NOT EXISTS ``vbr_jobevents`` (``InstanceId`` varchar(36) NOT NULL, ``Event`` text NOT NULL, PRIMARY KEY (``InstanceId``)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;"
-    Invoke-SQLNonQuery -Connection $Connection -String "CREATE TABLE IF NOT EXISTS ``vbr_jobhistory`` (``InstanceId`` varchar(36) NOT NULL,``ParentJobId`` varchar(36) NOT NULL, ``SourceObjectId`` varchar(36) NOT NULL,``SourceObject`` text NOT NULL,``TargetRestorePointId`` varchar(36) NOT NULL,``TaskEventId`` varchar(36) NOT NULL,``TaskEventData`` text NOT NULL,``TaskStart`` timestamp NOT NULL,``TaskEnd`` timestamp NOT NULL,``TaskState`` text NOT NULL,``TaskTotalSize`` long NOT NULL,``TaskProcessedUsedSize`` long NOT NULL,``TaskTransferredSize`` long NOT NULL,``SessionStart`` timestamp NOT NULL,``SessionEnd`` timestamp NOT NULL,``SessionState`` text NOT NULL,``SessionResult`` text NOT NULL,``SessionEventId`` varchar(36) NOT NULL,``SessionEventData`` text NOT NULL, ``SessionBackedUpSize`` long NOT NULL, PRIMARY KEY (``InstanceId``)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;"
-    Invoke-SQLNonQuery -Connection $Connection -String "CREATE TABLE IF NOT EXISTS ``vbr_restorepoints`` (``InstanceId`` varchar(36) NOT NULL,``RestorePointPath`` text NOT NULL,``RestorePointObjects`` text NOT NULL,``RestorePointSizeOnDisk`` long NOT NULL,``CreatedOn`` timestamp NOT NULL,``ParentBackupId`` varchar(36) NOT NULL,``ParentRepositoryExtentId`` varchar(36) NOT NULL,``CompressionRatio`` int NOT NULL, ``DeduplicationRatio`` int NOT NULL, PRIMARY KEY (``InstanceId``)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;"
+    Invoke-SQLNonQuery -Connection $Connection -String "CREATE TABLE IF NOT EXISTS ``vbr_servers`` (``InstanceId`` varchar(36) NOT NULL,``ParentHostId`` varchar(36),``HostName`` text,``HostType`` text,``HostOSType`` text,``HostOSInfo`` text,``HostRAM`` int,``HostCpuCount`` int,``HostCpuCores`` int, PRIMARY KEY (``InstanceId``)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;"
+    Invoke-SQLNonQuery -Connection $Connection -String "CREATE TABLE IF NOT EXISTS ``vbr_proxies`` (``InstanceId`` varchar(36) NOT NULL, ``ParentHostId`` varchar(36), ``ParentHostName`` text, ``ParentHostOSInfo`` text, ``ParentHostRAM`` int, ``ParentHostCpuCount`` int, ``ParentHostCpuCores`` int, ``ProxyName`` text, ``ProxyType`` text, ``ProxyTransportMode`` text, ``ProxyTransportAllowNbdFailover`` text, ``ProxyConcurrentJobs`` text, ``ProxyVersion`` text, ``ProxyVersionIsLatest`` text, ``ProxyThrottlingEnabled`` text, ``ProxyEnabled`` text, PRIMARY KEY (``InstanceId``)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;"
+    Invoke-SQLNonQuery -Connection $Connection -String "CREATE TABLE IF NOT EXISTS ``vbr_repositories`` (``InstanceId`` varchar(36) NOT NULL,``ParentHostId`` varchar(36),``ParentHostName`` text,``ParentHostOSInfo`` text,``ParentHostRAM`` int,``ParentHostCpuCount`` int,``ParentHostCpuCores`` int,``RepositoryName`` text,``RepositoryType`` text,``RepositoryState`` text,``RepositoryConcurrentJobs`` text,``RepositoryVersionIsLatest`` text,``RepositoryDiskSize`` long,``RepositoryDiskFree`` long,``RepositoryUsePerObjectChains`` text,``RepositoryAvailable`` text, PRIMARY KEY (``InstanceId``)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;"
+    Invoke-SQLNonQuery -Connection $Connection -String "CREATE TABLE IF NOT EXISTS ``vbr_backupjobs`` (``InstanceId`` varchar(36) NOT NULL,``JobName`` text,``JobType`` text,``JobPlatform`` text,``JobRestorePointsToKeep`` text,``JobResult`` text,``CreatedBy`` text,``CreatedOn`` timestamp,``JobNextRunTime`` timestamp,``JobLastRunTime`` timestamp,``JobEnabled`` text,``JobObjects`` text,``JobObjectNames`` text,``JobObjectIds`` text,``JobRestorePoints`` text,``JobSizeOnDisk`` long,``TargetRepositoryId`` varchar(36), PRIMARY KEY (``InstanceId``)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;"
+    Invoke-SQLNonQuery -Connection $Connection -String "CREATE TABLE IF NOT EXISTS ``vbr_copyjobs`` (``InstanceId`` varchar(36) NOT NULL,``JobName`` text,``JobType`` text,``JobPlatform`` text,``JobRestorePointsToKeep`` text,``JobResult`` text,``CreatedBy`` text,``CreatedOn`` timestamp,``JobNextRunTime`` timestamp,``JobLastRunTime`` timestamp,``JobEnabled`` text,``JobObjects`` text,``JobObjectNames`` text,``JobObjectIds`` text,``JobRestorePoints`` text,``JobSizeOnDisk`` long,``TargetRepositoryId`` varchar(36), PRIMARY KEY (``InstanceId``)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;"
+    Invoke-SQLNonQuery -Connection $Connection -String "CREATE TABLE IF NOT EXISTS ``vbr_replicajobs`` (``InstanceId`` varchar(36) NOT NULL,``JobName`` text,``JobType`` text,``JobPlatform`` text,``JobRestorePointsToKeep`` text,``JobResult`` text,``CreatedBy`` text,``CreatedOn`` timestamp,``JobNextRunTime`` timestamp,``JobLastRunTime`` timestamp,``JobEnabled`` text,``JobObjects`` text,``JobObjectNames`` text,``JobObjectIds`` text,``JobRestorePoints`` text,``JobSizeOnDisk`` long,``TargetRepositoryId`` varchar(36), PRIMARY KEY (``InstanceId``)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;"
+    Invoke-SQLNonQuery -Connection $Connection -String "CREATE TABLE IF NOT EXISTS ``vbr_jobobjects`` (``InstanceId`` varchar(36) NOT NULL, ``ObjectName`` text,``ObjectPlatform`` text,``ObjectType`` text,``ObjectSource`` text,``ParentJobId`` varchar(36), ``ParentJobName`` text,``ParentHostId`` varchar(36), ``ParentHostName`` text,``ParentHostHierarchyRef`` text, PRIMARY KEY (``InstanceId``)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;"
+    Invoke-SQLNonQuery -Connection $Connection -String "CREATE TABLE IF NOT EXISTS ``vbr_jobevents`` (``InstanceId`` varchar(36) NOT NULL, ``Event`` text, PRIMARY KEY (``InstanceId``)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;"
+    Invoke-SQLNonQuery -Connection $Connection -String "CREATE TABLE IF NOT EXISTS ``vbr_jobhistory`` (``InstanceId`` varchar(36) NOT NULL,``ParentJobId`` varchar(36), ``SourceObjectId`` varchar(36),``SourceObject`` text,``TargetRestorePointId`` varchar(36),``TaskEventId`` varchar(36),``TaskEventData`` text,``TaskStart`` timestamp,``TaskEnd`` timestamp,``TaskState`` text,``TaskTotalSize`` long,``TaskProcessedUsedSize`` long,``TaskTransferredSize`` long,``SessionStart`` timestamp,``SessionEnd`` timestamp,``SessionState`` text,``SessionResult`` text,``SessionEventId`` varchar(36),``SessionEventData`` text, ``SessionBackedUpSize`` long, PRIMARY KEY (``InstanceId``)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;"
+    Invoke-SQLNonQuery -Connection $Connection -String "CREATE TABLE IF NOT EXISTS ``vbr_restorepoints`` (``InstanceId`` varchar(36) NOT NULL,``RestorePointPath`` text,``RestorePointObjects`` text,``RestorePointSizeOnDisk`` long,``CreatedOn`` timestamp,``ParentBackupId`` varchar(36),``ParentRepositoryExtentId`` varchar(36),``CompressionRatio`` int, ``DeduplicationRatio`` int, PRIMARY KEY (``InstanceId``)) ENGINE=InnoDB DEFAULT CHARSET=utf8 AUTO_INCREMENT=1 ;"
 }
 
 Function Export-SQL {
@@ -352,19 +352,18 @@ Function Export-SQL {
         $SQLCmd += ") VALUES("
         foreach($p in $o.PsObject.Members) {
             if ($p.MemberType -eq "NoteProperty") {
-                $val = ""
-                if ($p.Value -ne $null) { $val = $p.Value.ToString() }
+                $val = "NULL"
                 if ($p.TypeNameOfValue -eq "System.Int32") { 
-                    if ($p.Value -eq $null -or $p.Value.Length -eq 0) { $val = "0" }
+                    if ($p.Value -ne $null) { $val = $p.Value.ToString() }
                     $SQLCmd += $val + ","
                 }
                 elseif ($p.TypeNameOfValue -eq "System.DateTime") { 
-                    if ($p.Value -eq $null -or $p.Value.Length -eq 0) { $val = "" }
-                    else { $val = $p.Value.ToString("YYYY-MM-dd HH:mm:ss") }
-                    $SQLCmd += " " + $p.Name + "=" + $val + ","
+                    if (!($p.Value -eq $null -or $p.Value.Length -eq 0)) { $val = '"' + $p.Value.ToString("yyyy-MM-dd HH:mm:ss") + '"' }
+                    $SQLCmd += " " + $p.Name + '=' + $val + ','
                 }
                 else {
-                    $SQLCmd += '"' + $val + '",'
+                    if ($p.Value -ne $null) { $val = '"' + $p.Value.ToString() + '"' }
+                    $SQLCmd += $val + ','
                 }
             }
         }
@@ -375,13 +374,13 @@ Function Export-SQL {
                 $val = ""
                 if ($p.Value -ne $null) { $val = $p.Value.ToString() }
                 if ($p.TypeNameOfValue -eq "System.Int32") { 
-                    if ($p.Value -eq $null -or $p.Value.Length -eq 0) { $val = "0" }
+                    if ($p.Value -eq $null -or $p.Value.Length -eq 0) { $val = "NULL" }
                     $SQLCmd += " " + $p.Name + "=" + $val + ","
                 }
                 elseif ($p.TypeNameOfValue -eq "System.DateTime") { 
-                    if ($p.Value -eq $null -or $p.Value.Length -eq 0) { $val = "" }
-                    else { $val = $p.Value.ToString("YYYY-MM-dd HH:mm:ss") }
-                    $SQLCmd += " " + $p.Name + "=" + $val + ","
+                    if ($p.Value -eq $null -or $p.Value.Length -eq 0) { $val = "NULL" }
+                    else { $val = $p.Value.ToString("yyyy-MM-dd HH:mm:ss") }
+                    $SQLCmd += " " + $p.Name + '="' + $val + '",'
                 }
                 else {
                     $SQLCmd += " " + $p.Name + '="' + $val + '",'
