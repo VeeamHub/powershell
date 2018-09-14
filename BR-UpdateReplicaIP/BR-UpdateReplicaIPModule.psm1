@@ -323,73 +323,100 @@ Function Get-VBRFailoverPlanVMs
     $foijs = $FailoverPlan.FailoverPlanObject
     $platform = $foijs[0].item.platform
     $replicationjobs = [Veeam.Backup.Core.CBackupJob]::GetByTypeAndPlatform([Veeam.Backup.Model.EDbJobType]::Replica, $platform, $false)
+    $taggedvms = $null
+	$hclvms = $null
 
     $result = @()
     foreach ($j in $replicationjobs) {
             $roijs = $j.GetObjectsInJob()
             foreach($ro in $roijs) {
-                foreach ($fo in $foijs)
-                {
-                        if ($ro.Location -like $fo.Item.Path)
-                        {
-                            if ($platform -eq [Veeam.Backup.Common.EPlatform]::EHyperV) {
-                                    $rprefix = $j.Options.HvReplicaTargetOptions.ReplicaNamePrefix
-                                    $rsuffix = $j.Options.HvReplicaTargetOptions.ReplicaNameSuffix
-                                    $replicatoptions = $j.Options.HvReplicaTargetOptions
-                            }
-                            elseif ($platform -eq [Veeam.Backup.Common.EPlatform]::EVMware)
-                            {
-                                    $rprefix = $j.Options.ViReplicaTargetOptions.ReplicaNamePrefix
-                                    $rsuffix = $j.Options.ViReplicaTargetOptions.ReplicaNameSuffix
-                                    $replicatoptions = $j.Options.ViReplicaTargetOptions
-                            }
-                            $reiprules = @()
-                            foreach($rule in $j.Options.ReIPRulesOptions.Rules) {
-                                $r = @{
-                                    'SourceIp'=$rule.Source.Ipaddress
-                                    'SourceSubnet'=$rule.Source.SubnetMask
-                                    'TargetIp'=$rule.Target.Ipaddress
-                                    'TargetSubnet'=$rule.Target.SubnetMask
-                                    'TargetGateway'=$rule.Target.DefaultGateway
-                                    'TargetDNS'=[string]::Join(",",$rule.Target.DNSAddresses)
-                                    'TargetWINS'=[string]::Join(",",$rule.Target.WINSAddresses)
-                                }
-                                $reiprules += New-Object -TypeName PSObject -Prop $r
-                            }
-                            if ($j.VssOptions) {
-                                    if ($j.VssOptions.LinCredsId -ne [System.Guid]::Empty) { $rcreds = $j.VssOptions.LinCredsId }
-                                    if ($j.VssOptions.WinCredsId -ne [System.Guid]::Empty) { $rcreds = $j.VssOptions.WinCredsId }
-                                    $rcreds = Get-VBRCredential -Id $rcreds
-                          }
-                            if ($j.TargetHostId) {
-                                    $replicatarget = [Veeam.Backup.Core.Common.CHost]::Get([System.Guid]::new($j.TargetHostId))
-                                    $rtparentci = $replicatarget.GetSoapConnHostInfo()
-                                    $rtparentcreds = (([Veeam.Backup.Core.Common.CHost]::Get([System.Guid]::new($rtparentci.Id))).GetSoapCreds()).CredsId
-                                    $rtparentcreds = Get-VBRCredential -Id $rtparentcreds
-                            }
-                            $p = @{
-                                    'SourceName'=$ro.Name
-                                    'Platform'=$platform
-                                    'Path'=$ro.Location
-                                    'PlanName'=$fo.Name
-                                    'PlanId'=$fo.Id
-                                    'PlanOijId'=$fo.Item.Id
-                                    'JobName'=$j.Name
-                                    'JobId'=$j.Id
-                                    'JobOijId'=$ro.Id
-                                    'ReplicaName'=$rprefix + $ro.Name + $rsuffix
-                                    'TargetHostId'=$j.TargetHostId
-                                    'TargetParentConnectionInfo'=$rtparentci
-                                    'TargetParentCredential'=$rtparentcreds
-                                    'TargetOptions'= $replicatoptions
-                                    'ReipRules'=$reiprules
-                                    'GuestCredential'=$rcreds
-                            }
-                            Write-Log ("$($fo.Item.Name) ($($fo.Item.Path)) is associated with " + $j.Name + ".")
-                            $result += New-Object -TypeName PSObject -Prop $p
-                        }
+                $roij = $ro.GetObject()
+                if ($roij.ViType -eq "Tag") {
+                    if ($taggedvms -eq $null) { $taggedvms = Find-VBRViEntity -Tag }
+                    $roivms = $taggedvms | Where-Object Path -like "$($ro.Location)\*"
+                }
+                else {
+                    if ($hclvms -eq $null) { $hclvms = Find-VBRViEntity -HostsAndClusters }
+                    $roivms = $hclvms | Where-Object Path -like "$($ro.Location)"
+                }
+                foreach ($roivm in $roivms) {
+                    foreach ($fo in $foijs)
+                    {
+                        $result += Find-MatchingReplicationFailoverOijs -FailoverPlan $FailoverPlan -ReplicaJob $j -Platform $platform -ReplicationOij $roivm -FailoverOij $fo
+                    }
                 }
             }
+    }
+    return $result
+}
+
+Function Find-MatchingReplicationFailoverOijs
+{
+    Param($FailoverPlan, $ReplicaJob, $Platform, $ReplicationOij, $FailoverOij)
+
+    $j = $ReplicaJob
+    $ro = $ReplicationOij
+    $fo = $FailoverOij.Item
+
+    $result = @()
+
+    if (($ro.Reference -like $fo.Reference))
+    {
+        if ($platform -eq [Veeam.Backup.Common.EPlatform]::EHyperV) {
+                $rprefix = $j.Options.HvReplicaTargetOptions.ReplicaNamePrefix
+                $rsuffix = $j.Options.HvReplicaTargetOptions.ReplicaNameSuffix
+                $replicatoptions = $j.Options.HvReplicaTargetOptions
+        }
+        elseif ($platform -eq [Veeam.Backup.Common.EPlatform]::EVMware)
+        {
+                $rprefix = $j.Options.ViReplicaTargetOptions.ReplicaNamePrefix
+                $rsuffix = $j.Options.ViReplicaTargetOptions.ReplicaNameSuffix
+                $replicatoptions = $j.Options.ViReplicaTargetOptions
+        }
+        $reiprules = @()
+        foreach($rule in $j.Options.ReIPRulesOptions.Rules) {
+            $r = @{
+                'SourceIp'=$rule.Source.Ipaddress
+                'SourceSubnet'=$rule.Source.SubnetMask
+                'TargetIp'=$rule.Target.Ipaddress
+                'TargetSubnet'=$rule.Target.SubnetMask
+                'TargetGateway'=$rule.Target.DefaultGateway
+                'TargetDNS'=[string]::Join(",",$rule.Target.DNSAddresses)
+                'TargetWINS'=[string]::Join(",",$rule.Target.WINSAddresses)
+            }
+            $reiprules += New-Object -TypeName PSObject -Prop $r
+        }
+        if ($j.VssOptions) {
+                if ($j.VssOptions.LinCredsId -ne [System.Guid]::Empty) { $rcreds = $j.VssOptions.LinCredsId }
+                if ($j.VssOptions.WinCredsId -ne [System.Guid]::Empty) { $rcreds = $j.VssOptions.WinCredsId }
+                $rcreds = Get-VBRCredential -Id $rcreds
+        }
+        if ($j.TargetHostId) {
+                $replicatarget = [Veeam.Backup.Core.Common.CHost]::Get([System.Guid]::new($j.TargetHostId))
+                $rtparentci = $replicatarget.GetSoapConnHostInfo()
+                $rtparentcreds = (([Veeam.Backup.Core.Common.CHost]::Get([System.Guid]::new($rtparentci.Id))).GetSoapCreds()).CredsId
+                $rtparentcreds = Get-VBRCredential -Id $rtparentcreds
+        }
+        $p = @{
+                'SourceName'=$ro.Name
+                'Platform'=$platform
+                'Path'=$fo.Path
+                'PlanName'=$FailoverPlan.Name
+                'PlanId'=$FailoverPlan.Id
+                'PlanOijId'=$fo.Id
+                'JobName'=$j.Name
+                'JobId'=$j.Id
+                'JobOijId'=$ro.Id
+                'ReplicaName'=$rprefix + $ro.Name + $rsuffix
+                'TargetHostId'=$j.TargetHostId
+                'TargetParentConnectionInfo'=$rtparentci
+                'TargetParentCredential'=$rtparentcreds
+                'TargetOptions'= $replicatoptions
+                'ReipRules'=$reiprules
+                'GuestCredential'=$rcreds
+        }
+        Write-Log ("$($fo.Name) ($($fo.Path)) is associated with " + $j.Name + ".")
+        $result += New-Object -TypeName PSObject -Prop $p
     }
     return $result
 }
