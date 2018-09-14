@@ -17,10 +17,6 @@ PowerShell script that creates a new Self Service Tenant and Default Policy Jobs
 To generate the service-veeam.xml file needed to authenticate against the API you need to do the following to generate the file:
 
 $Credential = Get-Credential
-cmdlet Get-Credential at command pipeline position 1
-Supply values for the following parameters:
-User: service.veeam
-Password for user service.veeam: ***********
 $Credential | Export-CliXml -Path service-veeam.xml
 
 - Note: If Tenant and Jobs are already created new jobs will be added with the same names
