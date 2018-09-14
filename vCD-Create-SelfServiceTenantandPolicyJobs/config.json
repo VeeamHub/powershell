@@ -1,0 +1,31 @@
+{
+    "VBRDetails": {
+        "VBRServer":"tpm03-vbr01.aperaturelabs.biz",
+        "VBREMPort":"9398",
+        "Username":"APLABS\\service.veeam",
+        "Password":"passwordxxx",
+        "JobTemplate":"",
+        "Repository":"SOBR-01",
+        "CopyJobRepository":"VCC_1155136"
+    },
+    "TenantDetails": {
+        "vCDServer":"vcloud.aperaturelabs.biz",
+        "vCDOrg":"ORG-003",
+        "vCDOrgvDC":"ORG-003-VDC-001",
+        "Quota":"1024"
+    },
+    "vCDJobDetails": {
+            "Job1":"Policy-1",
+            "Job2":"Policy-2",    
+            "CopyJob2":"Policy-2",    
+            "FullDay":"Friday",
+            "RestorePoints1":"31",
+            "RestorePoints2":"62",
+            "GFSWeeklyBackups":"7",
+            "GFSMonthlyBackups":"12",
+            "GFSQuarterlyBackups":"4",
+            "GFSYearlyBackups":"1",
+            "SimpleRetentionRestorePoints":"7",
+            "RecoveryPointObjectiveValue":"1"
+        }
+}
