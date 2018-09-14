@@ -7,8 +7,8 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-## Project Notes
-PowerShell script that creates a new Self Service Tenant and Default Policy Jobs in the Veeam Self Service Portal
+# Project Notes
+PowerShell script that creates a new Self Service Tenant and Default Policy Jobs in the Veeam vCD Self Service Portal
 
 - Creates a new tenant via the Veeam Enterprise Manager API in the vCD Self Service Portal. 
 - Then creates a number of vCD Backup and/or Backup Copy Jobs for that tenant at the Virtual Datacenter level. 
@@ -16,10 +16,18 @@ PowerShell script that creates a new Self Service Tenant and Default Policy Jobs
 
 To generate the service-veeam.xml file needed to authenticate against the API you need to do the following to generate the file:
 
+```
+
 $Credential = Get-Credential
+cmdlet Get-Credential at command pipeline position 1
+Supply values for the following parameters:
+User: service.veeam
+Password for user service.veeam: ***********
 $Credential | Export-CliXml -Path service-veeam.xml
+
+```
 
 - Note: If Tenant and Jobs are already created new jobs will be added with the same names
 - Note: To be run on a Server installed with the Veeam Backup & Replicaton Console
 
-Set desired Veeam Backup, Backup Copy Job, vCloud Director Tenant and Org Details and Repository and Quota tenant Variables in config.json 
+> Set desired Veeam Backup, Backup Copy Job, vCloud Director Tenant and Org Details and Repository and Quota tenant Variables in config.json 
