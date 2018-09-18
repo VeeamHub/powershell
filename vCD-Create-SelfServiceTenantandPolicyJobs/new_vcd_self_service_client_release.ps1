@@ -26,7 +26,8 @@
     Twitter:        @anthonyspiteri
     Github:         anthonyspiteri
     Credits:        Markus Kraus @vMarkus_K (Self Service Portal Tenant Add)
-                    Hal Yaman
+                    Hal Yaman (Project Member) - cloudoasis.com.au
+                    Kevin Murphy (Project Member) - kjm1979.com
 .LINK
     https://mycloudrevolution.com/2017/08/08/veeam-self-service-backup-portal-fuer-vcloud-director/
     https://gist.github.com/mycloudrevolution/ac7b992d005d78fc196afc76a9491918
