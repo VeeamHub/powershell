@@ -33,7 +33,7 @@
     https://cloudoasis.com.au/2018/09/01/create-veeam-vcd-job-powershell/
 
 .EXAMPLE
-    .\new_vcd_self_service_client.ps1
+    .\new_vcd_self_service_client_release.ps1
 #>
 
 if (!(get-pssnapin -name VeeamPSSnapIn -erroraction silentlycontinue)) 
@@ -212,7 +212,7 @@ function CreatevCDBackupPolicyJobs
         function CreatePolicyJob2
         {
             $JobName = $config.vCDJobDetails.Job2+"-"+$config.TenantDetails.vCDOrg
-            $CopyJobName = $config.vCDJobDetails.CopyJob2+"-"+$config.TenantDetails.vCDOrg+"-BCJ"
+            $CopyJobName = $config.vCDJobDetails.Job2+"-"+$config.TenantDetails.vCDOrg+"-BCJ"
             $JobDescription = 'Default '+$config.vCDJobDetails.Job2
             
             #Set Retention Policy
@@ -232,18 +232,18 @@ function CreatevCDBackupPolicyJobs
             $Job = Get-VBRJob -Name $CopyJobName
             $Options = $Job.GetOptions()
             $Options.GenerationPolicy.RetentionPolicyType = 'GFS'
-            $Options.GenerationPolicy.GFSWeeklyBackups = $vCDJobDetails.GFSWeeklyBackups
-            $Options.GenerationPolicy.GFSMonthlyBackups = $vCDJobDetails.GFSMonthlyBackups
-            $Options.GenerationPolicy.GFSQuarterlyBackups = $vCDJobDetails.GFSQuarterlyBackups
-            $Options.GenerationPolicy.GFSYearlyBackups = $vCDJobDetails.GFSYearlyBackups
+            $Options.GenerationPolicy.GFSWeeklyBackups = $config.vCDJobDetails.GFSWeeklyBackups
+            $Options.GenerationPolicy.GFSMonthlyBackups = $config.vCDJobDetails.GFSMonthlyBackups
+            $Options.GenerationPolicy.GFSQuarterlyBackups = $config.vCDJobDetails.GFSQuarterlyBackups
+            $Options.GenerationPolicy.GFSYearlyBackups = $config.vCDJobDetails.GFSYearlyBackups
             $Options.GenerationPolicy.EnableRechek = $True
             $Options.GenerationPolicy.RecheckDays = [System.DayOfWeek] 'Friday', 'Monday'
             $Options.GenerationPolicy.RecheckScheduleKind = 'Monthly'
             $Options.GenerationPolicy.SyncIntervalStartTime = '14:30:00'
-            $Options.GenerationPolicy.SimpleRetentionRestorePoints = $vCDJobDetails.SimpleRetentionRestorePoints
+            $Options.GenerationPolicy.SimpleRetentionRestorePoints = $config.vCDJobDetails.SimpleRetentionRestorePoints
             $Options.GenerationPolicy.WeeklyBackupDayOfWeek = 'Thursday'
             $Options.GenerationPolicy.RecoveryPointObjectiveUnit = 'Day'
-            $Options.GenerationPolicy.RecoveryPointObjectiveValue = $vCDJobDetails.RecoveryPointObjectiveValue
+            $Options.GenerationPolicy.RecoveryPointObjectiveValue = $config.vCDJobDetails.RecoveryPointObjectiveValue
             $Options.GenerationPolicy.RecheckBackupMonthlyScheduleOptions.DayNumberInMonth = 'Third'
             $Options.GenerationPolicy.RecheckBackupMonthlyScheduleOptions.DayOfWeek = 'Wednesday'
             $Options.GenerationPolicy.RecheckBackupMonthlyScheduleOptions.Months = [Veeam.Backup.Common.Emonth] 'January', 'February'
