@@ -1,0 +1,53 @@
+{
+    "LinuxRepo": {
+            "VBRServer":"localhost",
+            "IpAddress":"",
+            "Username": "centos",
+            "Key":"C:\\veeam_aws_vmc_2509\\KEY-VEEAM-03.pem",
+            "RepoName":"AWS-US-1-REPO-01",
+            "RepoFolder":"/home/repo01"
+        },
+    "VCCProvider": {
+            "VBRServer":"192.168.1.55",
+            "vCenterServer":"lab-vc-01.sliema.lab",
+            "vCenterDVS":"LAB-DVS-00",
+            "vCenterPortGroup":"VM-Management",
+            "vCenterDatastore":"HDD-1",
+            "vCenterResPool":"SDDC",
+            "ESXiHost":"lab-node-01.sliema.lab",
+            "CCUserName":"VCC_1155136",
+            "CCPassword":"xxxxxxxx",
+            "CCServerAddress":"veeam.syd.zettagrid.com",
+            "CCRepoName":"VCC_1155136",
+            "CCPort":"6180",
+            "NEAIPAddress":"192.168.1.239",
+            "NEASubnetMask":"255.255.255.0",
+            "NEAGateway":"192.168.1.254"
+        },
+    "VBRCredentials": {
+            "VBRServer":"192.168.1.55",
+            "Username":"xxxxxxx",
+            "Password":"xxxxxxx"
+        },
+    "VMCCredentials": {
+            "vCenter":"lab-vc-01.sliema.lab",
+            "Username":"administrator@sliema.sso",
+            "Password":"xxxxxxxxx"
+        },
+    "VBRJobDetails": {
+            "DefaultRepo1":"Default Backup Repository",
+            "Job1":"CCR-01",
+            "Job2":"CCB-02",    
+            "Job3":"CCB-03",
+            "TagCatagory1":"Backup",
+            "TagCatagory2":"Replication",
+            "Tag1":"TIER-1",
+            "Tag2":"TIER-2",
+            "Tag3":"TIER-3",
+            "FullDay":"Friday",
+            "Time1":"22:00",
+            "Time2":"02:00",
+            "RestorePoints1":"7",
+            "RestorePoints2":"30"
+        }
+}
