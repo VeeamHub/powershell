@@ -153,10 +153,6 @@ function Add-Linux-Repo
     {
         $host.ui.RawUI.WindowTitle = "Configuring Veeam Linux Repository"
 
-        Start-Sleep 5
-        #Get AWS EC2 Repo Internal IP from Terraform output
-        $AWSIPAddress = Get-Content ip.json | ConvertFrom-json 
-
         #Get Variables from Master Config
         $config = Get-Content config.json | ConvertFrom-Json
 
@@ -168,11 +164,11 @@ function Add-Linux-Repo
 
         #Add Linux Instance to Backup & Replication
         Write-Host ":: Adding Linux Server to Backup & Replication" -ForegroundColor Green
-        Add-VBRLinux -Name $AWSIPAddress.value -Description "Linux Repository" -Credentials $LinuxCredential -WarningAction SilentlyContinue | Out-Null
+        Add-VBRLinux -Name $config.LinuxRepo.IpAddress -Description "Linux Repository" -Credentials $LinuxCredential -WarningAction SilentlyContinue | Out-Null
 
         #Add Linux Repository to Backup & Replication
         Write-Host ":: Creating New Linux Backup Repository" -ForegroundColor Green
-        Add-VBRBackupRepository -Name $config.LinuxRepo.RepoName -Description "AWS Linux Repository" -Type LinuxLocal -Server $AWSIPAddress.value -Folder $config.LinuxRepo.RepoFolder -Credentials $LinuxCredential | Out-Null
+        Add-VBRBackupRepository -Name $config.LinuxRepo.RepoName -Description "AWS Linux Repository" -Type LinuxLocal -Server $config.LinuxRepo.IpAddress -Folder $config.LinuxRepo.RepoFolder -Credentials $LinuxCredential | Out-Null
     }
 
 function Create-vSphereTags

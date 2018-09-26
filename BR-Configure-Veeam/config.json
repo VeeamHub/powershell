@@ -1,7 +1,7 @@
 {
     "LinuxRepo": {
             "VBRServer":"localhost",
-            "IpAddress":"",
+            "IpAddress":"10.0.100.163",
             "Username": "centos",
             "Key":"C:\\veeam_aws_vmc_2509\\KEY-VEEAM-03.pem",
             "RepoName":"AWS-US-1-REPO-01",
