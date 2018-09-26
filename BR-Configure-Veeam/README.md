@@ -37,7 +37,7 @@ PowerShell script to configure a freshly installed Veeam Backup & Replication Se
     EXAMPLE - PS C:\>configure_veeam.ps1 -ClearVBRConfig
 
 ## config.json Breakdown
-All of the variables are configured in the config.json file. Nothing is required to be changed in the main depply script.
+All of the variables are configured in the config.json file. Nothing is required to be changed in the main configure script.
 
     {
         "LinuxRepo": {
