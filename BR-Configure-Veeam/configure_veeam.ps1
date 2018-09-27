@@ -183,7 +183,7 @@ function Create-vSphereTags
         New-TagCategory -Name $config.VBRJobDetails.TagCatagory2 -Cardinality "Single" -EntityType "VirtualMachine" -Description "Backup Jobs Policy Tag" | Out-Null
         
         Write-Host ":: Creating VMware Tags" -ForegroundColor Green
-        New-Tag -Name $config.VBRJobDetails.Tag1 -Category $config.VBRJobDetails.TagCatagory1 | Out-Null
+        New-Tag -Name $config.VBRJobDetails.Tag1 -Category $config.VBRJobDetails.TagCatagory2 | Out-Null
         New-Tag -Name $config.VBRJobDetails.Tag2 -Category $config.VBRJobDetails.TagCatagory1 | Out-Null
         New-Tag -Name $config.VBRJobDetails.Tag3 -Category $config.VBRJobDetails.TagCatagory1 | Out-Null
     }

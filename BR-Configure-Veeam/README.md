@@ -101,3 +101,9 @@ All of the variables are configured in the config.json file. Nothing is required
                         "RestorePoints2":"30"
                 }
     }
+
+### Improvements and Enhancements
+
+- [ ] Error Checking
+- [ ] Add Option for External Windows Repository
+- [ ] Creat Default Cloud Connect Replication 
