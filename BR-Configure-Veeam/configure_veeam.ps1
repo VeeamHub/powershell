@@ -188,7 +188,7 @@ function Create-vSphereTags
         New-Tag -Name $config.VBRJobDetails.Tag3 -Category $config.VBRJobDetails.TagCatagory1 | Out-Null
     }
 
-    function Create-VBRJobs
+function Create-VBRJobs
     {   
         $host.ui.RawUI.WindowTitle = "Creating Veeam Backup & Replication Jobs"
 
