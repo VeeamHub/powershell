@@ -75,11 +75,11 @@
         [Switch]$ClearVBRConfig
     )
 
-if (!$RunAll -and !$RunVBRConfigure -and !$ClearVBRConfig)
+if (!$RunAll -and !$RunVBRConfigure -and !$ClearVBRConfig -and !$CloudConnectOnly)
     {
         Write-Host ""
         Write-Host ":: - ERROR! Script was run without using a parameter..." -ForegroundColor Red -BackgroundColor Black
-        Write-Host ":: - Please use: -RunAll, -RunVBRConfigure or -ClearVBRConfig" -ForegroundColor Yellow -BackgroundColor Black 
+        Write-Host ":: - Please use: -RunAll, -RunVBRConfigure or -CloudConnectOnly or -ClearVBRConfig" -ForegroundColor Yellow -BackgroundColor Black 
         Write-Host ""
         break
     }
