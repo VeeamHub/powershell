@@ -24,6 +24,8 @@
     
 .PARAMETER Runall
         Runs all the functions
+.PARAMETER CloudConnectOnly
+        Runs all the functions to configure the Veeam Backup & Replication Server
 .PARAMETER RunVBRConfigure
         Runs all the functions to configure the Veeam Backup & Replication Server
 .PARAMETER CloudConnectNEA
@@ -59,6 +61,10 @@
         [Parameter(Mandatory=$false,
         ValueFromPipelineByPropertyName=$true)]
         [Switch]$NoCloudConnect,
+
+        [Parameter(Mandatory=$false,
+        ValueFromPipelineByPropertyName=$true)]
+        [Switch]$CloudConnectOnly,
 
         [Parameter(Mandatory=$false,
         ValueFromPipelineByPropertyName=$true)]
@@ -339,6 +345,27 @@ if ($RunAll){
     Write-Host ""
 }
 
+if ($CloudConnectOnly){
+    #Run Code to Configure Cloud Connect Only
+    $StartTimeVB = Get-Date
+    Connect-VBR-Server
+    Write-Host ""
+    Write-Host ":: - Connected to Backup & Replication Server - ::" -ForegroundColor Green -BackgroundColor Black
+    $EndTimeVB = Get-Date
+    $durationVB = [math]::Round((New-TimeSpan -Start $StartTimeVB -End $EndTimeVB).TotalMinutes,2)
+    Write-Host "Execution Time" $durationVB -ForegroundColor Green -BackgroundColor Black
+    Write-Host ""
+
+    $StartTimeVCC = Get-Date
+    Add-VCC-Provider
+    Write-Host ""
+    Write-Host ":: - Veeam Cloud Connect Service Provider Configured - ::" -ForegroundColor Green -BackgroundColor Black
+    $EndTimeVCC = Get-Date
+    $durationVCC = [math]::Round((New-TimeSpan -Start $StartTimeVCC -End $EndTimeVCC).TotalMinutes,2)
+    Write-Host "Execution Time" $durationVCC -ForegroundColor Green -BackgroundColor Black
+    Write-Host ""
+}
+
 if ($RunVBRConfigure){
     #Run the code for VBR configure
 
@@ -400,6 +427,27 @@ if ($RunVBRConfigure){
     $EndTimeJB = Get-Date
     $durationJB = [math]::Round((New-TimeSpan -Start $StartTimeJB -End $EndTimeJB).TotalMinutes,2)
     Write-Host "Execution Time" $durationJB -ForegroundColor Green -BackgroundColor Black
+    Write-Host ""
+}
+
+if ($CloudConnectOnly){
+    #Run Code to Configure Cloud Connect Only
+    $StartTimeVB = Get-Date
+    Connect-VBR-Server
+    Write-Host ""
+    Write-Host ":: - Connected to Backup & Replication Server - ::" -ForegroundColor Green -BackgroundColor Black
+    $EndTimeVB = Get-Date
+    $durationVB = [math]::Round((New-TimeSpan -Start $StartTimeVB -End $EndTimeVB).TotalMinutes,2)
+    Write-Host "Execution Time" $durationVB -ForegroundColor Green -BackgroundColor Black
+    Write-Host ""
+
+    $StartTimeVCC = Get-Date
+    Add-VCC-Provider
+    Write-Host ""
+    Write-Host ":: - Veeam Cloud Connect Service Provider Configured - ::" -ForegroundColor Green -BackgroundColor Black
+    $EndTimeVCC = Get-Date
+    $durationVCC = [math]::Round((New-TimeSpan -Start $StartTimeVCC -End $EndTimeVCC).TotalMinutes,2)
+    Write-Host "Execution Time" $durationVCC -ForegroundColor Green -BackgroundColor Black
     Write-Host ""
 }
 
