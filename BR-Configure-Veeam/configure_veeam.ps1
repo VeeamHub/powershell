@@ -24,6 +24,8 @@
     
 .PARAMETER Runall
         Runs all the functions
+.PARAMETER CloudConnectOnly
+        Runs all the functions to configure the Veeam Backup & Replication Server
 .PARAMETER RunVBRConfigure
         Runs all the functions to configure the Veeam Backup & Replication Server
 .PARAMETER CloudConnectNEA
@@ -62,6 +64,10 @@
 
         [Parameter(Mandatory=$false,
         ValueFromPipelineByPropertyName=$true)]
+        [Switch]$CloudConnectOnly,
+
+        [Parameter(Mandatory=$false,
+        ValueFromPipelineByPropertyName=$true)]
         [Switch]$NoLinuxRepo,
 
         [Parameter(Mandatory=$false,
@@ -69,11 +75,11 @@
         [Switch]$ClearVBRConfig
     )
 
-if (!$RunAll -and !$RunVBRConfigure -and !$ClearVBRConfig)
+if (!$RunAll -and !$RunVBRConfigure -and !$ClearVBRConfig -and !$CloudConnectOnly)
     {
         Write-Host ""
         Write-Host ":: - ERROR! Script was run without using a parameter..." -ForegroundColor Red -BackgroundColor Black
-        Write-Host ":: - Please use: -RunAll, -RunVBRConfigure or -ClearVBRConfig" -ForegroundColor Yellow -BackgroundColor Black 
+        Write-Host ":: - Please use: -RunAll, -RunVBRConfigure or -CloudConnectOnly or -ClearVBRConfig" -ForegroundColor Yellow -BackgroundColor Black 
         Write-Host ""
         break
     }
@@ -183,12 +189,12 @@ function Create-vSphereTags
         New-TagCategory -Name $config.VBRJobDetails.TagCatagory2 -Cardinality "Single" -EntityType "VirtualMachine" -Description "Backup Jobs Policy Tag" | Out-Null
         
         Write-Host ":: Creating VMware Tags" -ForegroundColor Green
-        New-Tag -Name $config.VBRJobDetails.Tag1 -Category $config.VBRJobDetails.TagCatagory1 | Out-Null
+        New-Tag -Name $config.VBRJobDetails.Tag1 -Category $config.VBRJobDetails.TagCatagory2 | Out-Null
         New-Tag -Name $config.VBRJobDetails.Tag2 -Category $config.VBRJobDetails.TagCatagory1 | Out-Null
         New-Tag -Name $config.VBRJobDetails.Tag3 -Category $config.VBRJobDetails.TagCatagory1 | Out-Null
     }
 
-    function Create-VBRJobs
+function Create-VBRJobs
     {   
         $host.ui.RawUI.WindowTitle = "Creating Veeam Backup & Replication Jobs"
 
@@ -339,6 +345,27 @@ if ($RunAll){
     Write-Host ""
 }
 
+if ($CloudConnectOnly){
+    #Run Code to Configure Cloud Connect Only
+    $StartTimeVB = Get-Date
+    Connect-VBR-Server
+    Write-Host ""
+    Write-Host ":: - Connected to Backup & Replication Server - ::" -ForegroundColor Green -BackgroundColor Black
+    $EndTimeVB = Get-Date
+    $durationVB = [math]::Round((New-TimeSpan -Start $StartTimeVB -End $EndTimeVB).TotalMinutes,2)
+    Write-Host "Execution Time" $durationVB -ForegroundColor Green -BackgroundColor Black
+    Write-Host ""
+
+    $StartTimeVCC = Get-Date
+    Add-VCC-Provider
+    Write-Host ""
+    Write-Host ":: - Veeam Cloud Connect Service Provider Configured - ::" -ForegroundColor Green -BackgroundColor Black
+    $EndTimeVCC = Get-Date
+    $durationVCC = [math]::Round((New-TimeSpan -Start $StartTimeVCC -End $EndTimeVCC).TotalMinutes,2)
+    Write-Host "Execution Time" $durationVCC -ForegroundColor Green -BackgroundColor Black
+    Write-Host ""
+}
+
 if ($RunVBRConfigure){
     #Run the code for VBR configure
 
@@ -400,6 +427,27 @@ if ($RunVBRConfigure){
     $EndTimeJB = Get-Date
     $durationJB = [math]::Round((New-TimeSpan -Start $StartTimeJB -End $EndTimeJB).TotalMinutes,2)
     Write-Host "Execution Time" $durationJB -ForegroundColor Green -BackgroundColor Black
+    Write-Host ""
+}
+
+if ($CloudConnectOnly){
+    #Run Code to Configure Cloud Connect Only
+    $StartTimeVB = Get-Date
+    Connect-VBR-Server
+    Write-Host ""
+    Write-Host ":: - Connected to Backup & Replication Server - ::" -ForegroundColor Green -BackgroundColor Black
+    $EndTimeVB = Get-Date
+    $durationVB = [math]::Round((New-TimeSpan -Start $StartTimeVB -End $EndTimeVB).TotalMinutes,2)
+    Write-Host "Execution Time" $durationVB -ForegroundColor Green -BackgroundColor Black
+    Write-Host ""
+
+    $StartTimeVCC = Get-Date
+    Add-VCC-Provider
+    Write-Host ""
+    Write-Host ":: - Veeam Cloud Connect Service Provider Configured - ::" -ForegroundColor Green -BackgroundColor Black
+    $EndTimeVCC = Get-Date
+    $durationVCC = [math]::Round((New-TimeSpan -Start $StartTimeVCC -End $EndTimeVCC).TotalMinutes,2)
+    Write-Host "Execution Time" $durationVCC -ForegroundColor Green -BackgroundColor Black
     Write-Host ""
 }
 

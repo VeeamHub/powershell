@@ -37,8 +37,9 @@ PowerShell script to configure a freshly installed Veeam Backup & Replication Se
 
     PARAMETER Runall - Runs all the functions
     PARAMETER RunVBRConfigure - Runs all the functions to configure the Veeam Backup & Replication Server
+    PARAMETER CloudConnectOnly - Used on it's own to configure a Cloud Connect Provider 
     PARAMETER CloudConnectNEA - When used with RunAll or RunVBRConfigure will deploy and configure the Cloud Connect Network Extension Appliance
-    PARAMETER NoCloudConnect - When used with RunAll or RunVBRConfigure will not configure the Cloud Connect component
+    PARAMETER NoCloudConnect - When used with RunAll or RunVBRConfigure or CloudConnectOnly will not configure the Cloud Connect component
     PARAMETER NoLinuxRepo - When used with RunAll or RunVBRConfigure will not add and configure the Linux Repository
     PARAMETER ClearVBRConfig - Will clear all previously configured settings and return Veeam Backup & Replication Server to default install
 
@@ -101,3 +102,9 @@ All of the variables are configured in the config.json file. Nothing is required
                         "RestorePoints2":"30"
                 }
     }
+
+### Improvements and Enhancements
+
+- [ ] Error Checking
+- [ ] Add Option for External Windows Repository
+- [ ] Creat Default Cloud Connect Replication 
