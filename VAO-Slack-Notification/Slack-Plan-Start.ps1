@@ -1,8 +1,8 @@
 ﻿param([string]$PlanName, [string]$PlanState)
 
 Import-Module PSSlack
-$Uri = "https://hooks.slack.com/services/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"
-$Channel = "vao-test"
+$Uri = "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
+$Channel = "YOURCHANNEL"
 
 [string]$Message = "+----------------------------------------------------------------------------+"
 $Message += "" | Out-String
