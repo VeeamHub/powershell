@@ -2,7 +2,7 @@
 
 Import-Module PSSlack
 $Uri = "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
-$Channel = "YOURCHANNEL"
+$Channel = "CHANNELNAME"
 
 [string]$Message = "+----------------------------------------------------------------------------+"
 $Message += "" | Out-String
