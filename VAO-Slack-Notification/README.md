@@ -9,6 +9,6 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ## Project Notes
 
-**Author:** Jorge De La Cruz Berg
+**Author:** Jorge De La Cruz
 
 **Function:** A simple, yet powerful, Slack notification to be added as part of the VAO steps
