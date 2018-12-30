@@ -15,7 +15,7 @@
     Note: There is no error checking or halt on error function
     Note: Set desired Veeam and vCenter variables in config.json 
 .NOTES
-    Version:        1.0
+    Version:        1.1
     Author:         Anthony Spiteri
     Twitter:        @anthonyspiteri
     Github:         anthonyspiteri
@@ -34,6 +34,8 @@
         When used with RunAll or RunVBRConfigure will not configure the Cloud Connect component
 .PARAMETER NoLinuxRepo
         When used with RunAll or RunVBRConfigure will not add and configure the Linux Repository
+.PARAMETER NoDefaultJobs
+        Will not configure Tags or Default Jobs when run with RunVBRConfigure
 .PARAMETER ClearVBRConfig
         Will clear all previously configured settings and return Veeam Backup & Replication Server to default install
 .EXAMPLE
@@ -69,6 +71,10 @@
         [Parameter(Mandatory=$false,
         ValueFromPipelineByPropertyName=$true)]
         [Switch]$NoLinuxRepo,
+
+        [Parameter(Mandatory=$false,
+                   ValueFromPipelineByPropertyName=$true)]
+        [Switch]$NoDefaultJobs,
 
         [Parameter(Mandatory=$false,
                    ValueFromPipelineByPropertyName=$true)]
@@ -411,23 +417,26 @@ if ($RunVBRConfigure){
             Write-Host ""
         }
 
-    $StartTimeTG = Get-Date
-    Create-vSphereTags
-    Write-Host ""
-    Write-Host ":: - vSphere Tags Created - ::" -ForegroundColor Green -BackgroundColor Black
-    $EndTimeTG = Get-Date
-    $durationTG = [math]::Round((New-TimeSpan -Start $StartTimeTG -End $EndTimeTG).TotalMinutes,2)
-    Write-Host "Execution Time" $durationTG -ForegroundColor Green -BackgroundColor Black
-    Write-Host ""
-    
-    $StartTimeJB = Get-Date
-    Create-VBRJobs
-    Write-Host ""
-    Write-Host ":: - Backup Jobs Configured - ::" -ForegroundColor Green -BackgroundColor Black
-    $EndTimeJB = Get-Date
-    $durationJB = [math]::Round((New-TimeSpan -Start $StartTimeJB -End $EndTimeJB).TotalMinutes,2)
-    Write-Host "Execution Time" $durationJB -ForegroundColor Green -BackgroundColor Black
-    Write-Host ""
+    if(!$NoDefaultJobs)
+        {
+            $StartTimeTG = Get-Date
+            Create-vSphereTags
+            Write-Host ""
+            Write-Host ":: - vSphere Tags Created - ::" -ForegroundColor Green -BackgroundColor Black
+            $EndTimeTG = Get-Date
+            $durationTG = [math]::Round((New-TimeSpan -Start $StartTimeTG -End $EndTimeTG).TotalMinutes,2)
+            Write-Host "Execution Time" $durationTG -ForegroundColor Green -BackgroundColor Black
+            Write-Host ""
+            
+            $StartTimeJB = Get-Date
+            Create-VBRJobs
+            Write-Host ""
+            Write-Host ":: - Backup Jobs Configured - ::" -ForegroundColor Green -BackgroundColor Black
+            $EndTimeJB = Get-Date
+            $durationJB = [math]::Round((New-TimeSpan -Start $StartTimeJB -End $EndTimeJB).TotalMinutes,2)
+            Write-Host "Execution Time" $durationJB -ForegroundColor Green -BackgroundColor Black
+            Write-Host ""
+        }
 }
 
 if ($CloudConnectOnly){

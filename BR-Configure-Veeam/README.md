@@ -41,6 +41,7 @@ PowerShell script to configure a freshly installed Veeam Backup & Replication Se
     PARAMETER CloudConnectNEA - When used with RunAll or RunVBRConfigure will deploy and configure the Cloud Connect Network Extension Appliance
     PARAMETER NoCloudConnect - When used with RunAll or RunVBRConfigure or CloudConnectOnly will not configure the Cloud Connect component
     PARAMETER NoLinuxRepo - When used with RunAll or RunVBRConfigure will not add and configure the Linux Repository
+    PARAMETER NoDefaultJobs - Will not configure Tags or Default Jobs when run with RunVBRConfigure
     PARAMETER ClearVBRConfig - Will clear all previously configured settings and return Veeam Backup & Replication Server to default install
 
     EXAMPLE - PS C:\>configure_veeam.ps1 -RubVBRConfigure -NoLinuxRepo
