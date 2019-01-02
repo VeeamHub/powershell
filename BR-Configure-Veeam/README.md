@@ -25,11 +25,12 @@ PowerShell script to configure a freshly installed Veeam Backup & Replication Se
     Note: Set desired Veeam and vCenter variables in config.json
 
 ## Requirements
-- Veeam Backup & Replication Console
+- Veeam Backup & Replication Console (Update 4 in order to Configure Capacity Tier for SOBR)
 - Veeam Backup & Replication Details and Credentials
 - vSphere Details and Credentials
 - Linux Server Details and Credentials*
 - Veeam Cloud Connect Provider Credentials*
+- AWS Access and Secret key along with Amazon S3 Bucket Details*
 
 *Can be excluded from config
 
@@ -42,10 +43,13 @@ PowerShell script to configure a freshly installed Veeam Backup & Replication Se
     PARAMETER NoCloudConnect - When used with RunAll or RunVBRConfigure or CloudConnectOnly will not configure the Cloud Connect component
     PARAMETER NoLinuxRepo - When used with RunAll or RunVBRConfigure will not add and configure the Linux Repository
     PARAMETER NoDefaultJobs - Will not configure Tags or Default Jobs when run with RunVBRConfigure
+    PARAMETER ConfigureSOBR - Will configure a SOBR with two extents when run with RunVBRConfigure with an AWS S3 Capacity Teir
+    PARAMETER NoCapacityTier - Will not configure an AWS S3 Based Object Storage Repo when used with ConfigureSOBR
     PARAMETER ClearVBRConfig - Will clear all previously configured settings and return Veeam Backup & Replication Server to default install
 
-    EXAMPLE - PS C:\>configure_veeam.ps1 -RubVBRConfigure -NoLinuxRepo
+    EXAMPLE - PS C:\>configure_veeam.ps1 -RunVBRConfigure -NoLinuxRepo
     EXAMPLE - PS C:\>configure_veeam.ps1 -ClearVBRConfig
+    EXAMPLE - PS C:\>configure_veeam.ps1 -RunVBRConfigure -ConfigureSOBR -NoCapacityTier
 
 ## config.json Breakdown
 All of the variables are configured in the config.json file. Nothing is required to be changed in the main configure script.
@@ -59,6 +63,20 @@ All of the variables are configured in the config.json file. Nothing is required
                         "RepoName":"AWS-US-1-REPO-01",
                         "RepoFolder":"/home/repo01"
                 },
+          "SOBRRepo": {
+                        "AWSAccesskey":"",
+                        "AWSSecretkey":"",
+                        "S3Folder": "",
+                        "S3Bucket":"",
+                        "ObjectStorageRepoName":"",
+                        "ObjectStorageRepoLimit":"",
+                        "RepoName":"",
+                        "RepoExtent1":"",
+                        "RepoExtent2":"",
+                        "RepoPath1":"",
+                        "RepoPath2":"",
+                        "RestoreWindow":""
+                 },
         "VCCProvider": {
                         "VBRServer":"172.17.0.229",
                         "vCenterServer":"lab-vc-01.sliema.lab",
