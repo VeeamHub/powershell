@@ -7,6 +7,20 @@
             "RepoName":"AWS-US-1-REPO-01",
             "RepoFolder":"/home/repo01"
         },
+    "SOBRRepo": {
+            "AWSAccesskey":"",
+            "AWSSecretkey":"",
+            "S3Folder": "",
+            "S3Bucket":"",
+            "ObjectStorageRepoName":"",
+            "ObjectStorageRepoLimit":"",
+            "RepoName":"",
+            "RepoExtent1":"",
+            "RepoExtent2":"",
+            "RepoPath1":"",
+            "RepoPath2":"",
+            "RestoreWindow":""
+        },
     "VCCProvider": {
             "VBRServer":"192.168.1.55",
             "vCenterServer":"lab-vc-01.sliema.lab",

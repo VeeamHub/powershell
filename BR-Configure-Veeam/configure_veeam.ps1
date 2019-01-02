@@ -15,7 +15,7 @@
     Note: There is no error checking or halt on error function
     Note: Set desired Veeam and vCenter variables in config.json 
 .NOTES
-    Version:        1.1
+    Version:        1.2
     Author:         Anthony Spiteri
     Twitter:        @anthonyspiteri
     Github:         anthonyspiteri
@@ -38,6 +38,10 @@
         Will not configure Tags or Default Jobs when run with RunVBRConfigure
 .PARAMETER ClearVBRConfig
         Will clear all previously configured settings and return Veeam Backup & Replication Server to default install
+.PARAMETER ConfigureSOBR
+        Will configure a SOBR with two extents when run with RunVBRConfigure with an AWS S3 Capacity Teir
+.PARAMETER NoCapacityTier
+        Will not configure an AWS S3 Based Object Storage Repo when used with ConfigureSOBR
 .EXAMPLE
         PS C:\>configure_veeam.ps1 -RubVBRConfigure -NoLinuxRepo
 .EXAMPLE
@@ -75,6 +79,14 @@
         [Parameter(Mandatory=$false,
                    ValueFromPipelineByPropertyName=$true)]
         [Switch]$NoDefaultJobs,
+
+        [Parameter(Mandatory=$false,
+                   ValueFromPipelineByPropertyName=$true)]
+        [Switch]$ConfigureSOBR,
+
+        [Parameter(Mandatory=$false,
+                   ValueFromPipelineByPropertyName=$true)]
+        [Switch]$NoCapacityTier,
 
         [Parameter(Mandatory=$false,
                    ValueFromPipelineByPropertyName=$true)]
@@ -181,6 +193,47 @@ function Add-Linux-Repo
         #Add Linux Repository to Backup & Replication
         Write-Host ":: Creating New Linux Backup Repository" -ForegroundColor Green
         Add-VBRBackupRepository -Name $config.LinuxRepo.RepoName -Description "AWS Linux Repository" -Type LinuxLocal -Server $config.LinuxRepo.IpAddress -Folder $config.LinuxRepo.RepoFolder -Credentials $LinuxCredential | Out-Null
+    }
+
+function Add-SOBR
+    {
+        $host.ui.RawUI.WindowTitle = "Configuring Veeam SOBR Repository"
+        
+        #Configure Capacity Tier with Amazon S3
+        if(!$NoCapacityTier)
+            {
+                #Add AWS Account Credentials
+                Add-VBRAmazonAccount -AccessKey $config.SOBRRepo.AWSAccessKey -SecretKey $config.SOBRRepo.AWSSecretKey | Out-Null
+                
+                #Set AWS Account Variables
+                $AWSAccount = Get-VBRAmazonAccount
+                $AWSConnection = Connect-VBRAmazonS3Service -Account $AWSAccount -RegionType Global -ServiceType CapacityTier
+                $AWSBucket = Get-VBRAmazonS3Bucket -Connection $AWSConnection -Name $config.SOBRRepo.S3Bucket
+                        
+                #Create new Amazon S3 Folder
+                New-VBRAmazonS3Folder -Connection $AWSConnection -Bucket $AWSBucket -Name $config.SOBRRepo.S3Folder | Out-Null
+        
+                $AWSFolder = Get-VBRAmazonS3Folder -Connection $AWSConnection -Bucket $AWSBucket
+        
+                #Add new Amazon S3 backed Object Storage Repository
+                Add-VBRAmazonS3Repository -Name $config.SOBRRepo.ObjectStorageRepoName -AmazonS3Folder $AWSFolder -Connection $AWSConnection -EnableSizeLimit -SizeLimit $config.SOBRRepo.ObjectStorageRepoLimit | Out-Null
+            }
+
+        $VBRServer = Get-VBRServer -Name $config.VBRCredentials.VBRServer
+
+        #Add Two Repositories
+        Add-VBRBackupRepository -Name $config.SOBRRepo.RepoExtent1 -Type WinLocal -Server $VBRServer  -Folder $config.SOBRRepo.RepoPath1 -LimitConcurrentJobs -MaxConcurrentJobs 10 -UsePerVMFile | Out-Null
+        Add-VBRBackupRepository -Name $config.SOBRRepo.RepoExtent2 -Type WinLocal -Server $VBRServer  -Folder $config.SOBRRepo.RepoPath2 -LimitConcurrentJobs -MaxConcurrentJobs 10 -UsePerVMFile | Out-Null
+        
+        #Add SOBR with or without Capacity Teir
+        if(!$NoCapacityTier)
+            {
+                Add-VBRScaleOutBackupRepository -Name $config.SOBRRepo.RepoName -PolicyType DataLocality -Extent $config.SOBRRepo.RepoExtent1, $config.SOBRRepo.RepoExtent2 -UsePerVMBackupFiles -EnableCapacityTier -ObjectStorageRepository $config.SOBRRepo.ObjectStorageRepoName -OperationalRestorePeriod $config.SOBRRepo.RestoreWindow | Out-Null
+            }
+        else
+            {
+                Add-VBRScaleOutBackupRepository -Name $config.SOBRRepo.RepoName -PolicyType DataLocality -Extent $config.SOBRRepo.RepoExtent1, $config.SOBRRepo.RepoExtent2 -UsePerVMBackupFiles | Out-Null
+            }
     }
 
 function Create-vSphereTags
@@ -416,6 +469,18 @@ if ($RunVBRConfigure){
             Write-Host "Execution Time" $durationLR -ForegroundColor Green -BackgroundColor Black
             Write-Host ""
         }
+
+    if ($ConfigureSOBR)
+        {
+            $StartTimeSR = Get-Date
+            Add-SOBR
+            Write-Host ""
+            Write-Host ":: - Veeam SOBR Repository Configured - ::" -ForegroundColor Green -BackgroundColor Black
+            $EndTimeSR = Get-Date
+            $durationSR = [math]::Round((New-TimeSpan -Start $StartTimeSR -End $EndTimeSR).TotalMinutes,2)
+            Write-Host "Execution Time" $durationLR -ForegroundColor Green -BackgroundColor Black
+            Write-Host ""
+        }  
 
     if(!$NoDefaultJobs)
         {
