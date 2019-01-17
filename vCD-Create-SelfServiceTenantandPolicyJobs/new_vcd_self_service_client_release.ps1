@@ -21,7 +21,7 @@
     Set desired Veeam variables and vCloud Director, Repository and Quota tenant Variables in config.json 
 
 .NOTES
-    Version:        1.0
+    Version:        1.0.1
     Author:         Anthony Spiteri
     Twitter:        @anthonyspiteri
     Github:         anthonyspiteri
@@ -76,7 +76,7 @@ if ($HTTPS -eq $True) {$Proto = "https"} else {$Proto = "http"}
 #endregion
  
 #region: POST - Authorization
-[String] $URL = $Proto + "://" + $Server + ":" + $Port + "/api/sessionMngr/?v=latest"
+[String] $URL = $Proto + "://" + $Server + ":" + $Port + "/api/sessionMngr/?v=v1_3"
 Write-Verbose "Authorization Url: $URL"
 $Auth = @{uri = $URL;
             Method = 'POST';
