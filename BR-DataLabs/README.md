@@ -5,6 +5,11 @@ IVMR_SecureRestore.ps1 - This script is an example of how to run an Instant VM R
 
 EntireVMRecovery_StagedRestore.PS1 - This is an example of a script to invoke an entire vm recovery, note that this script calls another script that will need to present on the local VBR server. 
 
+VeeamPSSnapIn_PowerShellCommands.ps1 - This script contains some more options when it comes to Staged Restore, We have three options. 
+	"Normal Entire VM Recovery"
+	"Staged Restore Demo No Application Group Required"
+	"Staged Restore Demo Application Group Required"
+	
 ## Distributed under MIT 
 
 license
