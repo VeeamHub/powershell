@@ -1,5 +1,5 @@
-# VeeamDataLabs
-This Repo will contain scripts that enable VeeamDataLabs
+# Veeam DataLabs
+This repository will contain scripts that enable VeeamDataLabs
 
 IVMR_SecureRestore.ps1 - This script is an example of how to run an Instant VM Recovery process 
 
