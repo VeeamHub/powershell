@@ -113,11 +113,9 @@ The code inside is executed and expected to return an array. For analysis, we on
 This does mean that you need to have actually one Job defined and have one Backup etc..
 
 # Actual Dump
-Updated on {0}
+Using VeeamPSSnapIn {0}
 
-
-
-"@ -f (get-date -UFormat "+%y/%m/%d - %H:%M:%S")))
+"@ -f ((Get-PSSnapin -Name VeeamPSSnapin).PSVersion.ToString())))
 
 
 
