@@ -134,6 +134,10 @@ $dumps += New-Object -TypeName psobject -Property @{
     ObjectCode=@('$VBRJob = @(Get-VBRJob)[0]');
 }
 $dumps += New-Object -TypeName psobject -Property @{
+    Prefix="VBRJobObject";
+    ObjectCode=@('$job = @(Get-VBRJob | where { $_.JobType -eq "Backup" })[0]','$VBRJobObject  = Get-VBRJobObject -job $job');
+}
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRJobOptions";
     ObjectCode=@('$job = @(Get-VBRJob | where { $_.JobType -eq "Backup" })[0]','$VBRJobOptions  = Get-VBRJobOptions -job $job');
 }
