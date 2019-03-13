@@ -186,7 +186,7 @@ foreach ($dump in $dumps) {
         Dump-VBRObject -object $o -header ("{0} [{1}]" -f $dump.Prefix,$o.GetType().Fullname) -objectcode $dump.ObjectCode -prefix ("`${0}" -f $dump.Prefix) -sb $sbfile -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
 
         $fname =  (mdfile -name $dump.Prefix)
-        $sbfile.ToString() | Out-File -FilePath $fname
+        $sbfile.ToString() | Out-File -FilePath $fname -Encoding utf8
 
         [void]$sb.AppendLine(("* [{0}](./{1}.md)" -f $dump.Prefix,$dump.Prefix))
     } else {
@@ -195,4 +195,4 @@ foreach ($dump in $dumps) {
 }
 
 
-$sb.ToString() | Out-File -FilePath $dumpfile
+$sb.ToString() | Out-File -FilePath $dumpfile -Encoding utf8
