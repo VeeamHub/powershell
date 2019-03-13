@@ -129,53 +129,50 @@ $blacklisttype = @("System.String","System.String[]","System.TimeSpan","System.D
 
 
 $dumps = @()
-$dumps += New-Object -TypeName psobject -ArgumentList @{
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRJobOptions";
     ObjectCode=@('$job = @(Get-VBRJob | where { $_.JobType -eq "Backup" })[0]','$VBRJobOptions  = Get-VBRJobOptions -job $job');
 }
-$dumps += New-Object -TypeName psobject -ArgumentList @{
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRJobScheduleOptions";
     ObjectCode=@('$job = @(Get-VBRJob | where { $_.JobType -eq "Backup" })[0]','$VBRJobScheduleOptions = Get-VBRJobScheduleOptions -job $job');
 }
-$dumps += New-Object -TypeName psobject -ArgumentList @{
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRJobVSSOptions";
     ObjectCode=@('$job = @(Get-VBRJob | where { $_.JobType -eq "Backup" })[0]','$VBRJobVSSOptions = Get-VBRJobVSSOptions -job $job');
 }
-$dumps += New-Object -TypeName psobject -ArgumentList @{
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRJobObjectVssOptions";
     ObjectCode=@('$job = @(Get-VBRJob | where { $_.JobType -eq "Backup" })[0]','$JobObject = @(Get-VBRJobObject -job $Job)[0]','$VBRJobObjectVssOptions = Get-VBRJobObjectVssOptions -ObjectInJob $JobObject');
 }
-
-$dumps += New-Object -TypeName psobject -ArgumentList @{
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRBackup";
     ObjectCode=@('$VBRBackup = @(Get-VBRBackup)[0]');
 }
-
-$dumps += New-Object -TypeName psobject -ArgumentList @{
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRBackupStorage";
     ObjectCode=@('$VBRBackup = @(Get-VBRBackup)[0]','$VBRBackupStorage = @($VBRBackup.GetAllStorages())[0]');
 }
-
-$dumps += New-Object -TypeName psobject -ArgumentList @{
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRBackupPoint";
     ObjectCode=@('$VBRBackup = @(Get-VBRBackup)[0]','$VBRBackupPoint = @($VBRBackup.GetPoints())[0]');
 }
-$dumps += New-Object -TypeName psobject -ArgumentList @{
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRRestorePoint";
     ObjectCode=@('$VBRBackup = @(Get-VBRBackup)[0]','$VBRRestorePoint = @($VBRBackup | Get-VBRRestorePoint )[0]');
 }
-$dumps += New-Object -TypeName psobject -ArgumentList @{
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRBackupSession";
     ObjectCode=@('$VBRBackupSession = @(Get-VBRBackupSession | ? {$_.JobType -eq "Backup"})[0]');
 }
-$dumps += New-Object -TypeName psobject -ArgumentList @{
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRBackupSessionTaskSession";
     ObjectCode=@('$VBRBackupSession = @(Get-VBRBackupSession | ? {$_.JobType -eq "Backup"})[0]','$VBRBackupSessionTaskSession = @($VBRBackupSession.GetTaskSessions())[0]');
 }
 
 
 
-foreach ($dump in $dumps) {
+foreach ($dump in $dumps | Sort Prefix) {
     $sbfile = New-Object -TypeName "System.Text.StringBuilder";
     $dump.ObjectCode | % {
      invoke-expression $_
