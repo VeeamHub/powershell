@@ -130,6 +130,10 @@ $blacklisttype = @("System.String","System.String[]","System.TimeSpan","System.D
 
 $dumps = @()
 $dumps += New-Object -TypeName psobject -Property @{
+    Prefix="VBRJob";
+    ObjectCode=@('$VBRJob = @(Get-VBRJob)[0]');
+}
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRJobOptions";
     ObjectCode=@('$job = @(Get-VBRJob | where { $_.JobType -eq "Backup" })[0]','$VBRJobOptions  = Get-VBRJobOptions -job $job');
 }
