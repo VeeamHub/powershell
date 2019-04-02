@@ -228,11 +228,11 @@ function Add-SOBR
         #Add SOBR with or without Capacity Teir
         if(!$NoCapacityTier)
             {
-                Add-VBRScaleOutBackupRepository -Name $config.SOBRRepo.RepoName -PolicyType DataLocality -Extent $config.SOBRRepo.RepoExtent1 $config.SOBRRepo.RepoExtent2 -UsePerVMBackupFiles -EnableCapacityTier -ObjectStorageRepository $config.SOBRRepo.ObjectStorageRepoName -OperationalRestorePeriod $config.SOBRRepo.RestoreWindow | Out-Null
+                Add-VBRScaleOutBackupRepository -Name $config.SOBRRepo.RepoName -PolicyType DataLocality -Extent $config.SOBRRepo.RepoExtent1, $config.SOBRRepo.RepoExtent2 -UsePerVMBackupFiles -EnableCapacityTier -ObjectStorageRepository $config.SOBRRepo.ObjectStorageRepoName -OperationalRestorePeriod $config.SOBRRepo.RestoreWindow | Out-Null
             }
         else
             {
-                Add-VBRScaleOutBackupRepository -Name $config.SOBRRepo.RepoName -PolicyType DataLocality -Extent $config.SOBRRepo.RepoExtent1 $config.SOBRRepo.RepoExtent2 -UsePerVMBackupFiles | Out-Null
+                Add-VBRScaleOutBackupRepository -Name $config.SOBRRepo.RepoName -PolicyType DataLocality -Extent $config.SOBRRepo.RepoExtent1, $config.SOBRRepo.RepoExtent2 -UsePerVMBackupFiles | Out-Null
             }
     }
 
