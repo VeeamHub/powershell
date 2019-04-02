@@ -222,17 +222,17 @@ function Add-SOBR
         $VBRServer = Get-VBRServer -Name $config.VBRCredentials.VBRServer
 
         #Add Two Repositories
-        Add-VBRBackupRepository -Name $config.SOBRRepo.RepoExtent1 -Type WinLocal -Server $VBRServer  -Folder $config.SOBRRepo.RepoPath1 -LimitConcurrentJobs -MaxConcurrentJobs 10 -UsePerVMFile | Out-Null
-        Add-VBRBackupRepository -Name $config.SOBRRepo.RepoExtent2 -Type WinLocal -Server $VBRServer  -Folder $config.SOBRRepo.RepoPath2 -LimitConcurrentJobs -MaxConcurrentJobs 10 -UsePerVMFile | Out-Null
+        Add-VBRBackupRepository -Name $config.SOBRRepo.RepoExtent1 -Type WinLocal -Server $VBRServer -Folder $config.SOBRRepo.RepoPath1 -LimitConcurrentJobs -MaxConcurrentJobs 10 -UsePerVMFile | Out-Null
+        Add-VBRBackupRepository -Name $config.SOBRRepo.RepoExtent2 -Type WinLocal -Server $VBRServer -Folder $config.SOBRRepo.RepoPath2 -LimitConcurrentJobs -MaxConcurrentJobs 10 -UsePerVMFile | Out-Null
         
         #Add SOBR with or without Capacity Teir
         if(!$NoCapacityTier)
             {
-                Add-VBRScaleOutBackupRepository -Name $config.SOBRRepo.RepoName -PolicyType DataLocality -Extent $config.SOBRRepo.RepoExtent1, $config.SOBRRepo.RepoExtent2 -UsePerVMBackupFiles -EnableCapacityTier -ObjectStorageRepository $config.SOBRRepo.ObjectStorageRepoName -OperationalRestorePeriod $config.SOBRRepo.RestoreWindow | Out-Null
+                Add-VBRScaleOutBackupRepository -Name $config.SOBRRepo.RepoName -PolicyType DataLocality -Extent $config.SOBRRepo.RepoExtent1 $config.SOBRRepo.RepoExtent2 -UsePerVMBackupFiles -EnableCapacityTier -ObjectStorageRepository $config.SOBRRepo.ObjectStorageRepoName -OperationalRestorePeriod $config.SOBRRepo.RestoreWindow | Out-Null
             }
         else
             {
-                Add-VBRScaleOutBackupRepository -Name $config.SOBRRepo.RepoName -PolicyType DataLocality -Extent $config.SOBRRepo.RepoExtent1, $config.SOBRRepo.RepoExtent2 -UsePerVMBackupFiles | Out-Null
+                Add-VBRScaleOutBackupRepository -Name $config.SOBRRepo.RepoName -PolicyType DataLocality -Extent $config.SOBRRepo.RepoExtent1 $config.SOBRRepo.RepoExtent2 -UsePerVMBackupFiles | Out-Null
             }
     }
 
