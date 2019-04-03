@@ -1,8 +1,13 @@
-Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn;
-
-$VeeamBackupJobName = "Everyone Backup"
-$VeeamRepository = "MailBackup"
-$OrgUnit = "DC=ACME,DC=local"                                      
+$VeeamBackupJobName = "Job Name"
+$VeeamRepository = "Repository name"
+$OrgUnit = "DC=ACME,DC=local"
+$username = "0365admin@acme.local"
+$pwdTxt = Get-Content "C:\temp\ExportedPassword.txt"
+$securePwd = $pwdTxt | ConvertTo-SecureString
+$exc_cred = New-Object System.Management.Automation.PSCredential -ArgumentList $username, $securePwd
+#$exc_cred = Get-Credential                                         # Comment out to use interactive authentication
+$session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $exc_cred -Authentication Basic -AllowRedirection
+Import-PSSession $session
 
 $org = Get-VBOOrganization                                         # Retruns Exchange Organization
 if ($org -eq $null) {
@@ -26,10 +31,22 @@ Catch
     Exit 1
 }
 
-# Exchange Powershell call - Return all Exchange Mailboex under the Organitional Unit $OrgUnit defined above.
+# Exchange Online Powershell call - Return all Exchange Mailboxes for the user contained in $OrgUnit.
 Try
 {
-    $mbxs = Get-Mailbox -OrganizationalUnit $OrgUnit -ResultSize Unlimited
+    $mbxs = @()
+    $no_licensed_user = @()
+    foreach ($user in Get-ADUser -Filter * -SearchBase $OrgUnit){
+        $found = Get-Mailbox -Identity $user.Name
+        if ($found -eq $null){
+          $no_licensed_user += @($found)
+        } else {
+          $mbxs += @($found)
+        }
+    }
+
+    Write-Host "Users with no licensed mailbox will be skipped:"
+    Write-Host $no_licensed_user
 }
 Catch
 {
@@ -45,8 +62,7 @@ $i=1
 ForEach ($MailBox in $MailBoxes) {
   Write-Progress -Activity "Parsing Mailboxes" -status "Mailbox $Mailbox.Email" -percentComplete ($i / $Mailboxes.count * 100)
   ForEach ($mbx in $mbxs) {
-     if ($MailBox.Email -match $mbx.EmailAddresses[0].AddressString ) {
-#         Write-Host $mbx.EmailAddresses[0].AddressString
+     if ($MailBox.Email -match $mbx.UserPrincipalName ) {
          $FinalList += @($MailBox)
      }
   }
