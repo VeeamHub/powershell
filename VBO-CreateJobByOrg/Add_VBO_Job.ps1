@@ -3,13 +3,13 @@ $VeeamRepository = "Repository name"
 $OrgUnit = "DC=ACME,DC=local"
 $username = "0365admin@acme.local"
 $pwdTxt = Get-Content "C:\temp\ExportedPassword.txt"
-$securePwd = $pwdTxt | ConvertTo-SecureString
+$securePwd = $pwdTxt | ConvertTo-SecureString -AsPlainText -Force
 $exc_cred = New-Object System.Management.Automation.PSCredential -ArgumentList $username, $securePwd
 #$exc_cred = Get-Credential                                         # Comment out to use interactive authentication
 $session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $exc_cred -Authentication Basic -AllowRedirection
 Import-PSSession $session
 
-$org = Get-VBOOrganization                                         # Retruns Exchange Organization
+$org = Get-VBOOrganization                                         # Returns Exchange Organization
 if ($org -eq $null) {
     Write-host "No Exchange organization is defined!"
     exit 1
@@ -62,7 +62,7 @@ $i=1
 ForEach ($MailBox in $MailBoxes) {
   Write-Progress -Activity "Parsing Mailboxes" -status "Mailbox $Mailbox.Email" -percentComplete ($i / $Mailboxes.count * 100)
   ForEach ($mbx in $mbxs) {
-     if ($MailBox.Email -match $mbx.UserPrincipalName ) {
+     if ($MailBox.Email -match $mbx.UserPrincipalName) {
          $FinalList += @($MailBox)
      }
   }
