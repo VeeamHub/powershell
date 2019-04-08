@@ -32,7 +32,7 @@ Catch
     Exit 1
 }
 
-# Exchange Powershell call - Return all Exchange Mailboxes under the Organizational Unit $OrgUnit defined above.
+# Exchange Online Powershell call - Return all Exchange Mailboxes under the Organizational Unit $OrgUnit defined above.
 Try
 {
   $mbxs = @()
