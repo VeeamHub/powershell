@@ -222,8 +222,8 @@ function Add-SOBR
         $VBRServer = Get-VBRServer -Name $config.VBRCredentials.VBRServer
 
         #Add Two Repositories
-        Add-VBRBackupRepository -Name $config.SOBRRepo.RepoExtent1 -Type WinLocal -Server $VBRServer  -Folder $config.SOBRRepo.RepoPath1 -LimitConcurrentJobs -MaxConcurrentJobs 10 -UsePerVMFile | Out-Null
-        Add-VBRBackupRepository -Name $config.SOBRRepo.RepoExtent2 -Type WinLocal -Server $VBRServer  -Folder $config.SOBRRepo.RepoPath2 -LimitConcurrentJobs -MaxConcurrentJobs 10 -UsePerVMFile | Out-Null
+        Add-VBRBackupRepository -Name $config.SOBRRepo.RepoExtent1 -Type WinLocal -Server $VBRServer -Folder $config.SOBRRepo.RepoPath1 -LimitConcurrentJobs -MaxConcurrentJobs 10 -UsePerVMFile | Out-Null
+        Add-VBRBackupRepository -Name $config.SOBRRepo.RepoExtent2 -Type WinLocal -Server $VBRServer -Folder $config.SOBRRepo.RepoPath2 -LimitConcurrentJobs -MaxConcurrentJobs 10 -UsePerVMFile | Out-Null
         
         #Add SOBR with or without Capacity Teir
         if(!$NoCapacityTier)

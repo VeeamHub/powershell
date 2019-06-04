@@ -21,7 +21,7 @@
     Set desired Veeam variables and vCloud Director, Repository and Quota tenant Variables in config.json 
 
 .NOTES
-    Version:        1.0
+    Version:        1.0.1
     Author:         Anthony Spiteri
     Twitter:        @anthonyspiteri
     Github:         anthonyspiteri
