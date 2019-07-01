@@ -19,8 +19,8 @@
 .LINK
     
 .EXAMPLE
-        PS C:\>map_unmap_vCD_job -map
-        PS C:\>map_unmap_vCD_job -unmap
+        PS C:\>vCD_job -map
+        PS C:\>vCD_job -unmap
 #>
 
 [CmdletBinding()]
