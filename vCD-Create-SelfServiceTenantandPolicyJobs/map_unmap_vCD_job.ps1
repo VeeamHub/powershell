@@ -13,6 +13,8 @@
     Twitter:        @anthonyspiteri
     Github:         anthonyspiteri
     Credits:        Luca Dell'Oca @dellock6 (https://www.virtualtothecore.com/automated-veeam-cloud-connect-deployment-5-replication-services-for-vcloud-director)
+                    Show-Options
+                    Get-Userchoice
     
 .LINK
     
