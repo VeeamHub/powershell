@@ -322,8 +322,4 @@ foreach ($policy in $policyInfo){
 Write-Output ""
 Write-Warning "DO NOT FORGET TO RECONFIGURE APP-AWARE PROCESSING ON THE POLICIES LISTED IN THE PSOBJECT RETURNED"
 
-<<<<<<< HEAD
 return $appaware
-=======
-$appaware | ConvertTo-Json -Depth 10
->>>>>>> 2ef3ebbc9fb9d6b223419f059086d6c84983a758
