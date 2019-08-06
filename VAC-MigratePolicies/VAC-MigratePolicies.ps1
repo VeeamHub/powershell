@@ -44,56 +44,32 @@
 	VAC-MigratePolicies returns a series of color coded text outputs showing success/warning/error
 
 .EXAMPLE
-	VAC-MigratePolicies.ps1 -VAC "vac.contoso.local" -VAC_Username "vac\jsmith" -VAC_Password "password"
-		-SQL "sql.contoso.local" -SQL_Username "vac_ro" -SQL_Password "password"
+	VAC-MigratePolicies.ps1 -Source "vac.contoso.local" -S_Username "vac\jsmith" -S_Password "password"
+		-Destination "vac.contoso.local" -D_Username "vac_ro" -D_Password "password"
 
 	Description 
 	-----------     
-	Connect to the specified VAC/SQL server using the username/password specified
+	Migrate Backup Policies on the specified VAC servers using the username/password specified
 
 .EXAMPLE
-	VAC-MigratePolicies.ps1 -VAC "vac.contoso.local" -VAC_Credential (Get-Credential)
-		-SQL "sql.contoso.local" -SQL_Credential (Get-Credential)
+	VAC-MigratePolicies.ps1 -Source "vac.contoso.local" -S_Credential (Get-Credential)
+		-Destination "vac.contoso.local" -D_Credential (Get-Credential)
 
 	Description 
 	-----------     
 	PowerShell credentials object is supported
 
 .EXAMPLE
-	VAC-MigratePolicies.ps1 -VAC "vac.contoso.local" -Credential $cred_vac
-		-SQL "sql.contoso.local" -SQL_Credential $cred_sql -Detailed
-
-	Description 
-	-----------     
-	Includes a detailed list of all metrics (and then some) used to generate the monthly usage report
-
-.EXAMPLE
-	VAC-MigratePolicies.ps1 -VAC "vac.contoso.local" -VAC_Username "vac\jsmith" -VAC_Password "password"
-		-SQL "sql.contoso.local" -SQL_Username "vac_ro" -SQL_Password "password" -Database "Custom_VAC_DB"
-
-	Description 
-	-----------     
-	Connecting to a SQL Database other than the default "VAC"
-
-.EXAMPLE
-	VAC-MigratePolicies.ps1 -VAC "vac.contoso.local" -VAC_Username "vac\jsmith" -VAC_Password "password"
-		-SQL "sql.contoso.local\MainInstance" -SQL_Username "vac_ro" -SQL_Password "password"
-
-	Description 
-	-----------     
-	Connecting to a SQL server with multiple instances
-
-.EXAMPLE
-	VAC-MigratePolicies.ps1 -VAC "vac.contoso.local" -VAC_Username "vac\jsmith" -VAC_Password "password" -VAC_Port 9999
-		-SQL "sql.contoso.local" -SQL_Username "vac_ro" -SQL_Password "password"
+	VAC-MigratePolicies.ps1 -Source "vac.contoso.local" -S_Credential $cred_source -S_Port 9999
+		-Destination "vac.contoso.local" -D_Credential $cred_dest -D_Port 9999
 
 	Description 
 	-----------     
 	Connecting to a VAC server using a non-standard API port
 
 .EXAMPLE
-	VAC-MigratePolicies.ps1 -VAC "vac.contoso.local" -VAC_Username "vac\jsmith" -VAC_Password "password"
-		-SQL "sql.contoso.local" -SQL_Username "vac_ro" -SQL_Password "password" -AllowSelfSignedCerts
+	VAC-MigratePolicies.ps1 -Source "vac.contoso.local" -S_Username "vac\jsmith" -S_Password "password"
+		-Destination "vac.contoso.local" -D_Username "vac_ro" -D_Password "password" -AllowSelfSignedCerts
 
 	Description 
 	-----------     
@@ -101,7 +77,7 @@
 
 .NOTES
 	NAME:  VAC-MigratePolicies.ps1
-	VERSION: 0.4
+	VERSION: 0.6
 	AUTHOR: Chris Arceneaux
 	TWITTER: @chris_arceneaux
 	GITHUB: https://github.com/carceneaux
@@ -110,7 +86,7 @@
 	https://arsano.ninja/
 
 .LINK
-	https://www.powershellgallery.com/packages/SqlServer
+	https://helpcenter.veeam.com/docs/vac/rest/post_backuppolicies.html?ver=30
 #>
 #Requires -Modules SqlServer
 [CmdletBinding(DefaultParametersetName="UsePass")]
@@ -172,8 +148,8 @@ Function Get-BackupPolicies{
 	)
 
 	# GET /v2/backupPolicies
-	[String] $url = "https://" + $vac + ":" + $port + "/v2/backupPolicies" +
-		'?$filter=' + "type%20ne%20'Predefined'" # Filters out predefined policies
+	[String] $url = "https://" + $vac + ":" + $port + "/v2/backupPolicies"
+	# not filtering out predefined policies to make sure we have 1 to 1 matches
 	Write-Verbose "VAC Get Backup Policies Url: $url"
 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 	$headers.Add("Authorization", "Bearer $token")
@@ -284,7 +260,7 @@ if ($D_Credential){
 
 # Authenticating to both VAC servers
 $s_token = Get-AuthToken -VAC $Source -Username $s_username -Password $s_password -Port $s_port
-#$d_token = Get-AuthToken -VAC $Destination -Username $d_username -Password $d_password -Port $d_port
+$d_token = Get-AuthToken -VAC $Destination -Username $d_username -Password $d_password -Port $d_port
 
 # Retrieving Source Backup Policies
 $s_policies = Get-BackupPolicies -VAC $Source -Port $s_port -Token $s_token
@@ -299,11 +275,11 @@ foreach ($policy in $s_policies){
 }
 
 # Retrieving Destination Backup Policies
-$d_token = Get-AuthToken -VAC $Destination -Username $d_username -Password $d_password -Port $d_port
 $d_policies = Get-BackupPolicies -VAC $Destination -Port $d_port -Token $d_token
 
 # Comparing policies by name to see if there are any matches
 $compared = Compare-Object -IncludeEqual -ExcludeDifferent $s_policies.name $d_policies.name
+
 #$compared = Select-Object @{n='InputObject';e={'Lobster-Laptop'}} -InputObject '' # for debugging purposes
 $copyAll = $true # boolean to determine if all of the policies are copied to the destination VAC server
 if ($compared.Count -gt 0){
@@ -313,21 +289,37 @@ if ($compared.Count -gt 0){
 }
 
 # Creating new Backup Policies on Destination VAC server
+$appaware = @()
 foreach ($policy in $policyInfo){
-	if ($copyAll -eq $true){ # no duplicate policies found
-		# $name = $policy.name
-		# $name = "testing_$name"
-		# $policy.name = $name # adding pseudo policy name for debugging and avoiding duplicates
-		$response = New-BackupPolicy -VAC $Destination -Port $d_port -Token $d_token -Policy ($policy | ConvertTo-Json)
-		Write-ColorOutput green "Policy created successfully: $($policy.name)"
-	} elseif ($policy.name -notin $compared.InputObject) { # filtering out duplicate policies
-		# $name = $policy.name
-		# $name = "testing_$name"
-		# $policy.name = $name # adding pseudo policy name for debugging and avoiding duplicates
-		$response = New-BackupPolicy -VAC $Destination -Port $d_port -Token $d_token -Policy ($policy | ConvertTo-Json)
+	if (($copyAll -eq $true) -or ($policy.name -notin $compared.InputObject)){
+		# Unable to support migration of app-aware processing options
+		if ($policy.guestProcessingSettings.processingEnabled -eq $true){
+			# Adding app-aware processing options to the PSObject output
+			$appawareObject = [PSCustomObject] @{name = $policy.name}
+			$appawareObject | Add-Member -NotePropertyName processingEnabled $true
+			$appawareObject | Add-Member -NotePropertyName processingType $policy.guestProcessingSettings.processingType
+			$appawareObject | Add-Member -NotePropertyName sqlOptions $policy.guestProcessingSettings.sqlOptions
+			$appawareObject | Add-Member -NotePropertyName oracleOptions $policy.guestProcessingSettings.oracleOptions
+			$appawareObject | Add-Member -NotePropertyName sharePointOptions $policy.guestProcessingSettings.sharePointOptions
+			$appawareObject | Add-Member -NotePropertyName scriptOptions $policy.guestProcessingSettings.scriptOptions
+			$appaware += $appawareObject
+			# Removing app-aware processing options of policy prior to importing
+			$policy.guestProcessingSettings.processingEnabled = $false
+			$policy.guestProcessingSettings.PSObject.Properties.Remove('processingType')
+			$policy.guestProcessingSettings.PSObject.Properties.Remove('sqlOptions')
+			$policy.guestProcessingSettings.PSObject.Properties.Remove('oracleOptions')
+			$policy.guestProcessingSettings.PSObject.Properties.Remove('sharePointOptions')
+			$policy.guestProcessingSettings.PSObject.Properties.Remove('scriptOptions')
+			Write-ColorOutput red "Removing app-aware processing options from policy: $($policy.name)"
+		}
+		$response = New-BackupPolicy -VAC $Destination -Port $d_port -Token $d_token -Policy ($policy | ConvertTo-Json -Depth 10)
 		Write-ColorOutput green "Policy created successfully: $($policy.name)"
 	} else { # skipping duplicate policies
 		Write-ColorOutput yellow "Policy marked duplicate. Skipping: $($policy.name)"
-	}
-	
+	}	
 }
+
+Write-Output ""
+Write-Warning "DO NOT FORGET TO RECONFIGURE APP-AWARE PROCESSING ON THE POLICIES LISTED IN THE PSOBJECT RETURNED"
+
+return $appaware
