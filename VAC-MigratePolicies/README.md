@@ -38,4 +38,5 @@ Get-Help .\VAC-MigratePolicies.ps1
 After the script has completed, don't forget to...
 
 * Fix Application-Aware Processing settings accordingly on the newly created Backup Policies.
+* PASSWORDS ARE NOT TRANSFERRED! Any and all passwords on all policies must be re-entered after the migration.
 * Assign private Backup Policies to their corresponding companies.

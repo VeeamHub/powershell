@@ -88,7 +88,6 @@
 .LINK
 	https://helpcenter.veeam.com/docs/vac/rest/post_backuppolicies.html?ver=30
 #>
-#Requires -Modules SqlServer
 [CmdletBinding(DefaultParametersetName="UsePass")]
 param(
     [Parameter(Mandatory=$true)]
@@ -312,11 +311,16 @@ foreach ($policy in $policyInfo){
 			$policy.guestProcessingSettings.PSObject.Properties.Remove('scriptOptions')
 			Write-ColorOutput red "Removing app-aware processing options from policy: $($policy.name)"
 		}
+		# Checking for encryption hint value
+		if ($policy.advancedSettings.encryptionHint){
+			$policy.advancedSettings.encryptionHint = $policy.advancedSettings.encryptionHint -Replace " ","_"
+			Write-ColorOutput yellow "Encryption hint found. Replacing spaces: $($policy.name)"
+		}
 		$response = New-BackupPolicy -VAC $Destination -Port $d_port -Token $d_token -Policy ($policy | ConvertTo-Json -Depth 10)
 		Write-ColorOutput green "Policy created successfully: $($policy.name)"
 	} else { # skipping duplicate policies
 		Write-ColorOutput yellow "Policy marked duplicate. Skipping: $($policy.name)"
-	}	
+	}
 }
 
 Write-Output ""
