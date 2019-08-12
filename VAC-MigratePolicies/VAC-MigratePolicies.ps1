@@ -10,7 +10,7 @@
 .PARAMETER Source
 	Source VAC Server IP or FQDN
 
-.PARAMETER Source_UserName
+.PARAMETER S_Username
 	Source VAC Portal Administrator account username
 
 .PARAMETER S_Password
@@ -25,7 +25,7 @@
 .PARAMETER Destination
 	Destination VAC Server IP or FQDN
 
-.PARAMETER D_UserName
+.PARAMETER D_Username
 	Destination VAC Portal Administrator account username
 
 .PARAMETER D_Password
