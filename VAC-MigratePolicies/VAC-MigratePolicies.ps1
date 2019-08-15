@@ -291,7 +291,9 @@ if ($compared.Count -gt 0){
 $appaware = @()
 foreach ($policy in $policyInfo){
 	if (($copyAll -eq $true) -or ($policy.name -notin $compared.InputObject)){
-		# Unable to support migration of app-aware processing options
+
+		<# BEGIN - Comment out code below if hotfix for issue 182543 has been applied. #>
+		# Workaround for API bug - app-aware processing
 		if ($policy.guestProcessingSettings.processingEnabled -eq $true){
 			# Adding app-aware processing options to the PSObject output
 			$appawareObject = [PSCustomObject] @{name = $policy.name}
@@ -311,7 +313,9 @@ foreach ($policy in $policyInfo){
 			$policy.guestProcessingSettings.PSObject.Properties.Remove('scriptOptions')
 			Write-ColorOutput red "Removing app-aware processing options from policy: $($policy.name)"
 		}
-		# Checking for encryption hint value
+		<# END - Comment out code above if hotfix for issue 182543 has been applied. #>
+
+		# Workaround for API bug - spaces in encryption hint
 		if ($policy.advancedSettings.encryptionHint){
 			$policy.advancedSettings.encryptionHint = $policy.advancedSettings.encryptionHint -Replace " ","_"
 			Write-ColorOutput yellow "Encryption hint found. Replacing spaces: $($policy.name)"
@@ -323,7 +327,8 @@ foreach ($policy in $policyInfo){
 	}
 }
 
-Write-Output ""
-Write-Warning "DO NOT FORGET TO RECONFIGURE APP-AWARE PROCESSING ON THE POLICIES LISTED IN THE PSOBJECT RETURNED"
-
-return $appaware
+if ($appaware) {
+	Write-Output ""
+	Write-Warning "DO NOT FORGET TO RECONFIGURE APP-AWARE PROCESSING ON THE POLICIES LISTED IN THE PSOBJECT RETURNED"
+	return $appaware
+}

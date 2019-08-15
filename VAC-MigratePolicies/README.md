@@ -24,12 +24,16 @@ Chris Arceneaux (@chris_arceneaux)
 
 This script will allow you to migrate all Backup Policies from one VAC instance to another. This can be highly beneficial when consolidating VAC appliances.
 
+### Known Issues
+
+* _POST /v2/backupPolicies_ - API call fails when Application-Aware Processing settings are defined. A workaround has been coded in this script to remove all app-aware settings from policies and let you know which policies were changed.
+  * There currently exists a hotfix (#182543) for this behavior. If you apply this hotfix, you can comment/delete lines 295-316 of the `VAC-MigratePolicies.ps1` script.
+* _POST /v2/backupPolicies_ - API call fails when an Encryption Hint is defined with spaces in it. A workaround has been coded in this script to replace all spaces with underscores in the Encryption Hint.
+
 ### Requirements
 
-**NOTE:** There is a bug in the - _POST /v2/backupPolicies_ - API call that prevents Application-Aware Processing settings from being defined. To work around this, this script will strip the app-aware settings from the policy prior to creation. After the script has completed, it will output the Backup Policies that need to be fixed as well as the settings to configure.
-
 * Veeam Availability Console version 2 Update 1 & version 3.x
-  * Portal Administrator account used to access the Rest API.
+  * Portal Administrator account used to access each Rest API.
 
 ### Usage
 
