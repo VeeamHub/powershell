@@ -315,11 +315,14 @@ foreach ($policy in $policyInfo){
 		}
 		<# END - Comment out code above if hotfix for issue 182543 has been applied. #>
 
+		<# BEGIN - Comment out code below if hotfix for issue 184025 has been applied. #>
 		# Workaround for API bug - spaces in encryption hint
 		if ($policy.advancedSettings.encryptionHint){
 			$policy.advancedSettings.encryptionHint = $policy.advancedSettings.encryptionHint -Replace " ","_"
 			Write-ColorOutput yellow "Encryption hint found. Replacing spaces: $($policy.name)"
 		}
+		<# END - Comment out code above if hotfix for issue 184025 has been applied. #>
+
 		$response = New-BackupPolicy -VAC $Destination -Port $d_port -Token $d_token -Policy ($policy | ConvertTo-Json -Depth 10)
 		Write-ColorOutput green "Policy created successfully: $($policy.name)"
 	} else { # skipping duplicate policies

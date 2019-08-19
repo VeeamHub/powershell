@@ -29,6 +29,9 @@ This script will allow you to migrate all Backup Policies from one VAC instance 
 * _POST /v2/backupPolicies_ - API call fails when Application-Aware Processing settings are defined. A workaround has been coded in this script to remove all app-aware settings from policies and let you know which policies were changed.
   * There currently exists a hotfix (#182543) for this behavior. If you apply this hotfix, you can comment/delete lines 295-316 of the `VAC-MigratePolicies.ps1` script.
 * _POST /v2/backupPolicies_ - API call fails when an Encryption Hint is defined with spaces in it. A workaround has been coded in this script to replace all spaces with underscores in the Encryption Hint.
+  * There currently exists a hotfix (#184025) for this behavior. If you apply this hotfix, you can comment/delete lines 318-324 of the `VAC-MigratePolicies.ps1` script.
+
+*Note: You can request hotfixes by opening a [Case with Veeam Support](https://www.veeam.com/support.html).*
 
 ### Requirements
 
