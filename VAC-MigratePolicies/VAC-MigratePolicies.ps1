@@ -291,38 +291,6 @@ if ($compared.Count -gt 0){
 $appaware = @()
 foreach ($policy in $policyInfo){
 	if (($copyAll -eq $true) -or ($policy.name -notin $compared.InputObject)){
-
-		<# BEGIN - Comment out code below if hotfix for issue 182543 has been applied. #>
-		# Workaround for API bug - app-aware processing
-		if ($policy.guestProcessingSettings.processingEnabled -eq $true){
-			# Adding app-aware processing options to the PSObject output
-			$appawareObject = [PSCustomObject] @{name = $policy.name}
-			$appawareObject | Add-Member -NotePropertyName processingEnabled $true
-			$appawareObject | Add-Member -NotePropertyName processingType $policy.guestProcessingSettings.processingType
-			$appawareObject | Add-Member -NotePropertyName sqlOptions $policy.guestProcessingSettings.sqlOptions
-			$appawareObject | Add-Member -NotePropertyName oracleOptions $policy.guestProcessingSettings.oracleOptions
-			$appawareObject | Add-Member -NotePropertyName sharePointOptions $policy.guestProcessingSettings.sharePointOptions
-			$appawareObject | Add-Member -NotePropertyName scriptOptions $policy.guestProcessingSettings.scriptOptions
-			$appaware += $appawareObject
-			# Removing app-aware processing options of policy prior to importing
-			$policy.guestProcessingSettings.processingEnabled = $false
-			$policy.guestProcessingSettings.PSObject.Properties.Remove('processingType')
-			$policy.guestProcessingSettings.PSObject.Properties.Remove('sqlOptions')
-			$policy.guestProcessingSettings.PSObject.Properties.Remove('oracleOptions')
-			$policy.guestProcessingSettings.PSObject.Properties.Remove('sharePointOptions')
-			$policy.guestProcessingSettings.PSObject.Properties.Remove('scriptOptions')
-			Write-ColorOutput red "Removing app-aware processing options from policy: $($policy.name)"
-		}
-		<# END - Comment out code above if hotfix for issue 182543 has been applied. #>
-
-		<# BEGIN - Comment out code below if hotfix for issue 184025 has been applied. #>
-		# Workaround for API bug - spaces in encryption hint
-		if ($policy.advancedSettings.encryptionHint){
-			$policy.advancedSettings.encryptionHint = $policy.advancedSettings.encryptionHint -Replace " ","_"
-			Write-ColorOutput yellow "Encryption hint found. Replacing spaces: $($policy.name)"
-		}
-		<# END - Comment out code above if hotfix for issue 184025 has been applied. #>
-
 		$response = New-BackupPolicy -VAC $Destination -Port $d_port -Token $d_token -Policy ($policy | ConvertTo-Json -Depth 10)
 		Write-ColorOutput green "Policy created successfully: $($policy.name)"
 	} else { # skipping duplicate policies
