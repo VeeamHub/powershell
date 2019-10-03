@@ -18,9 +18,9 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 **Function:** This script contains functions which will display an overview of license file details, usage of instance licenses (type, count and sum of license weight), and details of instance licenses (name, type, ID, registered time, and license weight.)
 
-**Requires:** Veeam Backup & Replication v9.5 Update 4 or higher. If not run in an administrator console, the script will relaunch for UAC elevation. Needs to be run on the VBR server itself. For remoting use Enter-PSSession or some other remote execution option.
+**Requires:** Veeam Backup & Replication v9.5 Update 4 or higher, and UAC elevation. Needs to be run on the VBR server itself. For remoting, use Enter-PSSession or some other remote execution option.
 
-**Usage:** 
+**Usage:**
 
 Import-Module .\BR-InstanceLicenseUsage.ps1  
 Get-VBRLicenseDetails  
