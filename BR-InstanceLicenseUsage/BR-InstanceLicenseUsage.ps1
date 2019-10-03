@@ -2,8 +2,7 @@
 Write-Verbose "Checking Administrator credentials"
 If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(`
       [Security.Principal.WindowsBuiltInRole] "Administrator")) {
-  Write-Warning "You are not running this as an Administrator!`nRe-running script and will prompt for administrator credentials."
-  Start-Process -Verb "Runas" -File PowerShell.exe -Argument "-STA -noprofile -file $($myinvocation.mycommand.definition)"
+  Write-Warning "You are not running this as an Administrator!`nPlease run this script from an administrative prompt."
   Break
 }
 
@@ -47,6 +46,7 @@ Function Get-VBRInstanceLicenseUsageDetails {
   $LicensedObjects = Get-WmiObject -Namespace Root\VeeamBS -Class LicenseConsumingObject
 
   Add-PSSnapin -Name VeeamPSSnapIn
+  Connect-VBRServer -Server localhost
 
   [System.Collections.ArrayList]$AllVMs = @()
 
@@ -118,7 +118,7 @@ Function Get-VBRInstanceLicenseUsageDetails {
 function Get-VBRLicenseDetails {
   $License = Get-WmiObject -Namespace Root\VeeamBS -ClassName License
 
-  $LicenseSupportExpiration = $License.SupportExpirationDate -replace '000000.000000-360'
+  $LicenseSupportExpiration = $License.SupportExpirationDate -replace '\d{6}.\d{6}\-\d{3}'
   $SupportExpiration = [datetime]::parseexact($LicenseSupportExpiration, 'yyyyMMdd', $null)
   $SupportExpirationDate = Get-Date $SupportExpiration -UFormat "%D"
 
