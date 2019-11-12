@@ -140,7 +140,17 @@ Function Get-TenantUsageForExtent {
             # Looping through backup files in Backup Job
             $files = @()
             foreach ($storage in $storages){
+                
+                # Parsing storage information
                 [xml]$stats = $storage.Stats
+                
+                # If BackupSize is 0, use filesystem size
+                if ($stats.CBackupStats.BackupSize -eq 0){
+                    $backupSize = (Get-ChildItem "$($vbm.DirectoryName)\$($storage.FilePath)").Length
+                } else {
+                    $backupSize = $stats.CBackupStats.BackupSize
+                }
+                
                 # Creating PSObject for backup files
                 $file = New-Object PSObject -Property @{
                     Id = $storage.Id
@@ -149,14 +159,14 @@ Function Get-TenantUsageForExtent {
                     CreationTime = $storage.CreationTime
                     CreationTimeUtc = $storage.CreationTimeUtc
                     ModificationTime = $storage.ModificationTime
-                    BackupSize = $stats.CBackupStats.BackupSize
+                    BackupSize = $backupSize
                     DataSize = $stats.CBackupStats.DataSize
                     DedupRatio = $stats.CBackupStats.DedupRatio
                     CompressRatio = $stats.CBackupStats.CompressRatio
                 }
                 $files += $file
             }
-            
+
             # Creating PSObject for Backup Job
             $job = New-Object PSObject -Property @{
                 Id = $jobXml.BackupMeta.Backup.Id
@@ -166,7 +176,26 @@ Function Get-TenantUsageForExtent {
             $jobs += $job
         }
     }
-    
+
+    # Finding untracked files in Backup Job as these use up space
+    $untrackedFiles = $null
+    if ($jobs.Count -gt 0) {
+        
+        # Gathering all files from filesystem in VCC Tenant folder excluding folders and metadata files
+        $fileSystem = Get-ChildItem -Recurse | Where-Object {$_.PSIsContainer -eq $false} | Where-Object {$_.Name -notlike "*vbm"}
+
+        # Gathering all Backup Job known filenames
+        $fileBackup = $jobs.Files.FilePath
+        
+        # Determining if there are untracked files
+        $untrackedFiles = $fileSystem | Where-Object {$fileBackup -notcontains $_}
+        if ($untrackedFiles) {
+            $untrackedFileSize = ($untrackedFiles | Measure-Object Length -Sum).Sum
+        } else {
+            $untrackedFileSize = 0
+        }
+    }
+
     # Removing temp drive
     $location | Set-Location
     Remove-PSDrive -Name "temp" -Confirm:$false
@@ -177,6 +206,8 @@ Function Get-TenantUsageForExtent {
         Name = $extent.Name
         Status = $extent.Status
         Jobs = $jobs
+        UntrackedFiles = $untrackedFiles
+        UntrackedFileSize = $untrackedFileSize
     }
 }
 
@@ -405,12 +436,55 @@ foreach ($tenant in $tenants) {
         }
     }
 
+    ##### Now totaling Block/Object usage numbers #####
+    Write-Verbose "Usage collection for $($tenant.Name) is complete. Summing up usage numbers now."
+    
+    # Zeroing out space usage
+    $usedBlock = 0
+    $usedObject = 0
+    # Looping through Backup Resources
+    foreach ($resource in $resources) {
+
+        # Is SOBR?
+        if ($resource.IsSOBR) {
+            
+            # Is Capacity Tier enabled?
+            if ($resource.HasCapacityTier) {
+                
+                # Capacity Tier detected - pulling SOBR Perf/Cap Tier values
+                $performance =  $resource.Repository.Jobs.Files | Where-Object {$_.ExternalContentMode -eq 0}
+                $total = ($performance | Measure-Object BackupSize -Sum).Sum
+                $total = [math]::round($total / 1Mb) #convert from bytes to MB
+                $usedBlock += $total
+
+                $capacity = $resource.Repository.Jobs.Files | Where-Object {$_.ExternalContentMode -eq 1}
+                $total = ($capacity | Measure-Object BackupSize -Sum).Sum
+                $total = [math]::round($total / 1Mb) #convert from bytes to MB
+                $usedObject += $total
+
+                # Checking for untracked files - rare occurrence but it takes up space. If you see this, please investigate with Veeam support.
+                $total = [math]::round($resource.Repository.UntrackedFileSize / 1Mb) #convert from bytes to MB
+                $usedBlock += $total
+            } else {
+                
+                # No Capacity Tier so pulling UsedSpace at face value
+                $usedBlock += $resource.UsedSpace
+            } 
+        } else {
+            
+            # No Capacity Tier so pulling UsedSpace at face value
+            $usedBlock += $resource.UsedSpace
+        }
+    }
+
     # Creating PSObject for Tenant usage
     $obj = New-Object PSObject -Property @{
         Id = $tenant.Id
         Name = $tenant.Name
         Description = $tenant.Description
         Enabled = $tenant.Enabled
+        UsedBlockMB = $usedBlock
+        UsedObjectMB = $usedObject
         Resources = $resources
     }
     $usage += $obj
