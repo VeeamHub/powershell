@@ -6,7 +6,7 @@ Chris Arceneaux (@chris_arceneaux)
 
 ## Function
 
-This script will allow you to pull VCC tenant usage including space used in Backup Repositories and SOBR, including Performance ***Capacity*** Tiers.
+This script will allow you to pull VCC tenant usage including space used in Backup Repositories and SOBR, including Performance & ***Capacity*** Tiers.
 
 ## Known Issues
 
