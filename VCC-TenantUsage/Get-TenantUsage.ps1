@@ -23,17 +23,17 @@
 
 .OUTPUTS
     - Get-TenantUsage returns a PowerShell object containing VCC tenant usage
-	- Get-TenantUsage "-Test" returns a series of color coded text outputs showing success/error
+	- Get-TenantUsage returns a PowerShell object containing network share test results
 
 .EXAMPLE
-	Get-TenantUsage.ps1 -Server "vbr.contoso.local" -Username "vac\jsmith" -Password "password"
+	Get-TenantUsage.ps1 -Server "vbr.contoso.local" -Username "contoso\jdoe" -Password "password"
 
 	Description 
 	-----------     
 	Pulling VCC Tenant usage using the specified VBR server using the username/password specified
 
 .EXAMPLE
-	Get-TenantUsage.ps1 -Server "vbr.contoso.local" -Username "vac\jsmith"
+	Get-TenantUsage.ps1 -Server "vbr.contoso.local" -Username "contoso\jdoe"
 
 	Description 
 	-----------     
@@ -206,10 +206,10 @@ Function Test-NetworkShares {
             $vbrServer = Get-VBRServer | Where-Object { $_.Id -eq $extent.Repository.Info.HostId }
             if ($vbrServer.IsLocal()) {
                 $address = (Get-VBRServerSession).Server
-                $share = "\\$address\$($extent.Repository.Id.Guid)"
             } else {
-                $share = "\\$($vbrServer.Name)\$($extent.Repository.Id.Guid)"
+                $address = $vbrServer.Name
             }
+            $share = "\\$address\$($extent.Repository.Id.Guid)"
 
             Write-Verbose "Testing network share: $share"
             New-PSDrive -Name "temp" -PSProvider FileSystem -Root "$share" -Credential $Credential -ErrorAction SilentlyContinue | Out-Null
@@ -222,10 +222,13 @@ Function Test-NetworkShares {
                 Write-Host -ForegroundColor Red -BackgroundColor Black "FAILED: $share"
                 # Creating PSObject for Backup Resource
                 $obj = New-Object PSObject -Property @{
+                    Id = $extent.Repository.Id.Guid
                     SOBR = $sobr.Name
                     Extent = $extent.Name
+                    Server = $address
                     Share = $share
                     LocalDir = $extent.Repository.FriendlyPath
+                    PowerShell = "New-SmbShare -Name `"$($extent.Repository.Id.Guid)`" -Path `"$($extent.Repository.FriendlyPath)`" -ReadAccess `"$($Credential.UserName)`""
                 }
                 $toFix += $obj
             }
@@ -237,7 +240,7 @@ Function Test-NetworkShares {
         Write-Host ""
         Write-Host "The following network shares need to be created/fixed so the script will work properly:"
         Write-Host ""
-        $toFix | Format-Table -AutoSize
+        $toFix
     } else {
         Write-Host ""
         Write-Host "All network shares are working properly. No further configuration is necessary."
@@ -272,7 +275,10 @@ Connect-VBRServer -Server $server -Credential $Credential
 
 # Validating successful connection to VBR server
 if (-Not (Get-VBRServerSession)){
-    throw "$($server): Connection failed - Please make sure the server was not misspelled and valid credentials were used."
+    Write-Warning "$($server): Connection failed - Please make sure the server was not misspelled and valid credentials were used."
+    
+    # Exiting script
+    exit
 }
 
 Write-Verbose "Retrieving all CC Tenants"
