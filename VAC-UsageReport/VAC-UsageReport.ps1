@@ -46,7 +46,7 @@
 	PowerShell credentials object is supported
 
 .EXAMPLE
-	VAC-UsageReport.ps1 -Server "vac.contoso.local" -Credential $cred_vac
+	VAC-UsageReport.ps1 -Server "vac.contoso.local" -Credential $cred_vac -Detailed
 
 	Description 
 	-----------     
@@ -60,7 +60,7 @@
 	Connecting to a VAC server using a non-standard API port
 
 .EXAMPLE
-	VAC-UsageReport.ps1 -Server "vac.contoso.local" -Username "contoso\jsmith" -Password "password"
+	VAC-UsageReport.ps1 -Server "vac.contoso.local" -Username "contoso\jsmith" -Password "password" -AllowSelfSignedCerts
 
 	Description 
 	-----------     
