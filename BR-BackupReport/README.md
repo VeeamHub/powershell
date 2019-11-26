@@ -15,7 +15,7 @@ To import this cmdlet, `cd` to the directory where `BackupReport.ps1` is kept an
 `-Backup` - pulls info for backups. *OPTIONAL* \
 `-BackupCopy` - pulls info for backup copies. *OPTIONAL* \
 \
-*If neither `-Backup`, nor `-BackupCopy` specified, the report will be generated for both Backups and Backup Copies.*
+*If neither `-Backup` nor `-BackupCopy` specified, the report will be generated for both Backups and Backup Copies.*
 
 ## Usage
 
