@@ -1,11 +1,14 @@
-Add-PSSnapin Microsoft.Exchange.Management.PowerShell.SnapIn;
+$VeeamBackupJobName = "Job Name"
+$VeeamRepository = "Repository name"
+$OrgUnit = "DC=ACME,DC=local"
+$username = "0365admin@acme.local"
+$pwdTxt = Get-Content "C:\temp\ExportedPassword.txt"
+$securePwd = $pwdTxt | ConvertTo-SecureString -AsPlainText -Force
+$exc_cred = New-Object System.Management.Automation.PSCredential -ArgumentList $username, $securePwd
+#$exc_cred = Get-Credential                                         # Comment out to use interactive authentication
+$session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $exc_cred -Authentication Basic -AllowRedirection
+Import-PSSession $session
 
-# The three fields below require a proper value
-$VeeamBackupJobName = "All But Brazil Backup"
-$VeeamRepository = "MailBackup"
-$OrgUnit = "OU=BR,DC=ACME,DC=local”
-#
-                         
 
 $org = Get-VBOOrganization                                         # Returns Exchange Organization
 if ($org -eq $null) {
@@ -29,10 +32,22 @@ Catch
     Exit 1
 }
 
-# Exchange Powershell call - Return all Exchange Mailboxes under the Organizational Unit $OrgUnit defined above.
+# Exchange Online Powershell call - Return all Exchange Mailboxes under the Organizational Unit $OrgUnit defined above.
 Try
 {
-    $mbxs = Get-Mailbox -OrganizationalUnit $OrgUnit -ResultSize Unlimited
+  $mbxs = @()
+  $no_licensed_user = @()
+  foreach ($user in Get-ADUser -Filter * -SearchBase $OrgUnit){
+      $found = Get-Mailbox -Identity $user.Name
+      if ($found -eq $null){
+        $no_licensed_user += @($found)
+      } else {
+        $mbxs += @($found)
+      }
+  }
+
+  Write-Host "Users with no licensed mailbox will be skipped:"
+  Write-Host $no_licensed_user
 }
 Catch
 {
@@ -48,7 +63,7 @@ $i=1
 ForEach ($MailBox in $MailBoxes) {
   Write-Progress -Activity "Parsing Mailboxes" -status "Mailbox $Mailbox.Email" -percentComplete ($i / $Mailboxes.count * 100)
   ForEach ($mbx in $mbxs) {
-     if ($MailBox.Email -match $mbx.EmailAddresses[0].AddressString ) {
+     if ($MailBox.Email -match $mbx.UserPrincipalName) {
 #         Write-Host $mbx.EmailAddresses[0].AddressString
          $FinalList += @($MailBox)
      }
@@ -65,4 +80,4 @@ If ($JobId = Get-VBOJob -Name $VeeamBackupJobName) {
 }
 
 
-Write-Host "Number of Mailboxes Excluded from Organizational Unit $OrgUnit = " $mbxs.count 
+Write-Host "Number of Mailboxes Excluded from Organizational Unit $OrgUnit = " $mbxs.count
