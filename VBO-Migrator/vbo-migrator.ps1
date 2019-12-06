@@ -145,7 +145,7 @@ $btnMigrate.Add_Click({
           }
         }
       } elseif ($type -eq 'Group') {
-        foreach ($object in $objectsdata) {
+        foreach ($object in $objectdata) {
           try {
             Move-VBOEntityData -From $source -To $target -Group $object -RunAsync -confirm:$false
           } catch {
@@ -153,7 +153,7 @@ $btnMigrate.Add_Click({
           }
         }
       } elseif ($type -eq 'Site') {
-        foreach ($object in $objectsdata) {
+        foreach ($object in $objectdata) {
           try {
             Move-VBOEntityData -From $source -To $target -Site $object -RunAsync -confirm:$false
           } catch {
