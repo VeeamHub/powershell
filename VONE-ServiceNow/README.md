@@ -1,4 +1,4 @@
-# Publish SQL backups for DBCC checks
+# SNOW Incident creation via Veeam One alerts
 ## VeeamHub
 Veeamhub projects are community driven projects, and are not created by Veeam R&D nor validated by Veeam Q&A. They are maintained by community members which might be or not be Veeam employees. 
 
@@ -14,11 +14,26 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ## Project Notes
 **Author:** Carlos Talbot (@tusc00)
 
-# Publish_DBCC_byvm.ps1
-DBCC check using Veeam's SQL Publish feature v1.1
+# Service Now Incident creation and resolution
 By Carlos Talbot (carlos@talbot.net)
+The two scripts in this folder are required for setting up Veeam One to automatically create and resolve
+Service Now incident tickets.
 
-This script should run on the SQL server the databases are attached to.
-You will need to install the Veeam console on the SQL server in order to enable the Veeam PowerShell cmdlets.
+IMPORTANT:
+The sript createticket.ps1 needs to be run for the first time interactively from a PowerShell command line. The script
+will prompt you for the username and password of your SNOW instnace which is then stored in an encrypted file in the
+same directory as the script. You need to run this as the same account as the VeeamOne service is running 
+as (e.g. LOCAL Administrator). Below is an example you can use to run the script:
+c:\scripts\createticket.ps1 "VM power status" "EXCH2K16" "virtual machine is not Running" "1/29/2020 9:56:38 PM" "Error" "Reset/Resolved" "21117"
 
-The script can optionally send a summary email with the results for each DBCC check.
+
+Configuring Veeam One
+You need to edit the alarm that will trigger the scripts with the settings below under the Notifications tab. The full line for each script is as follows (change path to scripts as required):
+
+powershell.exe C:\scripts\createticketv2.ps1 '%1' '%2' '%3' '%4' '%5' '%6' '%7'
+powershell.exe C:\scripts\resolveticketv2.ps1 '%1' '%2' '%3' '%4' '%5' '%6' '%7'
+
+![alt text](https://i.imgur.com/3qt9Dy2.png)
+
+You can set a variable in each of the scripts to enable writing to a debug file (SNOWdebug.log) by setting the
+variable $Debug = $true

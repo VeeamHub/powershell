@@ -37,7 +37,7 @@
 # Configure the variables below, you will be prompted for SNOW login during the first run which is then saved securely
 $SNOWURL = "https://dev50610.service-now.com/"
 $ScriptDir = "c:\scripts\"
-$Debug = $true     #enables writing to SNOWDebug.log file
+$Debug = $false     #enables writing to SNOWDebug.log file
 
 ########################################################################################################################
 # Nothing to configure below this line - Starting the main function of the script
