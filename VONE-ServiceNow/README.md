@@ -35,7 +35,7 @@ notification tab as shown in the image below. The full line for each script is a
 required). Don't forget to enable the alarm.
 
 powershell.exe C:\scripts\createticketv2.ps1 '%1' '%2' '%3' '%4' '%5' '%6' '%7'
-
+&nbsp;
 powershell.exe C:\scripts\resolveticketv2.ps1 '%1' '%2' '%3' '%4' '%5' '%6' '%7'
 
 ![alt text](https://i.imgur.com/7zcsC1q.png)
