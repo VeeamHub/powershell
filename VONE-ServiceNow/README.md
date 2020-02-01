@@ -36,8 +36,8 @@ In order to integrate the scripts with Veeam One you will need to edit an alarm 
 notification tab as shown in the image below. The full line for each script is as follows (change path to scripts as
 required). Don't forget to enable the alarm.
 
-powershell.exe C:\scripts\createticketv2.ps1 '%1' '%2' '%3' '%4' '%5' '%6' '%7'  
-powershell.exe C:\scripts\resolveticketv2.ps1 '%1' '%2' '%3' '%4' '%5' '%6' '%7'
+powershell.exe C:\scripts\createticket.ps1 '%1' '%2' '%3' '%4' '%5' '%6' '%7'  
+powershell.exe C:\scripts\resolveticket.ps1 '%1' '%2' '%3' '%4' '%5' '%6' '%7'
 
 ![alt text](veeamonealarm.png)
 
