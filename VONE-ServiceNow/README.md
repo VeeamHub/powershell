@@ -25,8 +25,10 @@ IMPORTANT:
 You will need to run the script createticket.ps1 for the first time interactively from a PowerShell command line.
 The script will prompt you for the username and password of your SNOW instnace which is then stored in an encrypted
 file in the same directory as the script. You need to run this as the same account as the VeeamOne service is running 
-as (e.g. LOCAL Administrator). Below is an example you can use to run the script:
-c:\scripts\createticket.ps1 "VM power status" "EXCH2K16" "virtual machine is not Running" "1/29/2020 9:56:38 PM" "Error" "Reset/Resolved" "21117"
+as (e.g. LOCAL Administrator). Below is an example you can use to run the script:  
+
+c:\scripts\createticket.ps1 "VM power status" "EXCH2K16" "virtual machine is not Running" "1/29/2020 9:56:38 PM" "Error" "Reset/Resolved" "21117"  
+
 Once this is completed you will find the file SNOWCredentials.xml within the script directory.
 
 Configuring Veeam One
