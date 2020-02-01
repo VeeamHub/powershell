@@ -39,7 +39,8 @@ required). Don't forget to enable the alarm.
 powershell.exe C:\scripts\createticketv2.ps1 '%1' '%2' '%3' '%4' '%5' '%6' '%7'  
 powershell.exe C:\scripts\resolveticketv2.ps1 '%1' '%2' '%3' '%4' '%5' '%6' '%7'
 
-![alt text](https://i.imgur.com/7zcsC1q.png)
+![alt text](veeamonealarm.PNG)
+#![alt text](https://i.imgur.com/7zcsC1q.png)
 
 If you nee to troubleshoot the execution of the scripts, you can set a variable in each of the scripts to enable
 writing to a debug file (SNOWdebug.log) by setting the variable $Debug = $true
