@@ -33,7 +33,7 @@ You need to edit the alarm that will trigger the scripts with the settings below
 powershell.exe C:\scripts\createticketv2.ps1 '%1' '%2' '%3' '%4' '%5' '%6' '%7'
 powershell.exe C:\scripts\resolveticketv2.ps1 '%1' '%2' '%3' '%4' '%5' '%6' '%7'
 
-![alt text](https://i.imgur.com/3qt9Dy2.png)
+![alt text](https://i.imgur.com/7zcsC1q.png)
 
 You can set a variable in each of the scripts to enable writing to a debug file (SNOWdebug.log) by setting the
 variable $Debug = $true
