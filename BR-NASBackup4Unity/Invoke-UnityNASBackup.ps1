@@ -29,7 +29,7 @@
    None. You cannot pipe objects to this script
 
    .Example
-   c:\scripts\latest\Invoke-UnityNASBackup.ps1 -Name unity01 -Share share01 -CredentialFile C:\Scripts\unity-credentials.xml 
+   c:\scripts\latest\Invoke-UnityNASBackup.ps1 -Name unity01 -Share share01 -CredentialFile C:\Scripts\unity-system-credentials.xml 
 
    .Notes 
    Version:        1.3
@@ -215,7 +215,9 @@ PROCESS {
         $uri = "https://" + $UnitySession.Server + $resourceurl
 
         # Invoke the RestAPI call
+
         $objSnapShare = Invoke-WebRequest -Uri $URI -ContentType "application/json" -Body $json -Websession $UnitySession.Websession -Headers $UnitySession.headers -Method POST -TimeoutSec 6000 -UseBasicParsing
+
         $objSnapShareContent = $objSnapShare.Content | convertfrom-json
         $SnapID = $objSnapShareContent.content.id
         Write-Log -Info "New cifs share named $SnapShotName created, ID: $SnapID" -Status Info
