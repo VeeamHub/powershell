@@ -215,7 +215,9 @@ PROCESS {
         $uri = "https://" + $UnitySession.Server + $resourceurl
 
         # Invoke the RestAPI call
-        $objSnapShare = Invoke-WebRequest -Uri $URI -UseBasicParsing -ContentType "application/json" -Body $json -Websession $UnitySession.Websession -Headers $UnitySession.headers -Method POST -TimeoutSec 6000
+
+        $objSnapShare = Invoke-WebRequest -Uri $URI -ContentType "application/json" -Body $json -Websession $UnitySession.Websession -Headers $UnitySession.headers -Method POST -TimeoutSec 6000 -UseBasicParsing
+
         $objSnapShareContent = $objSnapShare.Content | convertfrom-json
         $SnapID = $objSnapShareContent.content.id
         Write-Log -Info "New cifs share named $SnapShotName created, ID: $SnapID" -Status Info
