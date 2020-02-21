@@ -35,37 +35,25 @@ param (
     [switch]$BackupCopy
 )
 
+if ($Backup) {
+    $includeJobs = "^Backup$"
+} elseif ($BackupCopy) {
+    $includeJobs = "^BackupSync$"
+} else {
+    $includeJobs = "^Backup$|^BackupSync$"
+}    
+ 
+$sessions = Get-VBRBackupSession | ?{$_.JobType -match $includeJobs}
+$taskSessions = $sessions.GetTaskSessions() | Group-Object -Property Name -AsHashTable
 
-$sessions = get-vbrbackupsession
 $sessionInfo = @()
 $importPath = get-content -LiteralPath $Path
-foreach ($import in $importPath) {
-   foreach ($session in $sessions) {
-        if ($Backup)
-        {
-        $backupInfo = get-vbrtasksession -session $session | where-object {$_.Name -eq $import -and $session.JobType -eq 'Backup'}
-        }
-        elseif ($BackupCopy)
-        {
-        $backupInfo = get-vbrtasksession -session $session | where-object {$_.Name -eq $import -and $session.JobType -eq 'BackupSync'}
-        }
-        else {
-         $backupInfo = get-vbrtasksession -session $session | where-object {$_.Name -eq $import -and ($session.JobType -eq 'BackupSync' -or $session.JobType -eq 'Backup')}
-        }
-        if ($backupInfo) {
-                $sessionStats = @{
-                    VirtualMachine = $backupInfo.Name
-                    Result = $backupInfo.Status
-                    JobName = $session.JobName
-                    JobType = $session.JobType
-                    SessionStartTime = $session.CreationTime
-                    SessionEndTime = $session.EndTime
-                }
-     $sessionInfo += $sessionStats | select-object @{n='VM Name';e={$_.VirtualMachine}}, @{n='Result';e={$_.Result}}, @{n='Job Name';e={$_.JobName}}, @{n='Job Type';e={$_.JobType}}, @{n='Start time';e={$_.SessionStartTime}}, @{n='End time';e={$_.SessionEndTime}}
+$sessionInfo = foreach ($import in $importPath) {
+    $taskSessions.$import | Select-Object @{n='VM Name';e={$_.Name}}, @{n='Result';e={$_.Status}}, @{n='Job Name';e={$_.JobName}}, @{n='Job Type';e={$_.JobSess.JobType}}, @{n='Start time';e={$_.Progress.StartTimeLocal}}, @{n='End time';e={$_.Progress.StopTimeLocal}}
+}
 
- }
-   }
-   }
+$sessionInfo = $sessionInfo | Sort-Object "VM Name", "Job Type", "Job Name", "Start Time"
+
 $exportDir = test-path -path 'C:\Temp'
 $currentDate = (get-date).tostring('MM-dd-yyyy')
 $exportTo = 'C:\Temp\BackupReport-' + $currentDate + '.html'
