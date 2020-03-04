@@ -2,7 +2,8 @@
 
 ## Authors
 
-Chris Arceneaux (@chris_arceneaux). 
+Chris Arceneaux (@chris_arceneaux)
+
 Tim Hudson (@vL0bster)
 
 ## Function
