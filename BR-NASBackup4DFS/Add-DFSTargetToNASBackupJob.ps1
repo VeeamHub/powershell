@@ -218,10 +218,11 @@ PROCESS {
         #>
         $currentPath = $_.TargetPath
         # Gets the info for NAS Server Name
-        $VBRNASServer = Get-VBRNASServer | Where-Object { $_.Path -eq $currentPath }
+        #$VBRNASServer = Get-VBRNASServer | Where-Object { $_.Path -eq $currentPath }
+        $VBRNASServer = Get-VBRNASServer -Name $currentPath
         #Check if share is already added to VBR. If not create share in VBR, else just skip
-        if(!(Get-VBRNASServer -Name $_.TargetPath)) {
-            Add-VBRNASSMBServer -Path $_.TargetPath -AccessCredentials $ShareCredential -ProcessingMode $VolumeProcessingMode -ProxyMode Automatic -CacheRepository $CacheRepository
+        if(!(Get-VBRNASServer -Name $currentPath)) {
+            Add-VBRNASSMBServer -Path $currentPath -AccessCredentials $ShareCredential -ProcessingMode $VolumeProcessingMode -ProxyMode Automatic -CacheRepository $CacheRepository
             Write-Log -Info "Adding $currentPath to VBR... DONE" -Status Info
         } else  {
            Write-Log -Info "Share $currentPath is already added... SKIPPING" -Status Info
