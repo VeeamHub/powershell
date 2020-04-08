@@ -22,6 +22,10 @@
 
    .Example
    .\Add-DFSTargetToNASBackupJob.ps1 -DfsRoot "\\homelab\dfs" -VBRJobName "NAS DFS Test" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2 -VolumeProcessingMode VSSSnapshot
+
+   .Example
+   .\Add-DFSTargetToNASBackupJob.ps1 -DfsRoot "\\homelab\dfs" -VBRJobName "NAS DFS Test" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2 -VolumeProcessingMode VSSSnapshot -ExcludeSystem "*lab-dc01*" 
+
    .Notes 
    Version:        1.2
    Author:         Marco Horstmann (marco.horstmann@veeam.com)
@@ -50,10 +54,8 @@ Param(
    [Parameter(Mandatory=$True)]
    [string]$CacheRepository,
 
-<#
    [Parameter(Mandatory=$False)]
-   [string]$FileServerName,
-#>
+   [string]$ExcludeSystem,
 
    [Parameter(Mandatory=$False)]
    [string]$LogFile="C:\ProgramData\dfsresolver4nasbackup.log",
@@ -216,6 +218,15 @@ PROCESS {
             }
         }
         #>
+        <# Test Exclude
+        $allshares = $allshares | Where-Object -Property TargetPath -NotContains lab-dc01
+        if($_.TargetPath -like $ExcludeSystem) {
+            echo "Grande Drama"
+            } else {
+            echo "Nullo Problemo"
+        }
+        #>
+
         $currentPath = $_.TargetPath
         echo "DEBUG:"
         echo "Current Path is $currentPath"
@@ -223,8 +234,12 @@ PROCESS {
         # Gets the info for NAS Server Name
         #Check if share is already added to VBR. If not create share in VBR, else just skip
         if(!(Get-VBRNASServer -Name $currentPath)) {
-            Add-VBRNASSMBServer -Path $currentPath -AccessCredentials $ShareCredential -ProcessingMode $VolumeProcessingMode -ProxyMode Automatic -CacheRepository $CacheRepository
-            Write-Log -Info "Adding $currentPath to VBR... DONE" -Status Info
+            if($_.TargetPath -like $ExcludeSystem) {
+                Write-Log -Info "Share $currentPath is excluded by ExcludedSystem Parameter... SKIPPING" -Status Info
+            } else { 
+                Add-VBRNASSMBServer -Path $currentPath -AccessCredentials $ShareCredential -ProcessingMode $VolumeProcessingMode -ProxyMode Automatic -CacheRepository $CacheRepository
+                Write-Log -Info "Adding $currentPath to VBR... DONE" -Status Info
+            }
         } else  {
            Write-Log -Info "Share $currentPath is already added... SKIPPING" -Status Info
         }
