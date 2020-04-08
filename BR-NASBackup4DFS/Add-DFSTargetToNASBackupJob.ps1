@@ -24,7 +24,7 @@
    .\Add-DFSTargetToNASBackupJob.ps1 -DfsRoot "\\homelab\dfs" -VBRJobName "NAS DFS Test" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2 -VolumeProcessingMode VSSSnapshot
 
    .Example
-   .\Add-DFSTargetToNASBackupJob.ps1 -DfsRoot "\\homelab\dfs" -VBRJobName "NAS DFS Test" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2 -VolumeProcessingMode VSSSnapshot -ExcludeSystem "*lab-dc01*" 
+   .\Add-DFSTargetToNASBackupJob.ps1 -DfsRoot "\\homelab\dfs" -VBRJobName "NAS DFS Test" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2 -VolumeProcessingMode VSSSnapshot -ExcludeSystems "*lab-dc01*","*lab-nacifs01*" 
 
    .Notes 
    Version:        1.2
@@ -55,7 +55,7 @@ Param(
    [string]$CacheRepository,
 
    [Parameter(Mandatory=$False)]
-   [string]$ExcludeSystem,
+   [string]$ExcludeSystems,
 
    [Parameter(Mandatory=$False)]
    [string]$LogFile="C:\ProgramData\dfsresolver4nasbackup.log",
@@ -206,26 +206,6 @@ PROCESS {
     $VBRNASBackupJobObject = @()
     # For each detected share to this 
     $allshares | ForEach-Object {
-       <#
-        # ToDo: Add a filter for $allshares like only for shares from one system
-        if($FileServerName) {
-            $allshares | ForEach-Object {
-                if($_.TargetPath -ilike "\\$FileServerName\*") {
-                    Write-Host $_.TargetPath
-                } else {
-                Write-Host "Nicht so"
-                }
-            }
-        }
-        #>
-        <# Test Exclude
-        $allshares = $allshares | Where-Object -Property TargetPath -NotContains lab-dc01
-        if($_.TargetPath -like $ExcludeSystem) {
-            echo "Grande Drama"
-            } else {
-            echo "Nullo Problemo"
-        }
-        #>
 
         $currentPath = $_.TargetPath
         echo "DEBUG:"
@@ -233,15 +213,15 @@ PROCESS {
 
         # Gets the info for NAS Server Name
         #Check if share is already added to VBR. If not create share in VBR, else just skip
-        if(!(Get-VBRNASServer -Name $currentPath)) {
-            if($_.TargetPath -like $ExcludeSystem) {
-                Write-Log -Info "Share $currentPath is excluded by ExcludedSystem Parameter... SKIPPING" -Status Info
-            } else { 
+        if($_.TargetPath -like $ExcludeSystems) {
+            Write-Log -Info "Share $currentPath is excluded by ExcludedSystems Parameter... SKIPPING" -Status Info
+        } else { 
+            if(!(Get-VBRNASServer -Name $currentPath)) {
                 Add-VBRNASSMBServer -Path $currentPath -AccessCredentials $ShareCredential -ProcessingMode $VolumeProcessingMode -ProxyMode Automatic -CacheRepository $CacheRepository
                 Write-Log -Info "Adding $currentPath to VBR... DONE" -Status Info
+            } else  {
+                Write-Log -Info "Share $currentPath is already added... SKIPPING" -Status Info
             }
-        } else  {
-           Write-Log -Info "Share $currentPath is already added... SKIPPING" -Status Info
         }
         # Add this share to the list of NASBackupJobObjects
         # Here is the right point to add e.g. exclusion and inclusion masks
