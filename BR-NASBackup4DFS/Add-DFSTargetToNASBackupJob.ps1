@@ -23,10 +23,10 @@
    .Example
    .\Add-DFSTargetToNASBackupJob.ps1 -DfsRoot "\\homelab\dfs" -VBRJobName "NAS DFS Test" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2 -VolumeProcessingMode VSSSnapshot
    .Notes 
-   Version:        1.0
+   Version:        1.2
    Author:         Marco Horstmann (marco.horstmann@veeam.com)
-   Creation Date:  22 October 2019
-   Purpose/Change: Reworked documentation and commenting of code.
+   Creation Date:  08 April 2020
+   Purpose/Change: Bugfixes of stupid errors
    
    .LINK https://github.com/veeamhub/powershell
    .LINK https://horstmann.in
@@ -217,9 +217,10 @@ PROCESS {
         }
         #>
         $currentPath = $_.TargetPath
+        echo "DEBUG:"
+        echo "Current Path is $currentPath"
+
         # Gets the info for NAS Server Name
-        #$VBRNASServer = Get-VBRNASServer | Where-Object { $_.Path -eq $currentPath }
-        $VBRNASServer = Get-VBRNASServer -Name $currentPath
         #Check if share is already added to VBR. If not create share in VBR, else just skip
         if(!(Get-VBRNASServer -Name $currentPath)) {
             Add-VBRNASSMBServer -Path $currentPath -AccessCredentials $ShareCredential -ProcessingMode $VolumeProcessingMode -ProxyMode Automatic -CacheRepository $CacheRepository
@@ -229,6 +230,7 @@ PROCESS {
         }
         # Add this share to the list of NASBackupJobObjects
         # Here is the right point to add e.g. exclusion and inclusion masks
+        $VBRNASServer = Get-VBRNASServer -Name $currentPath
         $VBRNASBackupJobObject += New-VBRNASBackupJobObject -Server $VBRNASServer -Path $currentPath
     }
 
