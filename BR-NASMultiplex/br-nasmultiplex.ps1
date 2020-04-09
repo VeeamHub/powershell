@@ -98,14 +98,45 @@ function Add-NasMultiplexShares {
 
     $allobjects = $targetjob.BackupObject
 
-  
+    $seperator = "\"
+    if ($refobject.Server.Type -eq [Veeam.Backup.PowerShell.Cmdlets.VBRNASServerType]::NFS) {
+        $seperator = "/"
+    }
 
+    $exclusions = $refobject.ExclusionMask
+    
+
+    
     foreach($ns in $newshares) {
         $splattingcall = @{
             server=$ns
             path=$ns.path
             inclusionmask=$refobject.InclusionMask
         }
+
+
+        <#modify auto generated exclusions#>
+        $exclusions = @()
+        
+        $remap = @{}
+        $remap[$(@($refobject.Path,"~snapshot") -join $seperator)] =(@($ns.path,"~snapshot") -join $seperator)
+        $remap[$(@($refobject.Path,".snapshot") -join $seperator)] =(@($ns.path,".snapshot") -join $seperator)
+
+        foreach($exclusioncopy in $refobject.ExclusionMask) {
+            if($remap.ContainsKey($exclusioncopy)) {
+                $exclusions += $remap[$exclusioncopy]
+            } else {
+                $exclusions += $exclusioncopy
+            }
+        }
+        
+        $splattingcall.ExclusionMask = $exclusions
+        
+        
+
+
+
+
         $bo = New-VBRNASBackupJobObject @splattingcall
         if ($bo) { $allobjects += $bo }
 
