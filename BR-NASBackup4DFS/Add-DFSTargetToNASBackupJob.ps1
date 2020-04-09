@@ -30,12 +30,13 @@
    .\Add-DFSTargetToNASBackupJob.ps1 -DfsRoot "\\homelab\dfs" -VBRJobName "NAS DFS Test" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2 -VolumeProcessingMode VSSSnapshot -ExcludeSystems "*lab-dc01*","*lab-nacifs01*" 
 
    .Notes 
-   Version:        1.5
+   Version:        1.6
    Author:         Marco Horstmann (marco.horstmann@veeam.com)
-   Creation Date:  08 April 2020
-   Purpose/Change: Added option to filter for different systems
+   Creation Date:  09 April 2020
+   Purpose/Change: Bugfix if reparse point for nonexisting share is found generates now an error message
    
    .LINK https://github.com/veeamhub/powershell
+   .LINK https://github.com/marcohorstmann/powershell
    .LINK https://horstmann.in
  #> 
 [CmdletBinding(DefaultParameterSetName="__AllParameterSets")]
@@ -221,16 +222,23 @@ PROCESS {
             }
         }
 
-        echo $isexcluded
+        #DEBUG
+        #echo $isexcluded
         
         # Gets the info for NAS Server Name
         #Check if share is already added to VBR. If not create share in VBR, else just skip
         if($isexcluded) {
             Write-Log -Info "Share $currentPath is excluded by ExcludedSystems Parameter... SKIPPING" -Status Info
-        } else { 
+        } else {
             if(!(Get-VBRNASServer -Name $currentPath)) {
-                Add-VBRNASSMBServer -Path $currentPath -AccessCredentials $ShareCredential -ProcessingMode $VolumeProcessingMode -ProxyMode Automatic -CacheRepository $CacheRepository
-                Write-Log -Info "Adding $currentPath to VBR... DONE" -Status Info
+                try {
+                    Add-VBRNASSMBServer -Path $currentPath -AccessCredentials $ShareCredential -ProcessingMode $VolumeProcessingMode -ProxyMode Automatic -CacheRepository $CacheRepository
+                    Write-Log -Info "Adding $currentPath to VBR... DONE" -Status Info
+                } catch {
+                    Write-Log -Info "$_" -Status Error
+                    Write-Log -Info "Adding $currentPath to VBR... FAILED" -Status Error
+                    $isexcluded = $true
+                }
             } else  {
                 Write-Log -Info "Share $currentPath is already added... SKIPPING" -Status Info
             }
@@ -244,8 +252,14 @@ PROCESS {
         }
     }
 
-    # Updating existing job with this NASBackupJobObjects 
-    Set-VBRNASBackupJob -Job $nasBackupJob -BackupObject $VBRNASBackupJobObject
+    # Updating existing job with this NASBackupJobObjects
+    try {
+        Set-VBRNASBackupJob -Job $nasBackupJob -BackupObject $VBRNASBackupJobObject
+        Write-Log -Info "Updating Backup Job $VBRJobName... DONE" -Status Info
+    } catch {
+        Write-Log -Info "$_" -Status Error
+        Write-Log -Info "Updating Backup Job $VBRJobName... FAILED" -Status Error
+    }
     
        
 } # END PROCESS
