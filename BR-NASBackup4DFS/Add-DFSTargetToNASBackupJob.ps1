@@ -30,10 +30,10 @@
    .\Add-DFSTargetToNASBackupJob.ps1 -DfsRoot "\\homelab\dfs" -VBRJobName "NAS DFS Test" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2 -VolumeProcessingMode VSSSnapshot -ExcludeSystems "*lab-dc01*","*lab-nacifs01*" 
 
    .Notes 
-   Version:        1.6
+   Version:        1.7
    Author:         Marco Horstmann (marco.horstmann@veeam.com)
    Creation Date:  09 April 2020
-   Purpose/Change: Bugfix if reparse point for nonexisting share is found generates now an error message
+   Purpose/Change: Bugfix: Error Handling if Job doesn't exists
    
    .LINK https://github.com/veeamhub/powershell
    .LINK https://github.com/marcohorstmann/powershell
@@ -151,13 +151,12 @@ PROCESS {
 
     # Validate parameters: VBRJobName
     Write-Log -Status Info -Info "Checking VBR Job Name"
-    try {
-        $nasBackupJob = Get-VBRNASBackupJob -name $VBRJobName
-        Write-Log -Info "VBR Job Name ... FOUND" -Status Info
-    } catch  {
-        Write-Log -Info "$_" -Status Error
+    $nasBackupJob = Get-VBRNASBackupJob -name $VBRJobName
+    if($nasBackupJob -eq $null) {
         Write-Log -Info "Failed to find job name" -Status Error
         exit 99
+    } else { 
+        Write-Log -Info "VBR Job Name ... FOUND" -Status Info
     }
     # Validate parameters: ShareCrendential
     Write-Log -Status Info -Info "Checking Share Credentials"
