@@ -14,7 +14,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ## Project Notes
 **Author:** Timothy Dewin (@tdewin)
 
-**Function:** Add shares from the root domain to the same job via a gui
+**Function:** Add shares from the root domain to the same job via a gui. Tested only with SMB, might work with NFS
 
 **Requires:** Veeam Backup & Replication v10
 
@@ -32,8 +32,6 @@ Sourcing the code so you can use add-nasmultiplexshares manually
 **Parameters:**
 * -nogui : Just load the script but don't start the gui. If you source the code instead of running, you can than use Add-NasMultiplexShares to manually add multiple shares
 
-**limitations:**
-Exclusionmask are not copied from the referenceobject as they are generated objectspecific. Need extra verificationcode
 
 **Sample:**
 
