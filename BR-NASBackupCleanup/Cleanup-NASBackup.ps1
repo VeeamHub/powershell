@@ -1,39 +1,19 @@
 ﻿<#
 .SYNOPSIS
-   Getting Shares behind Reparse Points and add them to a NAS Backup Job
+   Find shares in VBR, which are not used by any backup job and remove them
    .DESCRIPTION
-   This script finds the shares behind an DFS namespace structure and adds it to VBR NAS Backup Job. You can configure
-   the folder scan depth 
-   .PARAMETER DfsRoot
-   With this parameter you specify the UNC path to scan e.g. "\\fileserver\dfs".
-   .PARAMETER VBRJobName
-   This is the existing Job where the detected shares should be added.
-   .PARAMETER ShareCredential
-   Enter the Credentials which should be used. They must be from VBR credentials manager.
-   .PARAMETER CacheRepository
-   Enter the Repository which should be used for Cache.
-   .PARAMETER ExcludeSystems
-   Enter list of excluded servername strings like "*server1*","*server2*,"*server3" to exclude reparse points which are
-   pointing to this UNC paths.
-   .PARAMETER ScanDepth
-   How deep in the subfolder structure the script should scan for reparse points?
+   This script finds the shares, which are not used by any NAS backup job. All shares will automatically removed from VBR configuration. 
    .PARAMETER LogFile
-   You can set your own path for log file from this script. Default filename is "C:\ProgramData\dfsresolver4nasbackup.log"
+   You can set your own path for log file from this script. Default filename is "C:\ProgramData\nasBackupCleanup.log"
 
    .Example
-   .\Add-DFSTargetToNASBackupJob.ps1 -DfsRoot "\\homelab\dfs" -VBRJobName "NAS DFS Test" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2
-
-   .Example
-   .\Add-DFSTargetToNASBackupJob.ps1 -DfsRoot "\\homelab\dfs" -VBRJobName "NAS DFS Test" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2 -VolumeProcessingMode VSSSnapshot
-
-   .Example
-   .\Add-DFSTargetToNASBackupJob.ps1 -DfsRoot "\\homelab\dfs" -VBRJobName "NAS DFS Test" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2 -VolumeProcessingMode VSSSnapshot -ExcludeSystems "*lab-dc01*","*lab-nacifs01*" 
+   .\Add-DFSTargetToNASBackupJob.ps1
 
    .Notes 
-   Version:        1.7
+   Version:        1.0
    Author:         Marco Horstmann (marco.horstmann@veeam.com)
    Creation Date:  09 April 2020
-   Purpose/Change: Bugfix: Error Handling if Job doesn't exists
+   Purpose/Change: New script
    
    .LINK https://github.com/veeamhub/powershell
    .LINK https://github.com/marcohorstmann/powershell
@@ -43,26 +23,6 @@
  [CmdletBinding(DefaultParameterSetName="__AllParameterSets")]
 Param(
 
-<#
-   [Parameter(Mandatory=$True)]
-   [string]$DfsRoot,
-
-   [ValidateSet(“Direct”,”StorageSnapshot”,”VSSSnapshot”)]
-   [Parameter(Mandatory=$False)]
-   [string]$VolumeProcessingMode="Direct",
-
-   [Parameter(Mandatory=$True)]
-   [string]$VBRJobName,
-
-   [Parameter(Mandatory=$True)]
-   [string]$ShareCredential,
-
-   [Parameter(Mandatory=$True)]
-   [string]$CacheRepository,
-
-   [Parameter(Mandatory=$False)]
-   [string[]]$ExcludeSystems,
-#>
    [Parameter(Mandatory=$False)]
    [switch]$Automatic=$false,
 
