@@ -30,10 +30,10 @@
    .\Add-DFSTargetToNASBackupJob.ps1 -DfsRoot "\\homelab\dfs" -VBRJobName "NAS DFS Test" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2 -VolumeProcessingMode VSSSnapshot -ExcludeSystems "*lab-dc01*","*lab-nacifs01*" 
 
    .Notes 
-   Version:        1.7
+   Version:        1.8
    Author:         Marco Horstmann (marco.horstmann@veeam.com)
-   Creation Date:  09 April 2020
-   Purpose/Change: Bugfix: Error Handling if Job doesn't exists
+   Creation Date:  16 April 2020
+   Purpose/Change: Bugfix: Disallow ProcessingMode StorageSnapshot because it will not work.
    
    .LINK https://github.com/veeamhub/powershell
    .LINK https://github.com/marcohorstmann/powershell
@@ -45,7 +45,8 @@ Param(
    [Parameter(Mandatory=$True)]
    [string]$DfsRoot,
 
-   [ValidateSet(“Direct”,”StorageSnapshot”,”VSSSnapshot”)]
+   #[ValidateSet(“Direct”,”StorageSnapshot”,”VSSSnapshot”)]
+   [ValidateSet(“Direct”,”VSSSnapshot”)]
    [Parameter(Mandatory=$False)]
    [string]$VolumeProcessingMode="Direct",
 
