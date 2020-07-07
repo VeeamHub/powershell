@@ -5,7 +5,8 @@ $uniqueidfilter="",
 $runtime=(get-date),
 $startinterval=$runtime.AddDays(-1),
 $stopinterval=$runtime,
-[ValidateSet("licensequery","jobquery")]$mode="jobquery"
+[ValidateSet("licensequery","jobquery")]$mode="jobquery",
+$zip=$true
 )
 
 class LightWeightReportingFile {
@@ -61,8 +62,20 @@ if (-not (Test-Path -Path $lwrpath -PathType Container)) {
 
     $parsedDataSet = @() 
     foreach($tf in $targetfiles) {
-        $parsedData = get-content $tf.fullpath | ConvertFrom-Json
-        $parsedDataSet += $parsedData
+        if ($zip) {
+            $data = ""
+            $fr = [System.IO.File]::Open($tf.fullpath,[System.IO.FileMode]::Open)
+            $gstreamread = [System.IO.Compression.GZipStream]::new($fr,[System.IO.Compression.CompressionMode]::Decompress)
+            $reader = [System.IO.StreamReader]::new($gstreamread,[System.Text.UTF8Encoding])
+            $data = $reader.ReadToEnd()
+            $fr.close()
+            $parsedData = $data | ConvertFrom-Json
+            $parsedDataSet += $parsedData
+        } else {
+            $parsedData = get-content $tf.fullpath | ConvertFrom-Json
+            $parsedDataSet += $parsedData
+        }
+      
     }
 
     switch($mode) {

@@ -4,7 +4,8 @@
 param(
 $lwrpath="c:\veeamlwr",
 $uniqueid="99570f44-c050-11ea-b3de-0242ac13000x",
-$sitename="DC3"
+$sitename="Main Data Center",
+$zip=$true
 )
 
 
@@ -95,5 +96,18 @@ foreach($job in (get-vbrjob)) {
 }
 
 Write-Verbose "Creating $collectpath"
-$lwr | ConvertTo-Json | Out-File -FilePath $collectpath
+$json = $lwr | ConvertTo-Json
+if ($zip) {
+    $data = [Text.Encoding]::UTF8.GetBytes($json)
+    $fr = [System.IO.File]::Open($collectpath,[System.IO.FileMode]::CreateNew)
+    $gstream = [System.IO.Compression.GZipStream]::new($fr,[System.IO.Compression.CompressionMode]::Compress)
+    $gstream.Write($data,0,$data.Length)
+    $gstream.Close()
+    $fr.close()
+} else {
+    $json | Out-File -FilePath $collectpath
+}
+
+
+
 

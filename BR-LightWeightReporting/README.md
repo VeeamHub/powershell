@@ -14,7 +14,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ## Project Notes
 **Author:** Timothy Dewin
 
-**Version:** 0.1
+**Version:** 0.1.1
 
 
 You probably don't want to use it, instead:
@@ -22,10 +22,11 @@ You probably don't want to use it, instead:
 - use veeam one if you want complete reportings
 - use veeam vspc if you have a complex multitenant environment where you want to monitor everything centrally
 
-This is only created for 2 special use case:
+This is only created for 2 special use case (in fact this are the 2 use cases that inspired me):
 - secure environments where the means of transfering data is limited to certain protocol (email, ftp, ..)
 - super low bandwidth where every byte counts and you want to have full control on how much reporting is done
-(in fact this are the 2 use cases that inspired me)
+
+
 
 
 ## How it works
