@@ -34,7 +34,7 @@ This is only created for 2 special use case (in fact this are the 2 use cases th
 - json report will be dumped to c:\veeamlwr. It is your own duty to copy these files to a central location via the protocol of your liking
 - put all reports on a central server under c:\veeamlwr
 - run lwr-central to query the latest license status or job status (decided by the -mode parameter)
-- It is your own duty to delete older files (you might want to keep them for tracking)
+- It is your own duty to delete older files (you might want to keep them for tracking) on the central server. On the local server, auto purging happens if it is not set to 0
 
 ## Local Site 
 Output should be nothing unless you add -verbose. Make sure -uniqueid is unique for every site but consistent for every run on each side
@@ -76,6 +76,17 @@ date               sitename socketsused socketsinstalled instanceused instancein
 7/07/2020 15:29:28 DC2                0               12            0              1006
 7/07/2020 15:37:15 DC3                0               12            0              1006
 7/07/2020 15:54:42 Main               0               12            0              1006
+```
+
+RPO monitoring (coloring in console)
+```
+.\lwr-central.ps1 -mode rporuntime
+```
+```
+PS C:\scripts> .\lwr-central.ps1 -mode rporuntime
+RPO Breach : Site Main Data Center     : linux                - 21/04/2020 10:06:42  - Success
+Job Failed : Site Main Data Center     : fsnas                - 8/07/2020 16:07:14   - Failed
+RPO Breach : Site Main Data Center     : windows              - 21/04/2020 9:11:29   - Success
 ```
 
 # FAQ

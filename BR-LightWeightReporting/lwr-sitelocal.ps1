@@ -5,9 +5,19 @@ param(
 $lwrpath="c:\veeamlwr",
 $uniqueid="99570f44-c050-11ea-b3de-0242ac13000x",
 $sitename="Main Data Center",
-$zip=$true
+$zip=$true,
+[ValidateSet("run")]$mode="run",
+$autopurgedays=30,
+$makesubdir=$true
 )
 
+
+Function Convert-FromUnixDate ($UnixDate) {
+   return [DateTimeOffset]::FromUnixTimeSeconds($UnixDate).LocalDateTime
+}
+Function Convert-ToUnixDate($DateTime) {
+   return [DateTimeOffset]::new($DateTime).ToUnixTimeSeconds()
+}
 
 <#
  Class definitions
@@ -18,7 +28,7 @@ class LightWeightJob
     [string]$currentstatus
     [string]$jobtype
     [string]$sourcetype
-    [datetime]$lastrun
+    [int64]$lastrun
     [string]$laststatus
 
     LightWeightJob() {}
@@ -27,13 +37,13 @@ class LightWeightJob
         $this.currentstatus = $currentstatus
         $this.jobtype = $jobtype
         $this.sourcetype = $sourcetype
-        $this.lastrun = $lastrun
+        $this.lastrun = (Convert-ToUnixDate $lastrun)
         $this.laststatus = $laststatus
     }
 }
 Class LightWeightReport
 {
-    [DateTime]$date
+    [int64]$date
     [string]$uniqueid
     [string]$sitename
     [int]$socketsinstalled
@@ -46,7 +56,7 @@ Class LightWeightReport
         $this.jobs = @()
     }
     LightWeightReport([DateTime]$date,[string]$uniqueid,[string]$sitename,[int]$socketsinstalled,[int]$socketsused,[int]$instanceinstalled,[int]$instanceused) {
-     $this.date = $date
+     $this.date = (Convert-ToUnixDate $date)
      $this.uniqueid = $uniqueid
      $this.sitename = $sitename
      $this.socketsinstalled = $socketsinstalled
@@ -64,11 +74,19 @@ if (-not (Test-Path -Path $lwrpath -PathType Container)) {
     New-Item -Path $lwrpath -ItemType Directory | out-null
 }
 
+if ( $makesubdir ) {
+    Write-Verbose "Using subdir to group data"
+    $lwrpath = Join-Path -Path $lwrpath -ChildPath $uniqueid
+    if (-not (Test-Path -Path $lwrpath -PathType Container)) {
+        Write-Verbose "$lwrpath does not exist, creating"
+        New-Item -Path $lwrpath -ItemType Directory | out-null
+    }
+}
 
 #use now to have a consistent time over the script
 $now = (Get-Date)
 #use 
-$collectpath = Join-Path -Path $lwrpath -ChildPath ("{0}_{1}.lwr" -f $uniqueid,$now.ToString("yyyyMMdd_HHmmss"))
+$collectpath = Join-Path -Path $lwrpath -ChildPath ("{0}_{1}.lwr" -f $uniqueid,(Convert-ToUnixDate $now))
 
 
 $license = Get-VBRInstalledLicense
@@ -92,7 +110,7 @@ $lwr = [LightWeightReport]::new($now,$uniqueid,$sitename,$socketsinstalled,$sock
 
 foreach($job in (get-vbrjob)) {
     $ls = $job.FindLastSession()
-    $lwr.jobs += [LightWeightJob]::new($job.Name,$job.GetLastState(),$job.JobType,$job.SourceType,$ls.EndTimeUTC,$ls.Result)
+    $lwr.jobs += [LightWeightJob]::new($job.Name,$job.GetLastState(),$job.JobType,$job.SourceType,$ls.EndTimeUTC.ToUniversalTime(),$ls.Result)
 }
 
 Write-Verbose "Creating $collectpath"
@@ -106,6 +124,36 @@ if ($zip) {
     $fr.close()
 } else {
     $json | Out-File -FilePath $collectpath
+}
+
+if ($autopurgedays -gt 0) {
+
+    $getfilelist = @{
+      Path = $lwrpath
+      Filter = "*.lwr"
+      Recurse = $true
+    }
+    $files = Get-ChildItem @getfilelist
+    $purgedate = ($now).AddDays(-$autopurgedays)
+    #for dev
+    $purgedate = ($now).AddSeconds(-$autopurgedays)
+    Write-Verbose "Autopurging older than $purgedate "
+
+    foreach ($file in $files) { 
+        if ($file.name -match "^(.*)_([0-9]+).lwr$") {
+            $uid = $Matches[1]
+            $date = (Convert-FromUnixDate $Matches[2])
+            #check if is our files
+            if ($uid -eq $uniqueid) {
+                if ($date -lt $purgedate) {
+                    Write-Verbose "Ready to purge $file $purgedate lt $date"
+                    Remove-Item $file.fullname
+                } else {
+                    Write-Verbose "Active $file $purgedate lt $date"
+                }
+            } 
+        }
+    }
 }
 
 

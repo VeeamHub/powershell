@@ -5,9 +5,17 @@ $uniqueidfilter="",
 $runtime=(get-date),
 $startinterval=$runtime.AddDays(-1),
 $stopinterval=$runtime,
-[ValidateSet("licensequery","jobquery")]$mode="jobquery",
-$zip=$true
+[ValidateSet("licensequery","jobquery","rporuntime")]$mode="rporuntime",
+$zip=$true,
+$rpodays=1,
+$recursivefilelist=$true
 )
+
+
+
+Function Convert-FromUnixDate ($UnixDate) {
+   return [DateTimeOffset]::FromUnixTimeSeconds($UnixDate).LocalDateTime
+}
 
 class LightWeightReportingFile {
     [string]$fullpath
@@ -31,12 +39,21 @@ if (-not (Test-Path -Path $lwrpath -PathType Container)) {
     Write-Verbose "$lwrpath exists, looking for files"
     Write-Verbose "start time $startinterval"
     Write-Verbose "stop time $stopinterval"
-    $files = Get-ChildItem -Filter "*.lwr" -Path $lwrpath
+
+    $getfilelist = @{
+      Path = $lwrpath
+      Filter = "*.lwr"
+    }
+    if ($recursivefilelist) {
+        $getfilelist["recurse"] = $true
+    }
+    $files = Get-ChildItem @getfilelist
+
     $parsedFiles = @()
     foreach ($file in $files) {
-        if ($file.name -match "^(.*)_([0-9]+_[0-9]+).lwr$") {
+        if ($file.name -match "^(.*)_([0-9]+).lwr$") {
             $uid = $Matches[1]
-            $date = [System.DateTime]::ParseExact($Matches[2],"yyyyMMdd_HHmmss",$null)
+            $date = (Convert-FromUnixDate $Matches[2])
             $parsedFiles += [LightWeightReportingFile]::new($file.FullName,$file.Name,$uid,$date)
         }
     }
@@ -80,15 +97,39 @@ if (-not (Test-Path -Path $lwrpath -PathType Container)) {
 
     switch($mode) {
         "licensequery" {
-            $table = $parsedDataSet | select date,sitename,socketsused,socketsinstalled,instanceused,instanceinstalled
+            $table = $parsedDataSet | select @{n="Date";e={(Convert-FromUnixDate $_.date)}},sitename,socketsused,socketsinstalled,instanceused,instanceinstalled
             $table | ft
         }
         "jobquery" {
             $jobtab = @()
             foreach($pd in $parsedDataSet) {
-               $jobtab += $pd.jobs | select @{n="Site";e={$pd.sitename}},@{n="UpdateStatus";e={$pd.date}},jobname,currentstatus,lastrun,laststatus
+               $jobtab += $pd.jobs | select @{n="Site";e={$pd.sitename}},@{n="UpdateStatus";e={(Convert-FromUnixDate $pd.date)}},jobname,currentstatus,@{n="Lastrun";e={(Convert-FromUnixDate $_.lastrun)}},laststatus
             }
             $jobtab | ft
+        }
+        "rporuntime" {
+            $rpo = $runtime.adddays(-$rpodays)
+
+            foreach($pd in $parsedDataSet) {
+                $pddate = (Convert-FromUnixDate $pd.date)
+                
+                if ($pddate -lt $rpo) {
+                    write-host -ForegroundColor Red ("Attention : Site {0,-20} : old data {1}" -f $pd.sitename,$pddate)
+                }
+                foreach ($job in $pd.jobs) {
+                    $lrc = (Convert-FromUnixDate $job.lastrun)
+                    if ($job.laststatus -ne "Success") {
+                        write-host -ForegroundColor Red ("Job Failed  : Site {0,-20} : {1,-20} - {3,-20} - {2}" -f $pd.sitename,$job.jobname,$job.laststatus,$lrc)
+                    } else {
+                        if ($lrc -lt $rpo) {
+                            write-host -ForegroundColor yellow ("RPO Breach : Site {0,-20} : {1,-20} - {3,-20} - {2}" -f $pd.sitename,$job.jobname,$job.laststatus,$lrc)
+                        } else {
+                            write-host ("Job OK     : Site {0,-20} : {1,-20} - {3,-20} - {2}" -f $pd.sitename,$job.jobname,$job.laststatus,$lrc)
+                        }
+                    }
+                }
+               
+            }
         }
         
     }
