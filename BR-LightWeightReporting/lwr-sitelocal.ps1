@@ -8,7 +8,8 @@ $sitename="Main Data Center",
 $zip=$true,
 [ValidateSet("run")]$mode="run",
 $autopurgedays=30,
-$makesubdir=$true
+$makesubdir=$true,
+$server="localhost"
 )
 
 
@@ -46,28 +47,44 @@ Class LightWeightReport
     [int64]$date
     [string]$uniqueid
     [string]$sitename
+    [string]$server
     [int]$socketsinstalled
     [int]$socketsused
     [int]$instanceinstalled
     [int]$instanceused
     [LightWeightJob[]]$jobs
+    [string[]]$error
 
     LightWeightReport() {
         $this.jobs = @()
+        $this.error = @()
     }
     LightWeightReport([DateTime]$date,[string]$uniqueid,[string]$sitename,[int]$socketsinstalled,[int]$socketsused,[int]$instanceinstalled,[int]$instanceused) {
-     $this.date = (Convert-ToUnixDate $date)
-     $this.uniqueid = $uniqueid
-     $this.sitename = $sitename
-     $this.socketsinstalled = $socketsinstalled
-     $this.socketsused = $socketsused
-     $this.instanceinstalled = $instanceinstalled
-     $this.instanceused = $instanceused
-     $this.jobs = @()
+        $this.date = (Convert-ToUnixDate $date)
+        $this.uniqueid = $uniqueid
+        $this.sitename = $sitename
+        $this.socketsinstalled = $socketsinstalled
+        $this.socketsused = $socketsused
+        $this.instanceinstalled = $instanceinstalled
+        $this.instanceused = $instanceused
+        $this.jobs = @()
+        $this.error = @()
     }
+
+     LightWeightReport([DateTime]$date,[string]$uniqueid,[string]$sitename) {
+        $this.date = (Convert-ToUnixDate $date)
+        $this.uniqueid = $uniqueid
+        $this.sitename = $sitename
+        $this.jobs = @()
+        $this.error = @()
+    }
+
+    
 }
 
 Add-PSSnapin VeeamPSSnapin
+
+
 
 if (-not (Test-Path -Path $lwrpath -PathType Container)) {
     Write-Verbose "$lwrpath does not exist, creating"
@@ -89,6 +106,15 @@ $now = (Get-Date)
 $collectpath = Join-Path -Path $lwrpath -ChildPath ("{0}_{1}.lwr" -f $uniqueid,(Convert-ToUnixDate $now))
 
 
+
+$lwr = [LightWeightReport]::new($now,$uniqueid,$sitename)
+try {
+    Connect-VBRServer -Server $server
+} catch {
+    $lwr.error += $_
+}
+
+
 $license = Get-VBRInstalledLicense
 [int]$socketsinstalled = 0
 [int]$socketsused = 0
@@ -105,7 +131,11 @@ foreach ($il in $license.InstanceLicenseSummary) {
     $instanceused += $il.UsedInstancesNumber
 }
 
-$lwr = [LightWeightReport]::new($now,$uniqueid,$sitename,$socketsinstalled,$socketsused,$instanceinstalled,$instanceused)
+$lwr.instanceused = $instanceused
+$lwr.instanceinstalled = $instanceinstalled
+$lwr.socketsinstalled = $socketsinstalled
+$lwr.socketsused = $socketsused
+$lwr.server = (Get-VBRServerSession).server
 
 
 foreach($job in (get-vbrjob)) {
@@ -136,7 +166,7 @@ if ($autopurgedays -gt 0) {
     $files = Get-ChildItem @getfilelist
     $purgedate = ($now).AddDays(-$autopurgedays)
     #for dev
-    $purgedate = ($now).AddSeconds(-$autopurgedays)
+    #$purgedate = ($now).AddSeconds(-$autopurgedays)
     Write-Verbose "Autopurging older than $purgedate "
 
     foreach ($file in $files) { 
@@ -155,6 +185,7 @@ if ($autopurgedays -gt 0) {
         }
     }
 }
+
 
 
 

@@ -88,6 +88,8 @@ if (-not (Test-Path -Path $lwrpath -PathType Container)) {
             $fr.close()
             $parsedData = $data | ConvertFrom-Json
             $parsedDataSet += $parsedData
+
+            Write-Verbose $data
         } else {
             $parsedData = get-content $tf.fullpath | ConvertFrom-Json
             $parsedDataSet += $parsedData
@@ -119,7 +121,7 @@ if (-not (Test-Path -Path $lwrpath -PathType Container)) {
                 foreach ($job in $pd.jobs) {
                     $lrc = (Convert-FromUnixDate $job.lastrun)
                     if ($job.laststatus -ne "Success") {
-                        write-host -ForegroundColor Red ("Job Failed  : Site {0,-20} : {1,-20} - {3,-20} - {2}" -f $pd.sitename,$job.jobname,$job.laststatus,$lrc)
+                        write-host -ForegroundColor Red ("Job Failed : Site {0,-20} : {1,-20} - {3,-20} - {2}" -f $pd.sitename,$job.jobname,$job.laststatus,$lrc)
                     } else {
                         if ($lrc -lt $rpo) {
                             write-host -ForegroundColor yellow ("RPO Breach : Site {0,-20} : {1,-20} - {3,-20} - {2}" -f $pd.sitename,$job.jobname,$job.laststatus,$lrc)
