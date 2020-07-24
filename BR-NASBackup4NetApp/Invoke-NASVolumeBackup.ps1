@@ -186,13 +186,17 @@ PROCESS {
   {
     try {
         $volumeObject = Get-NcVol -Controller $Controller -VserverContext $SVM -name $Volume
+        if (!$volumeObject) {
+            Write-Log -Info "Volume was not found" -Status Error
+            exit 40
+        }
         Write-Log -Info "Volume was found" -Status Info
         return $volumeObject
     } catch {
         # Error handling if snapshot cannot be removed
         Write-Log -Info "$_" -Status Error
         Write-Log -Info "Volume couldn't be located" -Status Error
-        exit 50
+        exit 40
     }
   }
 
