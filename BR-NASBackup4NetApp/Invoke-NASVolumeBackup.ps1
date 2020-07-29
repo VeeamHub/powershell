@@ -38,14 +38,19 @@
    .\Invoke-NASBackup.ps1 -PrimaryCluster 192.168.1.220 -PrimarySVM "lab-netapp94-svm1" -PrimaryVolume "vol_cifs" -PrimaryClusterCredentials "C:\scripts\saved_credentials_Administrator.xml"
 
    .Example
+   If you want to use this script with only one NetApp system and multiple parameters you can use this parameters.
+   You can add this file and parameter to a Veeam NAS Backup Job
+   .\Invoke-NASBackup.ps1 -PrimaryCluster 192.168.1.220 -PrimarySVM "lab-netapp94-svm1" -PrimaryVolume "volume1","volume2","volume3" -PrimaryClusterCredentials "C:\scripts\saved_credentials_Administrator.xml"
+
+   .Example
    If you want to use a secondary destination as source for NAS Backup you can use this parameter set.
    You can add this file and parameter to a Veeam NAS Backup Job
    .\Invoke-NASBackup.ps1 -PrimaryCluster 192.168.1.220 -PrimarySVM "lab-netapp94-svm1" -PrimaryVolume "vol_cifs" -PrimaryClusterCredentials "C:\scripts\saved_credentials_Administrator.xml" -UseSecondaryDestination -SecondaryCluster 192.168.1.225 -SecondarySVM "lab-netapp94-svm2" -SecondaryVolume "vol_cifs_vault" -SecondaryCredentials "C:\scripts\saved_credentials_Administrator.xml" 
 
    .Notes 
-   Version:        3.0
+   Version:        4.0 Beta 1
    Author:         Marco Horstmann (marco.horstmann@veeam.com)
-   Creation Date:  24 July 2020
+   Creation Date:  27 July 2020
    Purpose/Change: Forked script to allow adding volume name instead of share name
    
    .LINK https://github.com/veeamhub/powershell
@@ -61,7 +66,7 @@ Param(
    [string]$PrimarySVM,
    
    [Parameter(Mandatory=$True)]
-   [string]$PrimaryVolume,
+   [string[]]$PrimaryVolume,
    
    [Parameter(Mandatory=$True)]
    [string]$PrimaryClusterCredentials,   
@@ -184,27 +189,20 @@ PROCESS {
     return $controllersession
   }
 
-  # This function lookup the volume behind a share and return this volumename
-  function Get-NetAppVolumeFromShare($Controller, $SVM, $Share)
-  {
-    $share = get-nccifsshare -Controller $Controller -VserverContext $SVM -name $Share
-    return $share.Volume
-  }
-
   function Get-NetAppVolumeInfo($Controller, $SVM, $Volume)
   {
     try {
         $volumeObject = Get-NcVol -Controller $Controller -VserverContext $SVM -name $Volume
         if (!$volumeObject) {
-            Write-Log -Info "Volume was not found" -Status Error
+            Write-Log -Info "Volume $Volume was not found" -Status Error
             exit 40
         }
-        Write-Log -Info "Volume was found" -Status Info
+        Write-Log -Info "Volume $Volume was found" -Status Info
         return $volumeObject
     } catch {
         # Error handling if snapshot cannot be removed
         Write-Log -Info "$_" -Status Error
-        Write-Log -Info "Volume couldn't be located" -Status Error
+        Write-Log -Info "Volume $Volume couldn't be located" -Status Error
         exit 40
     }
   }
@@ -336,26 +334,30 @@ PROCESS {
     $SecondaryClusterSession = $PrimaryClusterSession
   }
   #Get the volume properties
-  $PrimaryVolumeObject = Get-NetAppVolumeInfo -Controller $PrimaryClusterSession -SVM $PrimarySVM -Volume $PrimaryVolume
- 
-  # This codeblock is only needed if we transfer to a secondary system. 
-  if($UseSecondaryDestination)
-  {
-    #If using Snapvault or SnapMirror we cannot just delete the snapshot. We need to rename
-    #it otherwise we get problems with the script
-    $OldSnapshotName = $SnapshotName + "OLD"
-    $SecondaryVolumeObject = Get-NetAppVolumeInfo -Controller $SecondaryClusterSession -SVM $SecondarySVM -Volume $SecondaryVolume
-    Remove-NetAppSnapshot -SnapshotName $OldSnapshotName -Controller $PrimaryClusterSession -SVM $PrimarySVM -Volume $PrimaryVolumeObject
-    # Rename exisiting Snapshot to $OldSnapshotName
-    Rename-NetAppSnapshot -SnapshotName $SnapshotName -NewSnapshotName $OldSnapshotName -Controller $PrimaryClusterSession -SVM $PrimarySVM -Volume $PrimaryVolumeObject
-    Create-NetAppSnapshot -SnapshotName $SnapshotName -Controller $PrimaryClusterSession -SVM $PrimarySVM -Volume $PrimaryVolumeObject
-    Start-NetAppSync -Controller $SecondaryClusterSession -SecondarySVM $SecondarySVM -SecondaryVolume $SecondaryVolumeObject -PrimarySnapshotName $SnapshotNameObject
-    Cleanup-SecondaryDestination -Controller $SecondaryClusterSession -SecondarySVM $SecondarySVM -SecondaryVolume $SecondaryVolumeObject -SourceSnapshotName $SnapshotName
+  ForEach($SingleVolume in $PrimaryVolume) {
+    $PrimaryVolumeObject = Get-NetAppVolumeInfo -Controller $PrimaryClusterSession -SVM $PrimarySVM -Volume $SingleVolume
+
+    # This codeblock is only needed if we transfer to a secondary system. 
+    if($UseSecondaryDestination)
+    {
+        #If using Snapvault or SnapMirror we cannot just delete the snapshot. We need to rename
+        #it otherwise we get problems with the script
+        $OldSnapshotName = $SnapshotName + "OLD"
+        $SecondaryVolumeObject = Get-NetAppVolumeInfo -Controller $SecondaryClusterSession -SVM $SecondarySVM -Volume $SecondaryVolume
+        Remove-NetAppSnapshot -SnapshotName $OldSnapshotName -Controller $PrimaryClusterSession -SVM $PrimarySVM -Volume $PrimaryVolumeObject
+        # Rename exisiting Snapshot to $OldSnapshotName
+        Rename-NetAppSnapshot -SnapshotName $SnapshotName -NewSnapshotName $OldSnapshotName -Controller $PrimaryClusterSession -SVM $PrimarySVM -Volume $PrimaryVolumeObject
+        Create-NetAppSnapshot -SnapshotName $SnapshotName -Controller $PrimaryClusterSession -SVM $PrimarySVM -Volume $PrimaryVolumeObject
+        Start-NetAppSync -Controller $SecondaryClusterSession -SecondarySVM $SecondarySVM -SecondaryVolume $SecondaryVolumeObject -PrimarySnapshotName $SnapshotNameObject
+        Cleanup-SecondaryDestination -Controller $SecondaryClusterSession -SecondarySVM $SecondarySVM -SecondaryVolume $SecondaryVolumeObject -SourceSnapshotName $SnapshotName
     
-    # If we dont use seconady systems we only take care of processing on the primary system.
-  } else {
-    #Just rotate the local snapshot when no secondary destination is enabled
-    Remove-NetAppSnapshot -SnapshotName $SnapshotName -Controller $PrimaryClusterSession -SVM $PrimarySVM -Volume $PrimaryVolumeObject
-    Create-NetAppSnapshot -SnapshotName $SnapshotName -Controller $PrimaryClusterSession -SVM $PrimarySVM -Volume $PrimaryVolumeObject
+        # If we dont use seconady systems we only take care of processing on the primary system.
+    } else {
+        #Just rotate the local snapshot when no secondary destination is enabled
+        Remove-NetAppSnapshot -SnapshotName $SnapshotName -Controller $PrimaryClusterSession -SVM $PrimarySVM -Volume $PrimaryVolumeObject
+        Create-NetAppSnapshot -SnapshotName $SnapshotName -Controller $PrimaryClusterSession -SVM $PrimarySVM -Volume $PrimaryVolumeObject
+    }
   }
+
+  Write-Log -Status Info -Info "Script execution finished"
 } # END Process
