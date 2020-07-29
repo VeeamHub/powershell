@@ -12,6 +12,9 @@
    Enter the Credentials which should be used. They must be from VBR credentials manager.
    .PARAMETER CacheRepository
    Enter the Repository which should be used for Cache.
+   .PARAMETER ExcludeSystems
+   Enter list of excluded servername strings like "*server1*","*server2*,"*server3" to exclude reparse points which are
+   pointing to this UNC paths.
    .PARAMETER ScanDepth
    How deep in the subfolder structure the script should scan for reparse points?
    .PARAMETER LogFile
@@ -22,13 +25,18 @@
 
    .Example
    .\Add-DFSTargetToNASBackupJob.ps1 -DfsRoot "\\homelab\dfs" -VBRJobName "NAS DFS Test" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2 -VolumeProcessingMode VSSSnapshot
+
+   .Example
+   .\Add-DFSTargetToNASBackupJob.ps1 -DfsRoot "\\homelab\dfs" -VBRJobName "NAS DFS Test" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2 -VolumeProcessingMode VSSSnapshot -ExcludeSystems "*lab-dc01*","*lab-nacifs01*" 
+
    .Notes 
-   Version:        1.0
+   Version:        1.8
    Author:         Marco Horstmann (marco.horstmann@veeam.com)
-   Creation Date:  22 October 2019
-   Purpose/Change: Reworked documentation and commenting of code.
+   Creation Date:  16 April 2020
+   Purpose/Change: Bugfix: Disallow ProcessingMode StorageSnapshot because it will not work.
    
    .LINK https://github.com/veeamhub/powershell
+   .LINK https://github.com/marcohorstmann/powershell
    .LINK https://horstmann.in
  #> 
 [CmdletBinding(DefaultParameterSetName="__AllParameterSets")]
@@ -37,7 +45,8 @@ Param(
    [Parameter(Mandatory=$True)]
    [string]$DfsRoot,
 
-   [ValidateSet(“Direct”,”StorageSnapshot”,”VSSSnapshot”)]
+   #[ValidateSet(“Direct”,”StorageSnapshot”,”VSSSnapshot”)]
+   [ValidateSet(“Direct”,”VSSSnapshot”)]
    [Parameter(Mandatory=$False)]
    [string]$VolumeProcessingMode="Direct",
 
@@ -50,10 +59,8 @@ Param(
    [Parameter(Mandatory=$True)]
    [string]$CacheRepository,
 
-<#
    [Parameter(Mandatory=$False)]
-   [string]$FileServerName,
-#>
+   [string[]]$ExcludeSystems,
 
    [Parameter(Mandatory=$False)]
    [string]$LogFile="C:\ProgramData\dfsresolver4nasbackup.log",
@@ -145,13 +152,12 @@ PROCESS {
 
     # Validate parameters: VBRJobName
     Write-Log -Status Info -Info "Checking VBR Job Name"
-    try {
-        $nasBackupJob = Get-VBRNASBackupJob -name $VBRJobName
-        Write-Log -Info "VBR Job Name ... FOUND" -Status Info
-    } catch  {
-        Write-Log -Info "$_" -Status Error
+    $nasBackupJob = Get-VBRNASBackupJob -name $VBRJobName
+    if($nasBackupJob -eq $null) {
         Write-Log -Info "Failed to find job name" -Status Error
         exit 99
+    } else { 
+        Write-Log -Info "VBR Job Name ... FOUND" -Status Info
     }
     # Validate parameters: ShareCrendential
     Write-Log -Status Info -Info "Checking Share Credentials"
@@ -202,37 +208,58 @@ PROCESS {
   
     # Creates an empty VBRNASBackupJobObject where we need to add the 
     $VBRNASBackupJobObject = @()
-    # For each detected share to this 
-    $allshares | ForEach-Object {
-       <#
-        # ToDo: Add a filter for $allshares like only for shares from one system
-        if($FileServerName) {
-            $allshares | ForEach-Object {
-                if($_.TargetPath -ilike "\\$FileServerName\*") {
-                    Write-Host $_.TargetPath
-                } else {
-                Write-Host "Nicht so"
-                }
+    # For each detected share do this 
+
+    ForEach ($share in $allshares) {
+
+        $currentPath = $share.TargetPath
+        
+        # Test all ExcludedSystems and if one matches set $isexcluded to true        
+        $isexcluded = $false
+        ForEach ($ExcludedSystem in $ExcludeSystems) {
+            if ($currentPath -like $ExcludedSystem) {
+                $isexcluded = $true
             }
         }
-        #>
-        $currentPath = $_.TargetPath
+
+        #DEBUG
+        #echo $isexcluded
+        
         # Gets the info for NAS Server Name
-        $VBRNASServer = Get-VBRNASServer | Where-Object { $_.Path -eq $currentPath }
         #Check if share is already added to VBR. If not create share in VBR, else just skip
-        if(!(Get-VBRNASServer -Name $_.TargetPath)) {
-            Add-VBRNASSMBServer -Path $_.TargetPath -AccessCredentials $ShareCredential -ProcessingMode $VolumeProcessingMode -ProxyMode Automatic -CacheRepository $CacheRepository
-            Write-Log -Info "Adding $currentPath to VBR... DONE" -Status Info
-        } else  {
-           Write-Log -Info "Share $currentPath is already added... SKIPPING" -Status Info
+        if($isexcluded) {
+            Write-Log -Info "Share $currentPath is excluded by ExcludedSystems Parameter... SKIPPING" -Status Info
+        } else {
+            if(!(Get-VBRNASServer -Name $currentPath)) {
+                try {
+                    Add-VBRNASSMBServer -Path $currentPath -AccessCredentials $ShareCredential -ProcessingMode $VolumeProcessingMode -ProxyMode Automatic -CacheRepository $CacheRepository
+                    Write-Log -Info "Adding $currentPath to VBR... DONE" -Status Info
+                } catch {
+                    Write-Log -Info "$_" -Status Error
+                    Write-Log -Info "Adding $currentPath to VBR... FAILED" -Status Error
+                    $isexcluded = $true
+                }
+            } else  {
+                Write-Log -Info "Share $currentPath is already added... SKIPPING" -Status Info
+            }
         }
+
         # Add this share to the list of NASBackupJobObjects
-        # Here is the right point to add e.g. exclusion and inclusion masks
-        $VBRNASBackupJobObject += New-VBRNASBackupJobObject -Server $VBRNASServer -Path $currentPath
+        # Here is the right point to add later e.g. exclusion and inclusion masks.
+        if(!$isexcluded) {
+            $VBRNASServer = Get-VBRNASServer -Name $currentPath
+            $VBRNASBackupJobObject += New-VBRNASBackupJobObject -Server $VBRNASServer -Path $currentPath
+        }
     }
 
-    # Updating existing job with this NASBackupJobObjects 
-    Set-VBRNASBackupJob -Job $nasBackupJob -BackupObject $VBRNASBackupJobObject
+    # Updating existing job with this NASBackupJobObjects
+    try {
+        Set-VBRNASBackupJob -Job $nasBackupJob -BackupObject $VBRNASBackupJobObject
+        Write-Log -Info "Updating Backup Job $VBRJobName... DONE" -Status Info
+    } catch {
+        Write-Log -Info "$_" -Status Error
+        Write-Log -Info "Updating Backup Job $VBRJobName... FAILED" -Status Error
+    }
     
        
 } # END PROCESS
