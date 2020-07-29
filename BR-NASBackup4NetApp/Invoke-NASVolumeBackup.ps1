@@ -107,8 +107,8 @@ DynamicParam {
 
     $SecondaryVolumeAttribute = New-Object System.Management.Automation.ParameterAttribute
     $SecondaryVolumeAttribute.Mandatory = $true
-    $SecondarySVMAttribute.HelpMessage = "This is the secondary share in a mirror and/or vault relationship"
-    $SecondaryShareParam = New-Object System.Management.Automation.RuntimeDefinedParameter('SecondaryShare', [String], $attributeCollection)
+    $SecondaryVolumeAttribute.HelpMessage = "This is the secondary volume in a mirror and/or vault relationship"
+    $SecondaryVolumeParam = New-Object System.Management.Automation.RuntimeDefinedParameter('SecondaryShare', [String], $attributeCollection)
     
     $SecondaryCredentialsAttribute = New-Object System.Management.Automation.ParameterAttribute
     $SecondaryCredentialsAttribute.Mandatory = $false
@@ -119,7 +119,7 @@ DynamicParam {
     #Add here all parameters to the dictionary to make them available for use in script
     $paramDictionary.Add('SecondaryCluster', $SecondaryClusterParam)
     $paramDictionary.Add('SecondarySVM', $SecondarySVMParam)
-    $paramDictionary.Add('SecondaryVolume', $SecondaryShareParam)
+    $paramDictionary.Add('SecondaryVolume', $SecondaryVolumeParam)
     $paramDictionary.Add('SecondaryCredentials', $SecondaryCredentialsParam)
     #add here additional parameters if later needed
   }
@@ -128,20 +128,29 @@ DynamicParam {
 }
 
 PROCESS {
+ 
+  # Get timestamp for log
+  function Get-TimeStamp
+  {    
+    return "[{0:MM/dd/yy} {0:HH:mm:ss}]" -f (Get-Date)
+  }
 
   # This function is used to log status to console and also the given logfilename.
   # Usage: Write-Log -Status [Info, Status, Warning, Error] -Info "This is the text which will be logged"
   function Write-Log($Info, $Status)
   {
+    $Info = "$(Get-TimeStamp) $Info"
     switch($Status)
     {
+        NewLog {Write-Host $Info -ForegroundColor Green  ; $Info | Out-File -FilePath $LogFile}
         Info    {Write-Host $Info -ForegroundColor Green  ; $Info | Out-File -FilePath $LogFile -Append}
         Status  {Write-Host $Info -ForegroundColor Yellow ; $Info | Out-File -FilePath $LogFile -Append}
         Warning {Write-Host $Info -ForegroundColor Yellow ; $Info | Out-File -FilePath $LogFile -Append}
         Error   {Write-Host $Info -ForegroundColor Red -BackgroundColor White; $Info | Out-File -FilePath $LogFile -Append}
         default {Write-Host $Info -ForegroundColor white $Info | Out-File -FilePath $LogFile -Append}
     }
-  } #end function 
+  } #end function
+ 
 
   # This function will load the NetApp Powershell Module.
   function Load-NetAppModule
@@ -312,6 +321,8 @@ PROCESS {
   #
   # Main Code starts
   #
+  Write-Log -Status NewLog -Info "Starting new log file"
+
   # Load the NetApp Modules
   Load-NetAppModule
   # Connect to the source NetApp system
