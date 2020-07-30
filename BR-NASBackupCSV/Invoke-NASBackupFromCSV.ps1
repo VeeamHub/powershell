@@ -68,7 +68,7 @@ PROCESS {
 
  
 
-    # Get timestamp for log
+  # Get timestamp for log
   function Get-TimeStamp
   {    
     return "[{0:dd.MM.yyyy} {0:HH:mm:ss}]" -f (Get-Date)
@@ -113,6 +113,7 @@ PROCESS {
     # Validate parameters: VBRJobName
     Write-Log -Status Info -Info "Checking VBR Job Name"
     try {
+        #Only validate if VBRJobName was provided
         if($VBRJobName) {
             $nasBackupJob = Get-VBRNASBackupJob -name $VBRJobName
             Write-Log -Info "VBR Job Name ... FOUND" -Status Info
@@ -124,8 +125,8 @@ PROCESS {
         Write-Log -Info "Failed to find job name" -Status Error
         exit 99
     }
-    # Validate parameters: ShareCrendential (only if exists)
-    
+
+    # Validate parameters: ShareCrendential (only if provided)
     Write-Log -Status Info -Info "Checking Share Credentials"
     try {
         if($ShareCredential) {
@@ -157,6 +158,7 @@ PROCESS {
     Write-Log -Status Info -Info "Readin CSV to Shares"
     try {
         [string[]]$allshares = Get-Content -Path $CSVfile
+        # Check if the $allshares is empty
         if(!$allshares) {
             Write-Log -Info "Failed to load CSV file" -Status Error
             Write-Log -Info "File not found or empty" -Status Error
@@ -179,6 +181,7 @@ PROCESS {
 
         #### TODO: Add here options for Remote VSS Direct and Storage Snapshot
             try {
+                #If the line contains a ":" this must be a NFS export so we go into the nfs part
                 if($share.contains(":")) {
                     if($VolumeProcessingMode -like "StorageSnapshot") {
                         $sharesnapshot = $share + "/.snapshot/VeeamNASBackup"
@@ -186,16 +189,22 @@ PROCESS {
                     } else {
                         Add-VBRNASNFSServer -Path $share -CacheRepository $repository -ProcessingMode Direct
                     }
+                #If the line starts with "\\" this must be a SMB share so we go into the SMB part
                 } elseif($share.startswith("\\")) {
+                    # Check if the share credentials was provided, otherwise we stop here. Because this script is build
+                    # for both worlds this needs to be checked here first. 
                     if(!$ShareCredential) {
                         Write-Log -Info "Share Credentials was provided for SMB ... FAILED" -Status Error
                         exit 80
                     }
+                    # IF we use Storage Snapshot Mode
                     if($VolumeProcessingMode -like "StorageSnapshot") {
                         $sharesnapshot = $share + "\~snapshot\VeeamNASBackup"
                         Add-VBRNASSMBServer -Path $share -CacheRepository $repository -ProcessingMode StorageSnapshot -StorageSnapshotPath $sharesnapshot -AccessCredentials $ShareCredential
+                    # IF we use VSS Snapshot Mode
                     } elseif($VolumeProcessingMode -like "VSSSnapshot") {
                         Add-VBRNASSMBServer -Path $share -CacheRepository $repository -ProcessingMode VSSSnapshot -AccessCredentials $ShareCredential
+                    # Otherwise we use Direct Mode
                     } else {
                         Add-VBRNASSMBServer -Path $share -CacheRepository $repository -ProcessingMode Direct -AccessCredentials $ShareCredential
                     }
@@ -209,10 +218,14 @@ PROCESS {
         } else  {
            Write-Log -Info "Share/Export $share is already added... SKIPPING" -Status Info
         }
-        $VBRNASServer = Get-VBRNASServer | Where-Object { $_.Path -eq $share}           
-        # Add this share to the list of NASBackupJobObjects
-        # Here is the right point to add e.g. exclusion and inclusion masks
-        $VBRNASBackupJobObject += New-VBRNASBackupJobObject -Server $VBRNASServer -Path $share
+        # Now get the share/export object from VBR to add it later to the job
+        # This only needs to be done if a job name was provided
+        if($VBRJobName) {
+            $VBRNASServer = Get-VBRNASServer | Where-Object { $_.Path -eq $share}           
+            # Add this share to the list of NASBackupJobObjects
+            # Here is the right point to add e.g. exclusion and inclusion masks
+            $VBRNASBackupJobObject += New-VBRNASBackupJobObject -Server $VBRNASServer -Path $share
+        }
     }
 
  
