@@ -1,15 +1,19 @@
-# Powershell Repository
-## VeeamHub
-Veeamhub projects are community driven projects, and are not created by Veeam R&D nor validated by Veeam Q&A. They are maintained by community members which might be or not be Veeam employees. 
+# Veeam Powershell Repository
 
-## Distributed under MIT license
-Copyright (c) 2016 VeeamHub
+Powershell sample scripts that can be reused / adapted. Please do not just execute scripts without understanding what each and every line will do. Scripts in this repository are community driven projects and are not created by Veeam R&D or validated by Veeam Q&A. They are maintained by community members which may or not be Veeam employees.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+## 📗 Documentation
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+Documentation and usage instructions can be found with each script.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## ✍ Contributions
 
-## Project Notes
-Powershell sample scripts that can be reused / adapted. Please do not just execute scripts without understanding what each and every line will do.
+We welcome contributions from the community! We encourage you to create [issues](https://github.com/VeeamHub/powershell/issues/new/choose) for Bugs & Feature Requests and submit Pull Requests for adding/updating scripts. For more detailed information, refer to our [Contributing Guide](CONTRIBUTING.md).
+
+## 🤝🏾 License
+
+* [MIT License](LICENSE)
+
+## 🤔 Questions
+
+If you have any questions or something is unclear, please don't hesitate to [create an issue](https://github.com/VeeamHub/powershell/issues/new/choose) and let us know!
