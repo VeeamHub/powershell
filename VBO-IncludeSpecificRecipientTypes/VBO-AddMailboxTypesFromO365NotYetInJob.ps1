@@ -94,7 +94,7 @@ $LogFileSkipped = "c:\ProgramData\Veeam\ScriptFiles\Logfiles\VBO-Mailboxes-skipp
 $MailboxExportFile = "c:\ProgramData\Veeam\ScriptFiles\Temp\MailboxesToAddToVBO-Job.txt"
 
 # Connect to your O365 tenant using the following service account and credential file.  
-$O365Adm="vbo@M365B271169.onmicrosoft.com"
+$O365Adm="youraccount@yourtenant"
 $O365CredFile = "c:\ProgramData\Veeam\ScriptFiles\Cred\cred.xml"
 
 # The Filter file can be used to put in UPNs of accounts that you want to filter out (not added to the backup job).
