@@ -29,8 +29,8 @@ Import-Module -Name ExchangeOnlineManagement
 # Modify the values below to your needs                                                                      #
 ##############################################################################################################
 
-$Org = Get-VBOOrganization -Name "M365B271169.onmicrosoft.com"
-$Job = Get-VBOJob -Organization $Org -Name "Shared Mailboxes"
+$Org = Get-VBOOrganization -Name "Your Tenant"
+$Job = Get-VBOJob -Organization $Org -Name "Your Backup Job"
 
 #Create the folder structure for your Workingset. Edit when changing the actual location.
 If(!(Test-Path -Path "$env:ProgramData\Veeam\ScriptFiles\")){
