@@ -1,11 +1,13 @@
 ﻿<# 
 .NAME
-	VBO-AddMailboxTypesFromO365NotYetInJob.ps1
+	VBO-AddMailboxTypesFrom0365NotYetInJob.ps1
 .SYNOPSIS
-	Modify the values below to connect to your O365 tenant and your VBO backup server and modify 	folder locations to your needs.
+	Modify the values below to connect to your O365 tenant and your VBO backup server and modify folder locations to your needs.
 .DESCRIPTION
-	Add specific mailbox types which are not in specific VBO job based on the Ex0 ExchangeOnlineManagement module.
+	Add specific mailbox types which are not in specific VBO job based on the ExO ExchangeOnlineManagement module.
 	Credentials used to connect to your O365 tenant will be stored encrypted in a cred.xml file.
+    Make sure that you use an MFA-Enabled service account with a preconfigured App password to login to O365. 
+    See the following link to create an App password for an MFA-Enabled service account: http://vee.am/App-Password.
 	Run this script at least once interactively to create this credentials .xml file and then schedule this script as a 
     scheduled task to automatically add newly added mailboxes based on the Recipient types selected to process.
 	More information about the usage of this script can be found inline. 
@@ -29,10 +31,23 @@ Import-Module -Name ExchangeOnlineManagement
 # Modify the values below to your needs                                                                      #
 ##############################################################################################################
 
+# Fill in your O365 Tenant and fill in the name of the backup job in which you want to dynamically add the specified RecipientType Mailboxes.
 $Org = Get-VBOOrganization -Name "Your Tenant"
-$Job = Get-VBOJob -Organization $Org -Name "Your Backup Job"
+$Job = Get-VBOJob -Organization $Org -Name "Your Backup Job Name"
 
-#Create the folder structure for your Workingset. Edit when changing the actual location.
+# Connect to your O365 tenant using the following service account and credential file.  
+$O365Adm="Your MFA-Enabled service account (UPN format)"
+$O365CredFile = "c:\ProgramData\Veeam\ScriptFiles\Cred\cred.xml"
+
+# Log file locations
+$LogFileAdded = "c:\ProgramData\Veeam\ScriptFiles\Logfiles\VBO-Mailboxes-added.log"
+$LogFileSkipped = "c:\ProgramData\Veeam\ScriptFiles\Logfiles\VBO-Mailboxes-skipped.log"
+$MailboxExportFile = "c:\ProgramData\Veeam\ScriptFiles\Temp\MailboxesToAddToVBO-Job.txt"
+
+# The Filter file can be used to put in UPNs of accounts that you want to filter out (not added to the backup job).
+$FilterFile = "c:\ProgramData\Veeam\ScriptFiles\Filter\filter.txt"
+
+# Create the folder structure for your Workingset. Edit when changing the actual location.
 If(!(Test-Path -Path "$env:ProgramData\Veeam\ScriptFiles\")){
     New-Item -Path "$env:ProgramData\Veeam\ScriptFiles\" -ItemType Directory -Force
     Write-Host -ForegroundColor green "Created the Workingset folder structure."
@@ -43,7 +58,7 @@ Else {
     Write-Host ""
 }
 
-#Create the folder structure for your Filter location. Edit when changing the actual location.
+# Create the folder structure for your Filter location. Edit when changing the actual location.
 If(!(Test-Path -Path "$env:ProgramData\Veeam\ScriptFiles\Filter")){
     New-Item -Path "$env:ProgramData\Veeam\ScriptFiles\Filter" -ItemType Directory -Force
     Write-Host -ForegroundColor green "Created the Filter folder structure."
@@ -54,7 +69,7 @@ Else {
     Write-Host ""
 }
 
-#Create the folder structure for your Cred location. Edit when changing the actual location.
+# Create the folder structure for your Cred location. Edit when changing the actual location.
 If(!(Test-Path -Path "$env:ProgramData\Veeam\ScriptFiles\Cred")){
         New-Item -Path "$env:ProgramData\Veeam\ScriptFiles\Cred" -ItemType Directory -Force
     Write-Host -ForegroundColor green "Created the Filter folder structure."
@@ -65,7 +80,7 @@ Else {
     Write-Host ""
 }
 
-#Create the folder structure for your Temp location. Edit when changing the actual location.
+# Create the folder structure for your Temp location. Edit when changing the actual location.
 If(!(Test-Path -Path "$env:ProgramData\Veeam\ScriptFiles\Temp")){
     New-Item -Path "$env:ProgramData\Veeam\ScriptFiles\Temp" -ItemType Directory -Force
     Write-Host -ForegroundColor green "Created the Temp folder structure."
@@ -76,7 +91,7 @@ Else {
     Write-Host ""
 }
 
-#Create the folder structure for your Logfiles location. Edit when changing the actual location.
+# Create the folder structure for your Logfiles location. Edit when changing the actual location.
 If(!(Test-Path -Path "$env:ProgramData\Veeam\ScriptFiles\Logfiles")){
     New-Item -Path "$env:ProgramData\Veeam\ScriptFiles\Logfiles" -ItemType Directory -Force
     Write-Host -ForegroundColor green "Created the Logfiles folder structure."
@@ -87,20 +102,6 @@ Else {
     Write-Host ""
 }
 
-
-# Log file locations
-$LogFileAdded = "c:\ProgramData\Veeam\ScriptFiles\Logfiles\VBO-Mailboxes-added.log"
-$LogFileSkipped = "c:\ProgramData\Veeam\ScriptFiles\Logfiles\VBO-Mailboxes-skipped.log"
-$MailboxExportFile = "c:\ProgramData\Veeam\ScriptFiles\Temp\MailboxesToAddToVBO-Job.txt"
-
-# Connect to your O365 tenant using the following service account and credential file.  
-$O365Adm="youraccount@yourtenant"
-$O365CredFile = "c:\ProgramData\Veeam\ScriptFiles\Cred\cred.xml"
-
-# The Filter file can be used to put in UPNs of accounts that you want to filter out (not added to the backup job).
-$FilterFile = "c:\ProgramData\Veeam\ScriptFiles\Filter\filter.txt"
-
-
 ##############################################################################################################
 # Install the ExchangeOnlineManagement module by running the rule below once.                                #
 #Install-Module -Name ExchangeOnlineManagement -RequiredVersion 1.0.1
@@ -108,7 +109,7 @@ $FilterFile = "c:\ProgramData\Veeam\ScriptFiles\Filter\filter.txt"
 
 # Check if the credentials file exists.
 If(!(Test-Path -path $O365CredFile)){
-    Get-Credential -Message em"Enter your Office 365 Admin Credentials" | Export-Clixml -Path $o365CredFile
+    Get-Credential -Message "Login using the MFA-enabled service account with App password for secure authentication." | Export-Clixml -Path $o365CredFile
     $O365Cred=Get-Credential –Credential $O365Adm | EXPORT-CLIXML $O365credFile
 }
 Else{
@@ -119,18 +120,20 @@ Else{
 $O365Cred=IMPORT-CLIXML $O365CredFile
 
 # Connect to Exchange Online and get the information of the mailboxes you want to add to your VBO script.
-Write-Host -ForegroundColor white "Connecting to O365 Tenant using specified credentials."
+Write-Host -ForegroundColor white "Connecting to M365 Tenant using specified credentials from cred.xml."
 Write-Host -ForegroundColor white ""
 Connect-ExchangeOnline -UserPrincipalName $O365Adm -ShowProgress:$false -ShowBanner:$false
 
 
 # Change the -RecipientTypeDetails to the specific types you want to include in your VBO job.
-# Examples: -RecipientTypeDetails EquipmentMailbox, RoomMailbox, SharedMailbox
+# Examples: -RecipientTypeDetails EquipmentMailbox, GroupMailbox, RoomMailbox, SharedMailbox, TeamMailbox, UserMailbox
 
 
 Write-Host -ForegroundColor white "Getting mailboxes based on the RecipientTypeDetails specified."
 Write-Host -ForegroundColor white ""
 $Mailboxes = Get-EXOMailbox -RecipientTypeDetails EquipmentMailbox, RoomMailbox, SharedMailbox -ResultSize unlimited 
+
+Disconnect-ExchangeOnline -Confirm:$false
 
 # Create a filter file if does not exist.
 If(!(Test-Path -path $FilterFile)){
@@ -226,6 +229,6 @@ Write-Output "`n" | Out-File -FilePath $LogFileSkipped -Append
 Write-Output "-------------------------------------------------------------------------------------------------------------------------" | Out-File -FilePath $LogFileSkipped -Append
 
 # Variables will be removed after the script run to clean up the system for the next run.
+Remove-Variable -Name * -ErrorAction SilentlyContinue
 Write-Host -ForegroundColor white ""
 Write-Host -ForegroundColor white "Cleaned up variables for the next run."
-Remove-Variable -Name User,Mailbox,BackupItemUser,NewMailbox,Mailboxes,Filters,AddedMailboxes,FilteredMailboxes,TotalMailboxes -ErrorAction SilentlyContinue

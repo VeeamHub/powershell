@@ -14,23 +14,34 @@ If a specific Mailbox may not be added to the job, write this UPN in the Filter 
 
 During the first run of this script, the script will automatically create a folder structure in which the temp-output file, log files, filter files, and credential files are stored. Please feel free to adjust those folders and file names to your own needs.
 
-Second, during the first interactive run of the script, the script will ask for the O365 credentials to be used for pulling the information out of O365. The credentials used will be stored encrypted in the cred.xml file stored in the Cred folder and will be used each run (interactive or scheduled). If you want to change the credentials used, just delete the credentials file and run the script interactively again to add the new credentials to be used.
+Second, during the first interactive run of the script, the script will ask for the O365 credentials to be used for pulling the information from O365. It's recommended that you use an MFA-Enabled service account with a preconfigured App password to securely login to O365. See the following link to create an App password for an MFA-Enabled service account: http://vee.am/App-Password.
+ 
+The credentials used during this first run will be stored encrypted in the cred.xml file stored in the Cred folder and will be used each run (interactive or scheduled). If you want to change the credentials used, just delete the credentials file and run the script interactively again to add the new credentials to be used.
 
 This script will automatically create audit logs in which you can found which account is added on which run and which accounts are skipped due to the filter match. 
 
 To use the filter just add the upn of the user or mailbox you want to exclude on a row by row bases.
 
 Full list of tested RecipientType values:
-EquipmentMailbox
-GroupMailbox
-RoomMailbox
-SharedMailbox
-TeamMailbox
-UserMailbox
+EquipmentMailbox,GroupMailbox,RoomMailbox,SharedMailbox,TeamMailbox,UserMailbox
 
 You can specify multiple values separated by commas in the script.
 
-Requires: Veeam Backup for Microsoft Office 365 and ExchangeOnlineManagement 1.0.1 PowerShell Module.
+Requires: Veeam Backup for Microsoft Office 365 and ExchangeOnlineManagement 1.0.1 PowerShell modules.
+
+##Changelog:
+
+Changes 18-08-2020 (v1.2)
+Tested with MFA-Enabled service account with App password, changed login information in the script.
+Cleaned up input fields with default names.
+Rearranged input fields to beginning of script
+Updated documentation to use this script with MFA-Enabled service account.
+
+Changes 13-08-2020 (v1.1)
+Cleaned up input fields and information in the script.
+
+Changes 13-08-2020 (v1.0)
+Initial commit.
 
 ## Distributed under MIT license
 Copyright (c) 2020 VeeamHub
