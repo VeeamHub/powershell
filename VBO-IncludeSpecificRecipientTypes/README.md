@@ -34,8 +34,8 @@ Requires: Veeam Backup for Microsoft Office 365 and ExchangeOnlineManagement 1.0
 Changes 18-08-2020 (v1.2)
 Tested with MFA-Enabled service account with App password, changed login information in the script.
 Cleaned up input fields with default names.
-Rearranged input fields to beginning of script
-Updated documentation to use this script with MFA-Enabled service account.
+Rearranged input fields to the beginning of the script
+Updated documentation to use this script with an MFA-Enabled service account.
 
 Changes 13-08-2020 (v1.1)
 Cleaned up input fields and information in the script.
