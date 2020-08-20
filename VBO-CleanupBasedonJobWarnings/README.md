@@ -21,7 +21,7 @@ This script can run simultaneously on multiple jobs. To configure the jobs on wh
 
 Requires: Veeam Backup for Microsoft Office 365 PowerShell module.
 
-##Changelog:
+## Changelog:
 
 Changes 20-08-2020 (v1.0)
 Initial commit.
