@@ -75,7 +75,7 @@
 param(
     [Parameter(Mandatory = $false)]
     [String] $ISO = "download",
-    [Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $false)] # For update you don't need license key
     [String] $License
 )
 
@@ -313,22 +313,22 @@ if ((-not $vem) -and (-not $vbr)) {
 }
 if ($vem) { Write-Log "Veeam Backup Enterprise Manager found: $($vem.Version)" }
 if ($vbr) { Write-Log "Veeam Backup & Replication Server found: $($vbr.Version)" }
-if (($vem.Version -eq "10.0.0.4461") -or ($vbr.Version -eq "10.0.0.4461")) {
-    throw "Veeam environment has already been partially upgraded to version 10.0.0.4461. As such, you cannot use this script. You must perform a manual upgrade to proceed."
+if (($vem.Version -eq "10.0.1.4854") -or ($vbr.Version -eq "10.0.1.4854")) {
+    throw "Veeam environment has already been partially upgraded to version 10.0.1.4854. As such, you cannot use this script. You must perform a manual upgrade to proceed."
 }
 
 # If ISO wasn't specified, download it from Veeam's public servers
 if ($iso -eq "download") {
     try {
-        $iso = "$logFolder\VeeamBackup&Replication_10.0.0.4461.iso"
+        $iso = "$logFolder\VeeamBackup&Replication_10.0.1.4854_20200723.iso"
         Write-Log "ISO not specified. Checking if previously downloaded..."
         if (Test-Path $iso) {
             Write-Log "ISO found: $iso"
         }
         else {
             Write-Log "ISO not found. Downloading ISO now..."
-            Start-BitsTransfer -Source "https://download2.veeam.com/VeeamBackup&Replication_10.0.0.4461.iso" -Destination $iso
-            Write-Log "ISO downloaded to: $logFolder\VeeamBackup&Replication_10.0.0.4461.iso"
+            Start-BitsTransfer -Source "https://download2.veeam.com/VeeamBackup&Replication_10.0.1.4854_20200723.iso" -Destination $iso
+            Write-Log "ISO downloaded to: $logFolder\VeeamBackup&Replication_10.0.1.4854_20200723.iso"
         }
         
     }
@@ -341,8 +341,8 @@ if ($iso -eq "download") {
 # Mounting ISO
 try {
     Write-Log "Mounting ISO in Operating System"
-    $mount = Mount-DiskImage -ImagePath $iso
-    $mountDrive = ($mount | Get-Volume).DriveLetter + ":"
+    $mount = Mount-DiskImage -ImagePath $iso -StorageType ISO
+    $mountDrive = (Get-DiskImage -ImagePath $iso | Get-Volume).DriveLetter + ":"
 }
 catch {
     Write-Log $_
