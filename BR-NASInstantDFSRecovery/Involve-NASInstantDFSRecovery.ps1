@@ -114,6 +114,43 @@ Param(
         return $sharearray
     }
 
+    #This function will create a 
+    function Switch-DfsTarget {
+        param (
+        [Parameter(Mandatory=$true)]$Path,
+        [Parameter(Mandatory=$true)]$originalPath,
+        [Parameter(Mandatory=$true)]$NASRecoverySession
+        )
+        
+        Set-DfsnFolderTarget -Path $Path -TargetPath $originalPath -State Offline
+        New-DfsnFolderTarget -Path $Path -TargetPath $NASRecoverySession.SharePath -State Online
+
+        [hashtable]$recoveredShareProperty = @{}
+        $recoveredShareProperty.Add('Path',$Path)
+        $recoveredShareProperty.Add('originalPath',$originalPath)
+        $recoveredShareProperty.Add('recoveryPath',$NASRecoverySession.SharePath)
+        $recoveredShare = New-Object -TypeName psobject -Property $recoveredShareProperty
+
+        Write-Log "Objektdetails Begin"
+        $recoveredShare
+        Write-Log "Objectdetails End"
+        return $recoveredShare
+    }
+
+<# Not used because done in main code
+    function Failback-DfsTarget {
+        param (
+        [Parameter(Mandatory=$true)]$Path,
+        [Parameter(Mandatory=$true)]$originalPath,
+        [Parameter(Mandatory=$true)]$recoveryPath
+        )
+        Set-DfsnFolderTarget -Path $Path -TargetPath $originalPath -State Online
+        Remove-DfsnFolderTarget -Path $Path -TargetPath $recoveryPath -Force:$true
+    }
+#>
+
+    # End of Functions
+
     # Main Code starts
     #
     Write-Log -Status NewLog -Info "Starting new log file"
@@ -190,9 +227,9 @@ Param(
     #$nasBackup
     #Get all restore points of this NASBackup to reduce VBR calls
     $nasBackupRestorePoints = Get-VBRNASBackupRestorePoint -NASBackup $nasBackup
-    $nasBackupRestorePoints
+    #$nasBackupRestorePoints
     # Get all shares from this object and write it to a new variable sharesInBackup
-    $nasBackupRestorePoints | Select-Object -Property NASServerName -Unique -OutVariable sharesInBackup
+    $sharesInBackup = $nasBackupRestorePoints | Select-Object -Property NASServerName -Unique
 
     <#Write-Log -Info "Before show sharesInBackup"
     $sharesInBackup
@@ -201,15 +238,58 @@ Param(
     #Array for storing the recovery session
     $NASRecoverySessions = @()
 
+    #Array and Objects for reverting this NAS recovery
+    #Create the array we'll add the objects to
+    $recoveredNASShares = @()
+    #$recoveredNASShares.Add(Get-ComputerInformation -computerName $computer)) | Out-Null
+
     ForEach($shareInBackup IN $sharesInBackup) {
         #$shareInBackup
         Write-Log -Info "Getting latest restorepoint for share $($shareInBackup.NASServerName.ToString()) ..." -Status Info
         $nasBackupRestorePoints | Where-Object -Property NASServerName -eq $shareInBackup.NASServerName | Select-Object -First 1 -OutVariable latestRestorePoint
         $nasInstantRecoveryPermissionSet = New-VBRNASPermissionSet -RestorePoint $latestRestorePoint -Owner $Owner -AllowEveryone
-        $NASInstantRecoveryMountOptions = New-VBRNASInstantRecoveryMountOptions -MountServerSelectionType Automatic #-RestorePoint $latestRestorePoint
-        $NASRecoverySessions += Start-VBRNASInstantRecovery -RestorePoint $latestRestorePoint -Permissions $nasInstantRecoveryPermissionSet -MountOptions $NASIRMountOptions
+        #$NASInstantRecoveryMountOptions = New-VBRNASInstantRecoveryMountOptions -MountServerSelectionType Automatic -RestorePoint $latestRestorePoint
+        $NASRecoverySessions += Start-VBRNASInstantRecovery -RestorePoint $latestRestorePoint -Permissions $nasInstantRecoveryPermissionSet
+        $currentFolderTarget = $allTargetPaths | Where-Object -Property TargetPath -eq $shareInBackup.NASServerName
+        #Set-DfsnFolderTarget -Path $currentFolderTarget.Path -TargetPath $currentFolderTarget.TargetPath -State Offline
+        #New-DfsnFolderTarget -Path $currentFolderTarget.Path -TargetPath $NASRecoverySessions[$NASRecoverySessions.Count – 1].SharePath -State Online
+        $currentPath = $currentFolderTarget.Path
+        $currentTargetPath = $currentFolderTarget.TargetPath
+        $currentNASRecoverySession = $NASRecoverySessions[$NASRecoverySessions.Count – 1]
+        #, is importent that the array will not extended, with "," the array will be added to the array
+        $temprecoveredNASShares = Switch-DfsTarget -Path $currentFolderTarget.Path -originalPath $currentFolderTarget.TargetPath -NASRecoverySession $NASRecoverySessions[$NASRecoverySessions.Count – 1]
+        $recoveredNASShares += , $temprecoveredNASShares
+        #$recoveredNASShares += Switch-DfsTarget -Path $currentPath -originalPath $currentTargetPath -NASRecoverySession $currentNASRecoverySession
         Write-Log -Status Info -Info "Loopende"
     }
+    #$NASRecoverySessions | FT
+    
+    $confirmation = Read-Host "Are you Sure You Want To Proceed and Clean up what you did?:"
+    if ($confirmation -eq 'y') {
+        ForEach($recoveredNASShare IN $recoveredNASShares) {
+            Write-Host "---"
+            $recoveredNASShare
+            Write-Host "---"
+        #    Switch-DfsTarget -Path $recoveredNASShare.Path -originalPath $recoveredNASShare.TargetPath -NASRecoverySession $recoveredNASShare.NASRecoverySession -Failback
+            Remove-DfsnFolderTarget -Path $recoveredNASShare.Path -TargetPath $recoveredNASShare.recoveryPath -Force:$true
+            Set-DfsnFolderTarget -Path $recoveredNASShare.Path -TargetPath $recoveredNASShare.originalPath -State Online
+        }
+        
+        <#
+        #Debug Removal
+        Remove-DfsnFolderTarget -Path "\\homelab\dfs\Orga\IT" -TargetPath "\\lab-vbr11\it" -Force:$true
+        Set-DfsnFolderTarget -Path "\\homelab\dfs\Orga\IT" -TargetPath "\\lab-nacifs01\it" -State Online
+        Remove-DfsnFolderTarget -Path "\\homelab\dfs\Field\Sales" -TargetPath "\\lab-vbr11\sales" -Force:$true
+        Set-DfsnFolderTarget -Path "\\homelab\dfs\Field\Sales" -TargetPath "\\lab-nacifs01\sales" -State Online
+        Remove-DfsnFolderTarget -Path "\\homelab\dfs\Field\Marketing" -TargetPath "\\lab-vbr11\marketing" -Force:$true
+        Set-DfsnFolderTarget -Path "\\homelab\dfs\Field\Marketing" -TargetPath "\\lab-nacifs01\marketing" -State Online
+        #>
+
+        ForEach($NASRecoverySession IN $NASRecoverySessions) {
+            Stop-VBRNASInstantRecovery -InstantRecovery $NASRecoverySession
+        }
+    }
+    
     # .\Involve-NASInstantDFSRecovery.ps1 -DfsRoot "\\homelab\dfs" -ScanDepth 3 -VBRJobName "DFS NAS Test" -Owner "HOMELAB\Administrator"
 #Stop-VBRNASInstantRecovery -InstantRecovery $NASRecoverySessions
 #} # END PROCESS
