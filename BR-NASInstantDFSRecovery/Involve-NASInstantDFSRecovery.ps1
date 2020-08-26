@@ -129,12 +129,8 @@ Param(
         $recoveredShareProperty.Add('Path',$Path)
         $recoveredShareProperty.Add('originalPath',$originalPath)
         $recoveredShareProperty.Add('recoveryPath',$NASRecoverySession.SharePath)
-        $recoveredShare = New-Object -TypeName psobject -Property $recoveredShareProperty
-
-        Write-Log "Objektdetails Begin"
-        $recoveredShare
-        Write-Log "Objectdetails End"
-        return $recoveredShare
+        #$recoveredShare = New-Object -TypeName psobject -Property $recoveredShareProperty
+        return $recoveredShareProperty
     }
 
 <# Not used because done in main code
@@ -257,19 +253,20 @@ Param(
         $currentTargetPath = $currentFolderTarget.TargetPath
         $currentNASRecoverySession = $NASRecoverySessions[$NASRecoverySessions.Count – 1]
         #, is importent that the array will not extended, with "," the array will be added to the array
-        $temprecoveredNASShares = Switch-DfsTarget -Path $currentFolderTarget.Path -originalPath $currentFolderTarget.TargetPath -NASRecoverySession $NASRecoverySessions[$NASRecoverySessions.Count – 1]
-        $recoveredNASShares += , $temprecoveredNASShares
+        #$temporaryNASShare = 
+        $recoveredNASShares += (Switch-DfsTarget -Path $currentFolderTarget.Path -originalPath $currentFolderTarget.TargetPath -NASRecoverySession $NASRecoverySessions[$NASRecoverySessions.Count – 1])
         #$recoveredNASShares += Switch-DfsTarget -Path $currentPath -originalPath $currentTargetPath -NASRecoverySession $currentNASRecoverySession
-        Write-Log -Status Info -Info "Loopende"
+        #Write-Log -Status Info -Info "Loopende"
     }
     #$NASRecoverySessions | FT
     
     $confirmation = Read-Host "Are you Sure You Want To Proceed and Clean up what you did?:"
     if ($confirmation -eq 'y') {
         ForEach($recoveredNASShare IN $recoveredNASShares) {
-            Write-Host "---"
-            $recoveredNASShare
-            Write-Host "---"
+            #Write-Host "---"
+            #$recoveredNASShare
+            Write-Log -Info "Das Target ist $($recoveredNASShare.Path)" -Status Info
+            #Write-Host "---"
         #    Switch-DfsTarget -Path $recoveredNASShare.Path -originalPath $recoveredNASShare.TargetPath -NASRecoverySession $recoveredNASShare.NASRecoverySession -Failback
             Remove-DfsnFolderTarget -Path $recoveredNASShare.Path -TargetPath $recoveredNASShare.recoveryPath -Force:$true
             Set-DfsnFolderTarget -Path $recoveredNASShare.Path -TargetPath $recoveredNASShare.originalPath -State Online
