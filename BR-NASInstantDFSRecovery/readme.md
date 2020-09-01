@@ -4,14 +4,6 @@ This cmdlet is getting all shares from a Veeam File Job and checks if this share
 in a DFS. All shares from this job will be started via Instant NAS Recovery and the DFS
 reparse points will be changed from the existing target to the mount server path.
 
-
-   .PARAMETER DfsRoot
-   With this parameter you specify the UNC path to scan e.g. "\\fileserver\dfs".
-   .PARAMETER VBRJobName
-   Name of the NAS backup job. which should be recovered
-   .PARAMETER ScanDepth
-   How deep in the subfolder structure the script should scan for reparse points?
-
 ## Parameters
 `-DfsRoot` - With this parameter you specify the UNC path to scan e.g. "\\fileserver\dfs". *REQUIRED* \
 `-VBRJobName` - Name of the NAS backup job. which should be recovered. *REQUIRED* \
