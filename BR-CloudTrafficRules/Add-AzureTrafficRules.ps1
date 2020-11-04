@@ -139,7 +139,7 @@ ForEach($azureRegionSubnet IN $AzureRegionDetails.Value) {
     echo "Die Range geht von $startaddrip bis $endaddrip"
 
     if(!($rulecheck = Get-VBRNetworkTrafficRule -Name $($name+"-To-"+$targetstartaddr) -ErrorAction SilentlyContinue)) {
-        Add-VBRNetworkTrafficRule -Name $($name+"-To-"+$targetstartaddr) -SourceIPStart $sourcestartaddrip -SourceIPEnd $sourceendaddrip -TargetIPStart $targetstartaddr -TargetIPEnd $targetendaddr -EnableThrottling -ThrottlingValue 5 -ThrottlingUnit MbitPerSec
+        Add-VBRNetworkTrafficRule -Name $($name+"-To-"+$targetstartaddr) -SourceIPStart $sourcestartaddrip -SourceIPEnd $sourceendaddrip -TargetIPStart $targetstartaddr -TargetIPEnd $targetendaddr -EnableThrottling -ThrottlingValue $ThrottlingValue -ThrottlingUnit $ThrottlingUnit
     } else {
         Write-Log -Info "Network traffic rule already EXISTS" -Status Info
     }
