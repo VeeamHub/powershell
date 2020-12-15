@@ -15,14 +15,14 @@
    You can set your own path for log file from this script. Default filename is "C:\ProgramData\dfsrecovery.log"
 
    .Example
-   .\Involve-NASInstantDFSRecovery.ps1 -DfsRoot "\\homelab\dfs" -ScanDepth 3 -VBRJobName "DFS NAS Test" -Owner "HOMELAB\Administrator"
+   .\Involve-NASInstantDFSRecovery.ps1 -DfsRoot "\\homelab\dfs" -ScanDepth 3 -VBRJobName "NAS Backup Job" -Owner "HOMELAB\Administrator"
 
 
    .Notes 
-   Version:        1.3
+   Version:        1.4
    Author:         Marco Horstmann (marco.horstmann@veeam.com)
-   Creation Date:  20 August 2020
-   Purpose/Change: Initial Release
+   Creation Date:  24 November 2020
+   Purpose/Change: Prepare V11 Rollout
    
    .LINK https://github.com/marcohorstmann/powershell
    .LINK https://horstmann.in
@@ -186,12 +186,23 @@ Param(
     # Check if Veeam Module can be loaded
     Write-Log -Status Info -Info "Trying to load Veeam PS Snapins ..."
     try {
-        Add-PSSnapin VeeamPSSnapin
-        Write-Log -Info "Loading Veeam PS Snapin ... SUCCESSS" -Status Info
+        import-module Veeam.Backup.PowerShell -ErrorAction Stop
+        Write-Log -Info "Loading Veeam Backup Powershell Module (V11+) ... SUCCESSFUL" -Status Info
     } catch  {
-        Write-Log -Info "$_" -Status Error
-        Write-Log -Info "Loading Veeam PS Snapin ... FAILED" -Status Error
-        exit 99
+        Write-Log -Info "$_" -Status Warning
+        Write-Log -Info "Loading Veeam Backup Powershell Module (V11+) ... FAILED" -Status Warning
+        Write-Log -Info "This can happen if you are using an Veeam Backup & Replication earlier than V11." -Status Warning
+        Write-Log -Info "You can savely ignore this warning." -Status Warning
+        try {
+            Write-Log -Info "Loading Veeam Backup Powershell Snapin (V10) ..." -Status Info
+            Add-PSSnapin VeeamPSSnapin -ErrorAction Stop
+            Write-Log -Info "Loading Veeam Backup Powershell Snapin (V10) ... SUCCESSFUL" -Status Info
+        } catch  {
+            Write-Log -Info "$_" -Status Error
+            Write-Log -Info "Loading Veeam Backup Powershell Snapin (V10) ... FAILED" -Status Error
+            Write-Log -Info "Was not able to load Veeam Backup Powershell Snapin (V10) or Module (V11)" -Status Error
+            exit
+        }
     }
 
     # Validate parameters: VBRJobName
@@ -342,7 +353,7 @@ Param(
         #Stop all running Instant Recoveries started by this script
         ForEach($NASRecoverySession IN $NASRecoverySessions) {
             try {
-                Stop-VBRNASInstantRecovery -InstantRecovery $NASRecoverySession
+                Stop-VBRNASInstantRecovery -InstantRecovery $NASRecoverySession -Force
                 Write-Log -Info "Stopping recovery of $($NASRecoverySession.SessionName)... DONE" -Status Info
             } catch  {
                 Write-Log -Info "$_" -Status Error

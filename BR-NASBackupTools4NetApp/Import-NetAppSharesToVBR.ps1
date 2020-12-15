@@ -81,16 +81,27 @@ PROCESS {
   # This function will load the NetApp Powershell Module.
   function Load-NetAppModule
   {
-    Write-Log -Info "Trying to load NetApp Powershell module" -Status Info
+        Write-Log -Status Info -Info "Trying to load Veeam PS Snapins ..."
     try {
-        Import-Module DataONTAP
-        Write-Log -Info "Loaded NetApp Powershell module sucessfully" -Status Info
+        import-module Veeam.Backup.PowerShell -ErrorAction Stop
+        Write-Log -Info "Loading Veeam Backup Powershell Module (V11+) ... SUCCESSFUL" -Status Info
     } catch  {
-        Write-Log -Info "$_" -Status Error
-        Write-Log -Info "Loading NetApp Powershell module failed" -Status Error
-        exit 99
+        Write-Log -Info "$_" -Status Warning
+        Write-Log -Info "Loading Veeam Backup Powershell Module (V11+) ... FAILED" -Status Warning
+        Write-Log -Info "This can happen if you are using an Veeam Backup & Replication earlier than V11." -Status Warning
+        Write-Log -Info "You can savely ignore this warning." -Status Warning
+        try {
+            Write-Log -Info "Loading Veeam Backup Powershell Snapin (V10) ..." -Status Info
+            Add-PSSnapin VeeamPSSnapin -ErrorAction Stop
+            Write-Log -Info "Loading Veeam Backup Powershell Snapin (V10) ... SUCCESSFUL" -Status Info
+        } catch  {
+            Write-Log -Info "$_" -Status Error
+            Write-Log -Info "Loading Veeam Backup Powershell Snapin (V10) ... FAILED" -Status Error
+            Write-Log -Info "Was not able to load Veeam Backup Powershell Snapin (V10) or Module (V11)" -Status Error
+            exit
+        }
     }
-  }
+  } #end function
 
   # This function is used to connect to a specfix NetApp SVM
   function Connect-NetAppSVM($svmName)
