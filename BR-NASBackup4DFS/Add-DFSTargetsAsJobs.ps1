@@ -1,39 +1,33 @@
 ﻿<# 
    .SYNOPSIS
-   Getting Shares behind Reparse Points and add them to a NAS Backup Job
+   Getting Shares behind Reparse Points and create own backup job
    .DESCRIPTION
-   This script finds the shares behind an DFS namespace structure and adds it to VBR NAS Backup Job. You can configure
-   the folder scan depth 
+   This script finds the shares behind an DFS namespace structure and adds it separate VBR File Backup Job.
+   Because it should not ask for 60 options it will be cloned from a Template Job.
    .PARAMETER DfsRoot
    With this parameter you specify the UNC path to scan e.g. "\\fileserver\dfs".
-   .PARAMETER VBRJobName
-   This is the existing Job where the detected shares should be added.
    .PARAMETER ShareCredential
    Enter the Credentials which should be used. They must be from VBR credentials manager.
    .PARAMETER CacheRepository
-   Enter the Repository which should be used for Cache.
+   Enter the Repository which should be used for Cache Repository for the share
    .PARAMETER ExcludeSystems
    Enter list of excluded servername strings like "*server1*","*server2*,"*server3" to exclude reparse points which are
    pointing to this UNC paths.
    .PARAMETER ScanDepth
    How deep in the subfolder structure the script should scan for reparse points?
+   .PARAMETER TemplateJob
+   This is an existing job in VBR, which will be used for creating the jobs
    .PARAMETER LogFile
-   You can set your own path for log file from this script. Default filename is "C:\ProgramData\dfsresolver4nasbackup.log"
+   You can set your own path for log file from this script. Default filename is "C:\ProgramData\Add-DFSTargetsAsJobs.log"
 
    .Example
-   .\Add-DFSTargetToNASBackupJob.ps1 -DfsRoot "\\homelab\dfs" -VBRJobName "NAS DFS Test" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2
-
-   .Example
-   .\Add-DFSTargetToNASBackupJob.ps1 -DfsRoot "\\homelab\dfs" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2 -VolumeProcessingMode VSSSnapshot
-
-   .Example
-   .\Add-DFSTargetToNASBackupJob.ps1 -DfsRoot "\\homelab\dfs" -VBRJobName "NAS DFS Test" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2 -VolumeProcessingMode VSSSnapshot -ExcludeSystems "*lab-dc01*","*lab-nacifs01*" 
+   .\Add-DFSTargetsAsJobs.ps1 -DfsRoot "\\homelab\dfs" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2 -TemplateJob "Dummy NAS Job"
 
    .Notes 
-   Version:        1.9
+   Version:        2.0
    Author:         Marco Horstmann (marco.horstmann@veeam.com)
-   Creation Date:  20 Januar 2021
-   Purpose/Change: Prepare v11 Launch
+   Creation Date:  21 Januar 2021
+   Purpose/Change: Using template job
    
    .LINK https://github.com/veeamhub/powershell
    .LINK https://github.com/marcohorstmann/powershell
@@ -51,10 +45,10 @@ Param(
    [string]$VolumeProcessingMode="Direct",
 
    [Parameter(Mandatory=$True)]
-   [string]$VBRJobName,
+   [string]$ShareCredential,
 
    [Parameter(Mandatory=$True)]
-   [string]$ShareCredential,
+   [string]$TemplateJob,
 
    [Parameter(Mandatory=$True)]
    [string]$CacheRepository,
@@ -63,7 +57,7 @@ Param(
    [string[]]$ExcludeSystems,
 
    [Parameter(Mandatory=$False)]
-   [string]$LogFile="C:\ProgramData\dfsresolver4nasbackup.log",
+   [string]$LogFile="C:\ProgramData\Add-DFSTargetsAsJobs.log",
 
    [Parameter(Mandatory=$True)]
    [int]$ScanDepth
@@ -139,6 +133,17 @@ PROCESS {
             exit 99
         }
     }
+
+    # Validate parameters: TemplateJob
+    Write-Log -Status Info -Info "Checking NAS Template Job Name"
+    $templateJobObject = Get-VBRNASBackupJob -name $templateJob
+    if($templateJobObject -eq $null) {
+        Write-Log -Info "Failed to find job name" -Status Error
+        exit 99
+    } else { 
+        Write-Log -Info "NASTemplate Job Name ... FOUND" -Status Info
+    }
+
     # Check if Veeam Module can be loaded
     Write-Log -Status Info -Info "Trying to load Veeam PS Snapins ..."
     try {
@@ -161,15 +166,6 @@ PROCESS {
         }
     }
 
-    # Validate parameters: VBRJobName
-    Write-Log -Status Info -Info "Checking VBR Job Name"
-    $nasBackupJob = Get-VBRNASBackupJob -name $VBRJobName
-    if($nasBackupJob -eq $null) {
-        Write-Log -Info "Failed to find job name" -Status Error
-        exit 99
-    } else { 
-        Write-Log -Info "VBR Job Name ... FOUND" -Status Info
-    }
     # Validate parameters: ShareCrendential
     Write-Log -Status Info -Info "Checking Share Credentials"
     if($ShareCredential = Get-VBRCredentials -Name $ShareCredential | Select -Last 1) {
@@ -216,10 +212,6 @@ PROCESS {
         exit 99
     }
     
-  
-    # Creates an empty VBRNASBackupJobObject where we need to add the 
-    $VBRNASBackupJobObject = @()
-    # For each detected share do this 
 
     ForEach ($share in $allshares) {
 
@@ -232,9 +224,6 @@ PROCESS {
                 $isexcluded = $true
             }
         }
-
-        #DEBUG
-        #echo $isexcluded
         
         # Gets the info for NAS Server Name
         #Check if share is already added to VBR. If not create share in VBR, else just skip
@@ -243,7 +232,22 @@ PROCESS {
         } else {
             if(!(Get-VBRNASServer -Name $currentPath)) {
                 try {
-                    Add-VBRNASSMBServer -Path $currentPath -AccessCredentials $ShareCredential -ProcessingMode $VolumeProcessingMode -ProxyMode Automatic -CacheRepository $CacheRepository
+                    #Add share to VBR
+                    $VBRNASServer = Add-VBRNASSMBServer -Path $currentPath -AccessCredentials $ShareCredential -ProcessingMode $VolumeProcessingMode -ProxyMode Automatic -CacheRepository $CacheRepository
+                    
+                    #Generate Job Object which will used to add share to the backup job
+                    $VBRNASBackupJobObject = New-VBRNASBackupJobObject -Server $VBRNASServer -Path $currentPath
+                    
+                    #Create a new backup job with default settings (maybe use when no templateJob was added?)
+                    #$nasJobObject = Add-VBRNASBackupJob -Name $currentPath -Description "Auto-Created via Script" -ShortTermBackupRepository $shortTermRepo -BackupObject $VBRNASBackupJobObject
+                    
+                    #Clone TemplateJob into a new Job
+                    $cloneResult = $templateJobObject | Copy-VBRJob -Name $currentPath
+                    #Get the object for the newly created backup job
+                    $nasJobObject = Get-VBRNASBackupJob -name $currentPath
+
+                    #Modify the job to replace the backup objects in the new job.
+                    $modifyResult = Set-VBRNASBackupJob -Job $nasJobObject -BackupObject $VBRNASBackupJobObject -EnableSchedule
                     Write-Log -Info "Adding $currentPath to VBR... DONE" -Status Info
                 } catch {
                     Write-Log -Info "$_" -Status Error
@@ -254,23 +258,6 @@ PROCESS {
                 Write-Log -Info "Share $currentPath is already added... SKIPPING" -Status Info
             }
         }
-
-        # Add this share to the list of NASBackupJobObjects
-        # Here is the right point to add later e.g. exclusion and inclusion masks.
-        if(!$isexcluded) {
-            $VBRNASServer = Get-VBRNASServer -Name $currentPath
-            $VBRNASBackupJobObject += New-VBRNASBackupJobObject -Server $VBRNASServer -Path $currentPath
-        }
     }
-
-    # Updating existing job with this NASBackupJobObjects
-    try {
-        Set-VBRNASBackupJob -Job $nasBackupJob -BackupObject $VBRNASBackupJobObject
-        Write-Log -Info "Updating Backup Job $VBRJobName... DONE" -Status Info
-    } catch {
-        Write-Log -Info "$_" -Status Error
-        Write-Log -Info "Updating Backup Job $VBRJobName... FAILED" -Status Error
-    }
-    
        
 } # END PROCESS
