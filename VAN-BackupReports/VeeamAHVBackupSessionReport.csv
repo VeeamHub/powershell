@@ -1,0 +1,7 @@
+"JobName","VM","Date","BackupType","Status","StartTime","EndTime","Duration","TotalSize","DataRead","Transferred","BackupSize","Dedupe","Compression"
+"Windows 2016 Backup","Windows 2016","3/24/2020 1:29:39 PM","Incremental","Success","3/24/2020 1:29:39 PM","3/24/2020 1:31:15 PM","00:01:35.8830000","30 GB","9.18 GB","11.09 GB","5.56 GB","1.62x","1.67x"
+"Windows 2016 Backup","Windows 2016","4/1/2020 8:55:38 AM","Incremental","Success","4/1/2020 8:55:38 AM","4/1/2020 8:56:10 AM","00:00:31.8400000","30 GB","0 B","64 B","17.04 MB","1x","1x"
+"Windows 2016 Backup","Windows 2016","4/2/2020 4:17:22 PM","Incremental","Success","4/2/2020 4:17:22 PM","4/2/2020 4:18:17 PM","00:00:55.1470000","30 GB","0 B","64 B","17.04 MB","1x","1x"
+"Windows 2016 Backup","Windows 2016","4/28/2020 5:12:09 PM","Incremental","Success","4/28/2020 5:12:09 PM","4/28/2020 5:13:12 PM","00:01:03.2060000","30 GB","0 B","64 B","17.04 MB","1x","1x"
+"Nutanix Backup Job - Windows 2016","Windows 2016","5/5/2020 11:40:22 AM","Incremental","Success","5/5/2020 11:40:22 AM","5/5/2020 11:41:17 AM","00:00:54.8270000","30 GB","0 B","64 B","17.04 MB","1x","1x"
+"Nutanix Backup Job - Windows 2016","Windows 2016","7/24/2020 5:27:49 PM","Incremental","Success","7/24/2020 5:27:49 PM","7/24/2020 5:38:21 PM","00:10:32.1800000","30 GB","9.18 GB","11.09 GB","5.56 GB","1.62x","1.67x"
