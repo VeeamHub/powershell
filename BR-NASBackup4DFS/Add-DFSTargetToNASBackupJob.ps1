@@ -24,16 +24,16 @@
    .\Add-DFSTargetToNASBackupJob.ps1 -DfsRoot "\\homelab\dfs" -VBRJobName "NAS DFS Test" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2
 
    .Example
-   .\Add-DFSTargetToNASBackupJob.ps1 -DfsRoot "\\homelab\dfs" -VBRJobName "NAS DFS Test" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2 -VolumeProcessingMode VSSSnapshot
+   .\Add-DFSTargetToNASBackupJob.ps1 -DfsRoot "\\homelab\dfs" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2 -VolumeProcessingMode VSSSnapshot
 
    .Example
    .\Add-DFSTargetToNASBackupJob.ps1 -DfsRoot "\\homelab\dfs" -VBRJobName "NAS DFS Test" -ShareCredential "HOMELAB\Administrator" -CacheRepository "Default Backup Repository" -ScanDepth 2 -VolumeProcessingMode VSSSnapshot -ExcludeSystems "*lab-dc01*","*lab-nacifs01*" 
 
    .Notes 
-   Version:        1.8
+   Version:        1.9
    Author:         Marco Horstmann (marco.horstmann@veeam.com)
-   Creation Date:  16 April 2020
-   Purpose/Change: Bugfix: Disallow ProcessingMode StorageSnapshot because it will not work.
+   Creation Date:  20 Januar 2021
+   Purpose/Change: Prepare v11 Launch
    
    .LINK https://github.com/veeamhub/powershell
    .LINK https://github.com/marcohorstmann/powershell
@@ -142,12 +142,23 @@ PROCESS {
     # Check if Veeam Module can be loaded
     Write-Log -Status Info -Info "Trying to load Veeam PS Snapins ..."
     try {
-        Add-PSSnapin VeeamPSSnapin
-        Write-Log -Info "Veeam PS Snapin loaded" -Status Info
+        import-module Veeam.Backup.PowerShell -ErrorAction Stop
+        Write-Log -Info "Loading Veeam Backup Powershell Module (V11+) ... SUCCESSFUL" -Status Info
     } catch  {
-        Write-Log -Info "$_" -Status Error
-        Write-Log -Info "Failed to load Veeam PS Snapin" -Status Error
-        exit 99
+        Write-Log -Info "$_" -Status Warning
+        Write-Log -Info "Loading Veeam Backup Powershell Module (V11+) ... FAILED" -Status Warning
+        Write-Log -Info "This can happen if you are using an Veeam Backup & Replication earlier than V11." -Status Warning
+        Write-Log -Info "You can savely ignore this warning." -Status Warning
+        try {
+            Write-Log -Info "Loading Veeam Backup Powershell Snapin (V10) ..." -Status Info
+            Add-PSSnapin VeeamPSSnapin -ErrorAction Stop
+            Write-Log -Info "Loading Veeam Backup Powershell Snapin (V10) ... SUCCESSFUL" -Status Info
+        } catch  {
+            Write-Log -Info "$_" -Status Error
+            Write-Log -Info "Loading Veeam Backup Powershell Snapin (V10) ... FAILED" -Status Error
+            Write-Log -Info "Was not able to load Veeam Backup Powershell Snapin (V10) or Module (V11)" -Status Error
+            exit
+        }
     }
 
     # Validate parameters: VBRJobName
