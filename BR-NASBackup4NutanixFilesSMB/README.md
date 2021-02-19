@@ -16,21 +16,22 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 ## Project Notes
 **Author:** Ronn Martin (ronn.martin@veeam.com)
 
-**Function:** Add as pre-NAS backup job script for Nutanix Files SMB backup
+**Function:** Add as pre-NAS backup job script for Nutanix Files SMB snapshot backup. This script simply leverages the latest hourly snapshot created by Nutanix Files for Veeam NAS backup purposes.
 
-**Requires:** Veeam Powershell (v10 snapin, v11 module), Nutanix Files - To enable Files snapshots “Enable Self Service Restore” must be selected for the share(s) that will be targeted by Veeam for NAS backup from snapshot 
+**Requires:** Veeam Powershell (v10 snapin, v11 module), Nutanix Files - To enable Files snapshots “Enable Self Service Restore” must be selected for the share(s) that will be targeted by Veeam for NAS backup from snapshot (hourly snapshot schedule required)
 
 **Usage:** Copy the BR-NASBackup4NutanixFilesSMB.ps1 script to the VBR server.  From the NAS backup job “Storage” dialog select “Advanced”/“Scripts” and enable “Run the following script before the job:” Browse to the script and select.  Enclose the script path in double quotes and add the file share(s) included in the backup job e.g.
 
 	“\Users\Administrator\Downloads\BR-NASBackup4NutanixFilesSMB.ps1" \\ntnxfs\ntnxsmb \\ntnxfs\profiles 
 
-**Parameters:** List of shares processed by the backup job NOTE: NO trailing "\", names must match VBR fileshare names
+**Parameters:** List of shares processed by the backup job NOTE: NO trailing "\\", names must match VBR fileshare names
 
-**Troubleshooting**
+**Troubleshooting:**
 Note that VBR Powershell interface through v10 was snapin-based.  Beginning with v11 we’ve switched to a Powershell module.  Be sure to adjust the script accordingly by commenting out the Veeam Powershell option that does not match your VBR platform.
 
-If the script fails it may be run standalone as the only VBR changes it will effect will be the file share backup source.
-The most likely cause of failure will be that the VBR backup service user context does not have permissions for Files shares.  Since Files SMB is tied to Active Directory a workgroup VBR server may not have permission to correctly execute the following Powershell enumeration of a given share’s snapshot folder.  For example –
+If the script fails it may be run/debugged standalone as the only VBR changes it will effect will be the file share backup source.
+
+The most likely cause of failure will be that the VBR backup service user context may not be authorized for Files shares.  Since Files SMB is tied to Active Directory a workgroup VBR server may not have appropriate permissions to correctly execute the following Powershell enumeration of a given share’s snapshot folder.  For example –
 
 	Get-ChildItem -Directory \\ntnxfs\ntnxsmb\.SNAPSHOT
 
