@@ -26,7 +26,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 **Parameters:** List of shares processed by the backup job NOTE: NO trailing "\", names must match VBR fileshare names
 
-**Troubleshooting
+**Troubleshooting**
 Note that VBR Powershell interface through v10 was snapin-based.  Beginning with v11 we’ve switched to a Powershell module.  Be sure to adjust the script accordingly by commenting out the Veeam Powershell option that does not match your VBR platform.
 
 If the script fails it may be run standalone as the only VBR changes it will effect will be the file share backup source.
