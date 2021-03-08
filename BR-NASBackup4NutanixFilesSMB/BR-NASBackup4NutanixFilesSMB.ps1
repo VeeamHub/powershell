@@ -1,22 +1,20 @@
-﻿#
+#
 # v0.1 Nutanix Files SMB NAS backup pre-job execution script.
-#
-# TODO - NFS support
-#
+##
 # PREREQUISITES - Veeam PowerShell snapin (v10) module (v11)
 #
 # INPUTS - 
 #    share path(s) e.g. \\myfilessvr\mysmbshare (must match VBR-define fileserver path e.g. no trailing "\"), multiple paths are supported
 #
 # OPERATION - The fileshare path is used to retrieve the existing VBR file server.  Since Nutanix Files
-# snapshots will (should!) already exist, the latest hourly snapshot folder will then be retrieved and 
-# used the source snapshot folder defined for the file server. The file server properties are also
-# set to backup from snapshot.
+# snapshots will (should!) already exist (this assumes self-service restore has been enabled on the Files
+# share), the latest hourly snapshot folder will then be retrieved and used as the source snapshot folder
+# defined for the file server. The file server properties are also set to backup from snapshot.
 #
 
-function getFileServer($fs) {
+function Get-FileServer($fs) {
     try {
-        $vbrNASSvr = Get-VBRNASServer | where {$_.Path -eq $fs}
+        $vbrNASSvr = Get-VBRNASServer | Where-Object {$_.Path -eq $fs}
         if ($vbrNASSvr.Count -gt 0) {
             return $vbrNASSvr
         }
@@ -30,9 +28,9 @@ function getFileServer($fs) {
     }
 }
 
-function getLatestSnapshot($snapDir) {
+function Get-LatestSnapshot($snapDir) {
     try {
-        $snaps = Get-ChildItem -Directory $snapDir |  where {$_.Name -like "*hourly*"} | Sort-Object -Property "Name" -Descending
+        $snaps = Get-ChildItem -Directory $snapDir | Where-Object {$_.Name -like "*hourly*"} | Sort-Object -Property "Name" -Descending
         if ($snaps.Count -gt 0) {
             return $snaps[0]
         }
@@ -54,14 +52,12 @@ Add-PSSnapin VeeamPSSnapin    #v10
 
 if ($args.Count -gt 0) {
     foreach ($fs in $args) {
-        Write-Host $fs
-        if (($fileserver = getFileServer($fs)) -ne $null) {
+        if (($fileserver = Get-FileServer($fs)) -ne $null) {
             try {
-                $snapDir = $fs+'\.SNAPSHOT'
-                Write-Host $snapDir
-                if (($snapName = getLatestSnapshot($snapDir)) -ne $null) {
+                $snapDir = $fs+'\.snapshot'
+                if (($snapName = Get-LatestSnapshot($snapDir)) -ne $null) {
                     Set-VBRNASSMBServer -Server $fileserver -StorageSnapshotPath $snapDir\$snapName -ProcessingMode StorageSnapshot
-                    #exit 0
+                    exit 0
                 }
                 else {
                     write-host "Files snapshot not found!"
