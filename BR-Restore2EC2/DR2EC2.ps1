@@ -17,7 +17,7 @@ $cust_csv = "C:/example/dr2ec2.csv"
 
 ## Script Below Edit at your own risk 
 
-import-csv = $cust_csv
+$csv = import-csv $cust_csv
 asnp “VeeamPSSnapIn” -ErrorAction SilentlyContinue
 Connect-VBRServer #-Server $vbrserver -User $vbruser -Password $vbrpwd
 
