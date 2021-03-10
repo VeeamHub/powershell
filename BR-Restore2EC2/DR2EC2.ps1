@@ -34,7 +34,7 @@ Connect-VBRServer #-Server $vbrserver -User $vbruser -Password $vbrpwd
     $restorepoint = Get-VBRRestorePoint -Name $vm_name | Sort-Object –Property CreationTime –Descending | Select -First 1
     $account = Get-VBRAmazonAccount -accesskey $accesskey
     $region = Get-VBRAmazonEC2Region -Account $account -RegionType Global -Name $vm_region
-    $vm_disk = Get-VBRFilesInRestorePoint -RestorePoint $restorepoint | Where FileName -Like ‘*flat.vmdk*'
+    $vm_disk = Get-VBRFilesInRestorePoint -RestorePoint $restorepoint | Where FileName -Like '*flat.vmdk*'
     $vm_disk = $vm_disk.FileName
     $config = foreach ($i in $vm_disk) {New-VBRAmazonEC2DiskConfiguration -DiskName $i -Include -DiskType GeneralPurposeSSD}
     $instance = Get-VBRAmazonEC2InstanceType -Region $region -Name $vm_instance
