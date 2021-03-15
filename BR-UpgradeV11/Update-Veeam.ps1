@@ -33,7 +33,7 @@
 
 .NOTES
 	NAME:  Update-Veeam.ps1
-	VERSION: 1.0
+	VERSION: 1.1
 	AUTHOR: Chris Arceneaux
 	TWITTER: @chris_arceneaux
 	GITHUB: https://github.com/carceneaux
@@ -51,11 +51,11 @@
     5. Veeam Explorer for Microsoft Exchange
     6. Veeam Explorer for Microsoft SharePoint
     7. Veeam Explorer for Microsoft SQL Server
-    8. Veeam Explorer for Oracle
-    9. Veeam Distribution Service
-    10. Veeam Installer Service
-    11. Veeam Agent for Linux Redistributable
-    12. Veeam Agent for MacOS Redistributable
+    8. Veeam Explorer for Microsoft Teams
+    9. Veeam Explorer for Oracle
+    10. Veeam Distribution Service
+    11. Veeam Installer Service
+    12. Veeam Agent for Linux Redistributable
     13. Veeam Agent for Microsoft Windows Redistributable
     14. Veeam Mount Service
     15. Veeam Backup Transport
@@ -670,6 +670,20 @@ if ($vbr) {
         Write-Log "Unmounting Veeam ISO"
         Dismount-DiskImage -ImagePath $iso
         throw "Upgrade failed. Please check debug log for more information: $logFolder\VeeamExplorerForOracle.log"
+    }
+
+    try {
+        # Upgrading Veeam Explorer for Microsoft Teams
+        Write-Log "Upgrading Veeam Explorer for Microsoft Teams: $mountDrive\Explorers\VeeamExplorerForTeams.msi"
+        $result = Update-Explorer -msi "$mountDrive\Explorers\VeeamExplorerForTeams.msi"
+        if ($result -eq 0 -or $result -eq 3010) { Write-Log "SUCCESS: ${result}" }
+        else { throw "ERROR: ${result}" }
+    }
+    catch {
+        Write-Log $_
+        Write-Log "Unmounting Veeam ISO"
+        Dismount-DiskImage -ImagePath $iso
+        throw "Upgrade failed. Please check debug log for more information: $logFolder\VeeamExplorerForTeams.log"
     }
     
     try {
