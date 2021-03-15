@@ -51,12 +51,13 @@ Here's a high-level view of the upgrade process:
 5. Veeam Explorer for Microsoft Exchange
 6. Veeam Explorer for Microsoft SharePoint
 7. Veeam Explorer for Microsoft SQL Server
-8. Veeam Explorer for Oracle
-9. Veeam Distribution Service
-10. Veeam Installer Service
-11. Veeam Agent for Linux Redistributable
-12. Veeam Agent for Microsoft Windows Redistributable
-13. Veeam Mount Service
-14. Veeam Backup Transport
-15. Veeam Backup vPowerNFS
-16. Veeam Backup Cloud Gateway (if installed)
+8. Veeam Explorer for Microsoft Teams
+9. Veeam Explorer for Oracle
+10. Veeam Distribution Service
+11. Veeam Installer Service
+12. Veeam Agent for Linux Redistributable
+13. Veeam Agent for Microsoft Windows Redistributable
+14. Veeam Mount Service
+15. Veeam Backup Transport
+16. Veeam Backup vPowerNFS
+17. Veeam Backup Cloud Gateway (if installed)

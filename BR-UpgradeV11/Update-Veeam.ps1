@@ -33,7 +33,7 @@
 
 .NOTES
 	NAME:  Update-Veeam.ps1
-	VERSION: 1.0
+	VERSION: 1.1
 	AUTHOR: Chris Arceneaux
 	TWITTER: @chris_arceneaux
 	GITHUB: https://github.com/carceneaux
@@ -51,11 +51,11 @@
     5. Veeam Explorer for Microsoft Exchange
     6. Veeam Explorer for Microsoft SharePoint
     7. Veeam Explorer for Microsoft SQL Server
-    8. Veeam Explorer for Oracle
-    9. Veeam Distribution Service
-    10. Veeam Installer Service
-    11. Veeam Agent for Linux Redistributable
-    12. Veeam Agent for MacOS Redistributable
+    8. Veeam Explorer for Microsoft Teams
+    9. Veeam Explorer for Oracle
+    10. Veeam Distribution Service
+    11. Veeam Installer Service
+    12. Veeam Agent for Linux Redistributable
     13. Veeam Agent for Microsoft Windows Redistributable
     14. Veeam Mount Service
     15. Veeam Backup Transport
