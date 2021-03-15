@@ -671,6 +671,20 @@ if ($vbr) {
         Dismount-DiskImage -ImagePath $iso
         throw "Upgrade failed. Please check debug log for more information: $logFolder\VeeamExplorerForOracle.log"
     }
+
+    try {
+        # Upgrading Veeam Explorer for Microsoft Teams
+        Write-Log "Upgrading Veeam Explorer for Microsoft Teams: $mountDrive\Explorers\VeeamExplorerForTeams.msi"
+        $result = Update-Explorer -msi "$mountDrive\Explorers\VeeamExplorerForTeams.msi"
+        if ($result -eq 0 -or $result -eq 3010) { Write-Log "SUCCESS: ${result}" }
+        else { throw "ERROR: ${result}" }
+    }
+    catch {
+        Write-Log $_
+        Write-Log "Unmounting Veeam ISO"
+        Dismount-DiskImage -ImagePath $iso
+        throw "Upgrade failed. Please check debug log for more information: $logFolder\VeeamExplorerForTeams.log"
+    }
     
     try {
         # Upgrading Veeam Distribution Service
