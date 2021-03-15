@@ -212,6 +212,25 @@ Function Write-Log {
     Write-Output $logEntry | Out-file $logFile -Append
 }
 
+Function Install-Requirement {
+    Param(
+        [String]$exe
+    )
+
+    # Extracting msi package name
+    $exe -match "[^\\]+$" | Out-Null
+    $logName = $Matches[0] -replace ".exe", ".log"
+
+    $params = @(
+        "/install"    
+        "/quiet"
+        "/norestart"
+        "/log"
+        '"{0}\{1}"' -f $logFolder, $logName        
+    )
+    return (Start-Process "$exe" -Wait -ArgumentList $params -Passthru).ExitCode
+}
+
 Function Update-Package {
     Param(
         [String]$msi
@@ -509,6 +528,34 @@ if ($vbr) {
     # Stopping all Veeam services prior to upgrade
     Write-Log "Stopping all Veeam services"
     Get-Service veeam* | Stop-Service
+
+    try {
+        # Installing Microsoft .NET Core Runtime
+        Write-Log "Installing Microsoft .NET Core Runtime: $mountDrive\Redistr\x64\dotnet-runtime-3.1.10-win-x64.exe"
+        $result = Install-Requirement -exe "$mountDrive\Redistr\x64\dotnet-runtime-3.1.10-win-x64.exe"
+        if ($result -eq 0 -or $result -eq 3010) { Write-Log "SUCCESS: ${result}" }
+        else { throw "ERROR: ${result}" }
+    }
+    catch {
+        Write-Log $_
+        Write-Log "Unmounting Veeam ISO"
+        Dismount-DiskImage -ImagePath $iso
+        throw "Upgrade failed. Please check debug log for more information: $logFolder\dotnet-runtime-3.1.10-win-x64.log"
+    }
+
+    try {
+        # Installing Microsoft ASP.NET Core Shared Framework
+        Write-Log "Installing Microsoft ASP.NET Core Shared Framework: $mountDrive\Redistr\x64\aspnetcore-runtime-3.1.10-win-x64.exe"
+        $result = Install-Requirement -exe "$mountDrive\Redistr\x64\aspnetcore-runtime-3.1.10-win-x64.exe"
+        if ($result -eq 0 -or $result -eq 3010) { Write-Log "SUCCESS: ${result}" }
+        else { throw "ERROR: ${result}" }
+    }
+    catch {
+        Write-Log $_
+        Write-Log "Unmounting Veeam ISO"
+        Dismount-DiskImage -ImagePath $iso
+        throw "Upgrade failed. Please check debug log for more information: $logFolder\dotnet-runtime-3.1.10-win-x64.log"
+    }
     
     try {
         # Upgrading Veeam Backup Catalog
