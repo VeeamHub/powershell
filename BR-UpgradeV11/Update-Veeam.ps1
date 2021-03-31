@@ -25,7 +25,7 @@
 	Upgrades Veeam environment using the specified license file and downloads the Veeam 10 ISO from Veeam's public servers
 
 .EXAMPLE
-	Update-Veeam.ps1 -ISO "C:\VeeamBackup&Replication_11.0.0.837_20210220.iso" -License "C:\license.lic"
+	Update-Veeam.ps1 -ISO "C:\VeeamBackup&Replication_11.0.0.837_20210324.iso" -License "C:\license.lic"
 
 	Description 
 	-----------     
@@ -352,15 +352,15 @@ if ($vbr) { Write-Log "Veeam Backup & Replication Server found: $($vbr.Version)"
 # If ISO wasn't specified, download it from Veeam's public servers
 if ($iso -eq "download") {
     try {
-        $iso = "$logFolder\VeeamBackup&Replication_11.0.0.837_20210220.iso"
+        $iso = "$logFolder\VeeamBackup&Replication_11.0.0.837_20210324.iso"
         Write-Log "ISO not specified. Checking if previously downloaded..."
         if (Test-Path $iso) {
             Write-Log "ISO found: $iso"
         }
         else {
             Write-Log "ISO not found. Downloading ISO now..."
-            Start-BitsTransfer -Source "https://download2.veeam.com/VBR/v11/VeeamBackup&Replication_11.0.0.837_20210220.iso" -Destination $iso
-            Write-Log "ISO downloaded to: $logFolder\VeeamBackup&Replication_11.0.0.837_20210220.iso"
+            Start-BitsTransfer -Source "https://download2.veeam.com/VBR/v11/VeeamBackup&Replication_11.0.0.837_20210324.iso" -Destination $iso
+            Write-Log "ISO downloaded to: $iso"
         }
         
     }

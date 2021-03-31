@@ -20,6 +20,7 @@ This script was written to work with standard Veeam Backup & Replication environ
 
 * If Veeam software other than Veeam Backup Enterprise Manager or Veeam Backup & Replication Server is installed on the same server, this software will be taken offline during the upgrade.
 * After the upgrade, any Agent-base backups (VAW, VAL) that Veeam administers will need to be upgraded.
+* This script does NOT install any patches an ISO might contain in the `Updates` folder. If it exists, the patch will need to be installed after running this script.
 
 ## Requirements
 
