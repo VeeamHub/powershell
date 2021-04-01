@@ -51,7 +51,7 @@
 
 .NOTES
 	NAME:  Get-VcdOrgUsage.ps1
-	VERSION: 1.0
+	VERSION: 1.1
 	AUTHOR: Chris Arceneaux
 	TWITTER: @chris_arceneaux
 	GITHUB: https://github.com/carceneaux
@@ -240,7 +240,7 @@ foreach ($item in $vcdOrgItems) {
 if ($IncludeAllVcdBackups) {
     Write-Verbose "Flag specified...including usage for Non-VSSP Backups as well..."
     # Retrieving all VCD backups
-    $allVcdBackups = Get-VBRBackup | Where-Object -FilterScript { $_.BackupPlatform.ToString() -eq "EVcd" }
+    $allVcdBackups = [Veeam.Backup.Core.CBackup]::GetAll() | Where-Object -FilterScript { $_.BackupPlatform.ToString() -eq "EVcd" }
     
     # Separating out VSSP backups vs backups created directly on the backup server by the provider
     $nonSelfServiceVcdBackups = $allVcdBackups | Where-Object -FilterScript { $_.Id -notin $selfServiceBackupIds }
@@ -338,16 +338,16 @@ if ($AggregateByOrgVdc) {
     foreach ($orgReportEntry in $orgReports.GetEnumerator()) {
         foreach ($orgVdcReportEntry in $orgReportEntry.Value.GetEnumerator()) {
             $usage.Add([PSCustomObject]@{
-                    VcdId        = $orgVdcReportEntry.Value.vcdId;
+                    #VcdId        = $orgVdcReportEntry.Value.vcdId;
                     VCD          = $orgVdcReportEntry.Value.vcdName;
-                    OrganizationRef = $orgVdcReportEntry.Value.organizationRef;
+                    #OrganizationRef = $orgVdcReportEntry.Value.organizationRef;
                     Organization = $orgReportEntry.Key;
-                    OrgVdcRef    = $orgVdcReportEntry.Value.orgVdcRef
+                    #OrgVdcRef    = $orgVdcReportEntry.Value.orgVdcRef
                     OrgVDC       = $orgVdcReportEntry.Key;
-                    RepositoryId = $orgVdcReportEntry.Value.repositoryId;
+                    #RepositoryId = $orgVdcReportEntry.Value.repositoryId;
                     Repository   = $orgVdcReportEntry.Value.repositoryName;
                     ProtectedVMs = $orgVdcReportEntry.Value.protectedVms;
-                    QuotaId      = $orgVdcReportEntry.Value.quotaId;
+                    #QuotaId      = $orgVdcReportEntry.Value.quotaId;
                     QuotaGB      = $orgVdcReportEntry.Value.quotaGb;
                     UsedSpaceGB  = [math]::round($orgVdcReportEntry.Value.usedSpace / 1Gb, 2) #convert bytes to GB
                 })
@@ -358,14 +358,14 @@ if ($AggregateByOrgVdc) {
 else {
     foreach ($orgReportEntry in $orgReports.GetEnumerator()) {
         $usage.Add([PSCustomObject]@{
-                VcdId        = $orgReportEntry.Value.vcdId;
+                #VcdId        = $orgReportEntry.Value.vcdId;
                 VCD          = $orgReportEntry.Value.vcdName;
-                OrganizationRef = $orgReportEntry.Value.organizationRef;
+                #OrganizationRef = $orgReportEntry.Value.organizationRef;
                 Organization = $orgReportEntry.Key;
-                RepositoryId = $orgReportEntry.Value.repositoryId;
+                #RepositoryId = $orgReportEntry.Value.repositoryId;
                 Repository   = $orgReportEntry.Value.repositoryName;
                 ProtectedVMs = $orgReportEntry.Value.protectedVms;
-                QuotaId      = $orgReportEntry.Value.quotaId;
+                #QuotaId      = $orgReportEntry.Value.quotaId;
                 QuotaGB      = $orgReportEntry.Value.quotaGb;
                 UsedSpaceGB  = [math]::round($orgReportEntry.Value.usedSpace / 1Gb, 2) #convert bytes to GB
             })
