@@ -21,12 +21,16 @@ The scope of the usage returned is also customizable. It can be limited to self-
 
 ## Known Issues
 
-`-AggregateByOrgVdc` and `-IncludeAllVcdBackups` parameters REQUIRE the backups to be stored in per-VM backup files ("Use per-VM backup files" option in advanced settings of a backup repository). This is because the size of the backups is calculated using backup files, and it's impossible to reliably attribute per-VM consumption to the correct Organization/Org VDC when a backup file contains several VMs from different Organizations/Org VDCs.
+* *There are no known issues for VSSP backup usage.*
+* `-IncludeAllVcdBackups` does not include VCD Replication job storage usage.
+* `-IncludeAllVcdBackups` reports usage correctly but repository specified may be incorrect.
 
 ## Requirements
 
 * Veeam Backup & Replication 11
   * _Does not work with previous versions_
+* Backups must be stored in a Backup Repository with [per-machine backup files enabled](https://helpcenter.veeam.com/docs/backup/vsphere/repository_repository.html?ver=110)
+  * This is because the size of the backups is calculated using backup files, and it's impossible to reliably attribute per-machine consumption to the correct Organization/Org VDC when a backup file contains several VMs from different Organizations/Org VDCs.
 
 ## Usage
 
