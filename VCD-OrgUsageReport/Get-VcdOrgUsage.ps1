@@ -47,7 +47,7 @@
 
 	Description
 	-----------
-	Verbose output is support
+	Verbose output is supported
 
 .NOTES
 	NAME:  Get-VcdOrgUsage.ps1
