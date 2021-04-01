@@ -56,6 +56,8 @@
 	TWITTER: @chris_arceneaux
 	GITHUB: https://github.com/carceneaux
 
+    A big thanks to Yuri Sukhov ([@wombatairlines](https://twitter.com/wombatairlines))! I used his [code](https://github.com/wombatonfire/veeam-powershell/tree/master/New-OrgBackupReport) as a starting point for this project.
+
 .LINK
 	https://arsano.ninja/
 
@@ -104,8 +106,9 @@ if ($IncludeAllVcdBackups) {
 $orgReports = @{}
 $knownVmIds = New-Object -TypeName System.Collections.Generic.List[guid]
 
-# Retrieving all VCD Organization items from Veeam
-$vcdOrgItems = Find-VBRvCloudEntity | Where-Object -FilterScript { $_.Type -eq "Organization" }
+# Retrieving all required VCD items from Veeam
+$vcdItems = Find-VBRvCloudEntity
+$vcdOrgItems = $vcdItems | Where-Object { $_.Type -eq "Organization" }
 Write-Verbose "Retrieved $($vcdOrgItems.count) Organizations from Veeam"
 
 # Retrieving all Veeam repositories
@@ -113,7 +116,7 @@ $repos = Get-VBRBackupRepository
 $repos += Get-VBRBackupRepository -ScaleOut
 Write-Verbose "Retrieved $($repos.count) Repositories from Veeam"
 
-# Looping through all VCD Organization items
+# Retrieving VSSP backups usage :: Looping through all VCD Organizations
 foreach ($item in $vcdOrgItems) {
     Write-Verbose "$($item.Name): Retrieving VSSP Backups for Organization"
     # Creating CVcdOrganization object. Required for subsequent API call.
@@ -121,11 +124,12 @@ foreach ($item in $vcdOrgItems) {
         -ArgumentList $item.VcdId, $item.VcdRef, $item.Name
     
     # Looping through all Veeam repositories
-    foreach ($repo in $repos){
+    foreach ($repo in $repos) {
         Write-Verbose "$($item.Name): Searching '$($repo.Name)' for VSSP quota..."
         # Retrieving VSSP quota if exists
-        $orgQuotaId = [Veeam.Backup.Core.CJobQuota]::FindByOrganization($vcdOrg, $repo.Id.Guid).Id
-        
+        $orgQuota = [Veeam.Backup.Core.CJobQuota]::FindByOrganization($vcdOrg, $repo.Id.Guid)
+        $orgQuotaId = $orgQuota.Id
+
         # If VSSP quota exists
         if ($orgQuotaId) {
             Write-Verbose "$($item.Name): VSSP quota found: $orgQuotaId"
@@ -159,8 +163,18 @@ foreach ($item in $vcdOrgItems) {
                         }
                         if (!$orgReports[$vcdOrg.OrgName].Contains($orgVdcName)) {
                             $orgReports[$vcdOrg.OrgName][$orgVdcName] = [PSCustomObject]@{
-                                protectedVms = 0;
-                                usedSpace    = 0
+                                vcdId            = $vcdOrg.HostId;
+                                vcdName          = ($vcdItems | Where-Object { $_.Id -eq $vcdOrg.HostId }).Name;
+                                organizationRef  = $vcdOrg.OrgRef;
+                                organizationName = $vcdOrg.OrgName;
+                                orgVdcRef        = $vcdVAppLocation.OrgVdcRef;
+                                orgVdcName       = $orgVdcName;
+                                repositoryId     = $repo.Id;
+                                repositoryName   = $repo.Name;
+                                protectedVms     = 0;
+                                quotaId          = $orgQuotaId;
+                                quotaGb          = $orgQuota.QuotaSize.InGigabytes;
+                                usedSpace        = 0
                             }
                         }
                         if ($object.Type -eq "VM") {
@@ -181,18 +195,26 @@ foreach ($item in $vcdOrgItems) {
             # Aggregate by VCD Organization
             else {
                 Write-Verbose "$($item.Name): Aggregating by Organization..."
+                
                 # Looping through backups
                 foreach ($backupId in $orgBackupIds) {
                     if ($IncludeAllVcdBackups) {
                         $selfServiceBackupIds.Add($backupId)
                     }
-
                     # Retrieving backup using backup ID
                     $backup = [Veeam.Backup.Core.CBackup]::Get($backupId)
                     if (!$orgReports.Contains($vcdOrg.OrgName)) {
                         $orgReports[$vcdOrg.OrgName] = [PSCustomObject]@{
-                            protectedVms = 0;
-                            usedSpace    = 0
+                            vcdId            = $vcdOrg.HostId;
+                            vcdName          = ($vcdItems | Where-Object { $_.Id -eq $vcdOrg.HostId }).Name;
+                            organizationRef  = $vcdOrg.OrgRef;
+                            organizationName = $vcdOrg.OrgName;
+                            repositoryId     = $repo.Id;
+                            repositoryName   = $repo.Name;
+                            protectedVms     = 0;
+                            quotaId          = $orgQuotaId;
+                            quotaGb          = $orgQuota.QuotaSize.InGigabytes;
+                            usedSpace        = 0
                         }
                     }
                     # Looping through backup objects
@@ -214,7 +236,7 @@ foreach ($item in $vcdOrgItems) {
     }
 }
 
-# Including ALL VCD backups if specified. Not just VSSP backups.
+# Retrieving ALL VCD backups usage (if specified). Not just VSSP backups.
 if ($IncludeAllVcdBackups) {
     Write-Verbose "Flag specified...including usage for Non-VSSP Backups as well..."
     # Retrieving all VCD backups
@@ -224,8 +246,10 @@ if ($IncludeAllVcdBackups) {
     $nonSelfServiceVcdBackups = $allVcdBackups | Where-Object -FilterScript { $_.Id -notin $selfServiceBackupIds }
     Write-Verbose "Non-VSSP Backups found: $($nonSelfServiceVcdBackups.count)"
 
-    # Looping through backups
+    # Looping through Non-VSSP backups
     foreach ($backup in $nonSelfServiceVcdBackups) {
+        # Setting repository information
+        $repo = $repos | Where-Object {$_.Id -eq $backup.RepositoryId}
         # Retrieving backup files
         $storages = $backup.GetAllStorages()
         # Looping through backup objects
@@ -245,8 +269,18 @@ if ($IncludeAllVcdBackups) {
                 }
                 if (!$orgReports[$orgName].Contains($orgVdcName)) {
                     $orgReports[$orgName][$orgVdcName] = [PSCustomObject]@{
-                        protectedVms = 0;
-                        usedSpace    = 0
+                        vcdId            = $vcdVAppLocation.VcdInstanceDbId;
+                        vcdName          = ($vcdItems | Where-Object { $_.Id -eq $vcdVAppLocation.VcdInstanceDbId}).Name;
+                        organizationRef  = $vcdVAppLocation.OrgRef;
+                        organizationName = $orgName;
+                        orgVdcRef        = $vcdVAppLocation.OrgVdcRef;
+                        orgVdcName       = $orgVdcName;
+                        repositoryId     = $repo.Id;
+                        repositoryName   = $repo.Name;
+                        protectedVms     = 0;
+                        quotaId          = $null;
+                        quotaGb          = $null;
+                        usedSpace        = 0
                     }
                 }
                 if ($object.Type -eq "VM") {
@@ -266,8 +300,16 @@ if ($IncludeAllVcdBackups) {
             else {
                 if (!$orgReports.Contains($orgName)) {
                     $orgReports[$orgName] = [PSCustomObject]@{
-                        protectedVms = 0;
-                        usedSpace    = 0
+                        vcdId            = $vcdVAppLocation.VcdInstanceDbId;
+                        vcdName          = ($vcdItems | Where-Object { $_.Id -eq $vcdVAppLocation.VcdInstanceDbId}).Name;
+                        organizationRef  = $vcdVAppLocation.OrgRef;
+                        organizationName = $orgName;
+                        repositoryId     = $repo.Id;
+                        repositoryName   = $repo.Name;
+                        protectedVms     = 0;
+                        quotaId          = $null;
+                        quotaGb          = $null;
+                        usedSpace        = 0
                     }
                 }
                 if ($object.Type -eq "VM") {
@@ -296,9 +338,17 @@ if ($AggregateByOrgVdc) {
     foreach ($orgReportEntry in $orgReports.GetEnumerator()) {
         foreach ($orgVdcReportEntry in $orgReportEntry.Value.GetEnumerator()) {
             $usage.Add([PSCustomObject]@{
+                    VcdId        = $orgVdcReportEntry.Value.vcdId;
+                    VCD          = $orgVdcReportEntry.Value.vcdName;
+                    OrganizationRef = $orgVdcReportEntry.Value.organizationRef;
                     Organization = $orgReportEntry.Key;
-                    VDC          = $orgVdcReportEntry.Key;
-                    ProtectedVMs = $orgVdcReportEntry.Value.protectedVms
+                    OrgVdcRef    = $orgVdcReportEntry.Value.orgVdcRef
+                    OrgVDC       = $orgVdcReportEntry.Key;
+                    RepositoryId = $orgVdcReportEntry.Value.repositoryId;
+                    Repository   = $orgVdcReportEntry.Value.repositoryName;
+                    ProtectedVMs = $orgVdcReportEntry.Value.protectedVms;
+                    QuotaId      = $orgVdcReportEntry.Value.quotaId;
+                    QuotaGB      = $orgVdcReportEntry.Value.quotaGb;
                     UsedSpaceGB  = [math]::round($orgVdcReportEntry.Value.usedSpace / 1Gb, 2) #convert bytes to GB
                 })
         }
@@ -308,8 +358,15 @@ if ($AggregateByOrgVdc) {
 else {
     foreach ($orgReportEntry in $orgReports.GetEnumerator()) {
         $usage.Add([PSCustomObject]@{
+                VcdId        = $orgReportEntry.Value.vcdId;
+                VCD          = $orgReportEntry.Value.vcdName;
+                OrganizationRef = $orgReportEntry.Value.organizationRef;
                 Organization = $orgReportEntry.Key;
+                RepositoryId = $orgReportEntry.Value.repositoryId;
+                Repository   = $orgReportEntry.Value.repositoryName;
                 ProtectedVMs = $orgReportEntry.Value.protectedVms;
+                QuotaId      = $orgReportEntry.Value.quotaId;
+                QuotaGB      = $orgReportEntry.Value.quotaGb;
                 UsedSpaceGB  = [math]::round($orgReportEntry.Value.usedSpace / 1Gb, 2) #convert bytes to GB
             })
     }
