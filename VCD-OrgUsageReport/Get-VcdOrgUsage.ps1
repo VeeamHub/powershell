@@ -239,8 +239,8 @@ foreach ($item in $vcdOrgItems) {
 # Retrieving ALL VCD backups usage (if specified). Not just VSSP backups.
 if ($IncludeAllVcdBackups) {
     Write-Verbose "Flag specified...including usage for Non-VSSP Backups as well..."
-    # Retrieving all VCD backups
-    $allVcdBackups = [Veeam.Backup.Core.CBackup]::GetAll() | Where-Object -FilterScript { $_.BackupPlatform.ToString() -eq "EVcd" }
+    # Retrieving all VCD backups (excluding VCD Replication)
+    $allVcdBackups = [Veeam.Backup.Core.CBackup]::GetAll() | Where-Object -FilterScript { ($_.BackupPlatform.ToString() -eq "EVcd") -and (!$_.IsVcdReplica) }
     
     # Separating out VSSP backups vs backups created directly on the backup server by the provider
     $nonSelfServiceVcdBackups = $allVcdBackups | Where-Object -FilterScript { $_.Id -notin $selfServiceBackupIds }
