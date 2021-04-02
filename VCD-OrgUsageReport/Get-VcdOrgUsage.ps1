@@ -51,7 +51,7 @@
 
 .NOTES
 	NAME:  Get-VcdOrgUsage.ps1
-	VERSION: 1.1
+	VERSION: 1.2
 	AUTHOR: Chris Arceneaux
 	TWITTER: @chris_arceneaux
 	GITHUB: https://github.com/carceneaux
@@ -248,8 +248,6 @@ if ($IncludeAllVcdBackups) {
 
     # Looping through Non-VSSP backups
     foreach ($backup in $nonSelfServiceVcdBackups) {
-        # Setting repository information
-        $repo = $repos | Where-Object {$_.Id -eq $backup.RepositoryId}
         # Retrieving backup files
         $storages = $backup.GetAllStorages()
         # Looping through backup objects
@@ -275,13 +273,18 @@ if ($IncludeAllVcdBackups) {
                         organizationName = $orgName;
                         orgVdcRef        = $vcdVAppLocation.OrgVdcRef;
                         orgVdcName       = $orgVdcName;
-                        repositoryId     = $repo.Id;
-                        repositoryName   = $repo.Name;
+                        repositoryId     = $null;
+                        repositoryName   = $null;
                         protectedVms     = 0;
                         quotaId          = $null;
                         quotaGb          = $null;
                         usedSpace        = 0
                     }
+                }
+                # Nulling Backup Repository as it might not match VSSP backups
+                else {
+                    $orgReports[$orgName][$orgVdcName].repositoryId = $null
+                    $orgReports[$orgName][$orgVdcName].repositoryName = $null
                 }
                 if ($object.Type -eq "VM") {
                     if ($object.Id -notin $knownVmIds) {
@@ -312,6 +315,12 @@ if ($IncludeAllVcdBackups) {
                         usedSpace        = 0
                     }
                 }
+                # Nulling Backup Repository as it might not match VSSP backups
+                else {
+                    $orgReports[$orgName].repositoryId = $null
+                    $orgReports[$orgName].repositoryName = $null
+                }
+
                 if ($object.Type -eq "VM") {
                     if ($object.Id -notin $knownVmIds) {
                         $orgReports[$orgName].protectedVms += 1

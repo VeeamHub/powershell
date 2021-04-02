@@ -22,8 +22,9 @@ The scope of the usage returned is also customizable. It can be limited to self-
 ## Known Issues
 
 * *There are no known issues for VSSP backup usage.*
-* `-IncludeAllVcdBackups` does not include VCD Replication job storage usage.
-* `-IncludeAllVcdBackups` reports usage correctly but repository specified may be incorrect.
+* Non-VSSP Backup usage:
+  * `-IncludeAllVcdBackups` does not include VCD Replication job usage
+  * `-IncludeAllVcdBackups` usage does not specify Backup Repository
 
 ## Requirements
 
@@ -35,3 +36,11 @@ The scope of the usage returned is also customizable. It can be limited to self-
 ## Usage
 
 Get-Help .\Get-VcdOrgUsage.ps1 -Full
+
+***NOTE:*** If you'd like the following additional metrics, you can uncomment corresponding lines 350-379 in the script:
+
+* VCD UID
+* Organization UID
+* Org VDC UID
+* Backup Repository UID
+* VSSP Quota UID
