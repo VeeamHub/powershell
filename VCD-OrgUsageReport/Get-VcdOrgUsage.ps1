@@ -307,8 +307,8 @@ if ($IncludeAllVcdBackups) {
                         vcdName          = ($vcdItems | Where-Object { $_.Id -eq $vcdVAppLocation.VcdInstanceDbId}).Name;
                         organizationRef  = $vcdVAppLocation.OrgRef;
                         organizationName = $orgName;
-                        repositoryId     = $repo.Id;
-                        repositoryName   = $repo.Name;
+                        repositoryId     = $null;
+                        repositoryName   = $null;
                         protectedVms     = 0;
                         quotaId          = $null;
                         quotaGb          = $null;
