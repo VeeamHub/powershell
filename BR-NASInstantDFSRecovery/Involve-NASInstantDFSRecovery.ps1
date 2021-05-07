@@ -15,14 +15,13 @@
    You can set your own path for log file from this script. Default filename is "C:\ProgramData\dfsrecovery.log"
 
    .Example
-   .\Involve-NASInstantDFSRecovery.ps1 -DfsRoot "\\homelab\dfs" -ScanDepth 3 -VBRJobName "NAS Backup Job" -Owner "HOMELAB\Administrator"
-
+   .\Involve-NASInstantDFSRecovery.ps1 -DfsRoot "\\homelab\dfs" -ScanDepth 3 -VBRJobName "File Backup NetApp SVM" -Owner "HOMELAB\Administrator"
 
    .Notes 
-   Version:        1.4
+   Version:        1.5
    Author:         Marco Horstmann (marco.horstmann@veeam.com)
-   Creation Date:  24 November 2020
-   Purpose/Change: Prepare V11 Rollout
+   Creation Date:  6 May 2021
+   Purpose/Change: Fixed compatibility with added NAS systems
    
    .LINK https://github.com/marcohorstmann/powershell
    .LINK https://horstmann.in
@@ -316,9 +315,20 @@ Param(
             Write-Log -Info "is not able to validate this." -Status Error
             exit 99
 }
+        #Adding different processing for SMB shares or NAS systems (object content is different)
+        if($shareInBackup.NASServerName.ToString() -match ":" ) {
+            #if it includes a ":" it is a share of a NAS system which was added. the path needs to be converted to an UNC path:
+            $splittedNasShareDetails = $shareInBackup.NASServerName.ToString().split("\\:",3)
+            $NasShareDetailsResult = "\\" + $splittedNasShareDetails[1]+$splittedNasShareDetails[2]
+        } else {
+            # Just add the SMB path
+            $NasShareDetailsResult = $shareInBackup.NASServerName.ToString()
+        }
+
         #Get the currentFolderTarget of DFS where the TargetPath is the current share
-        $currentFolderTarget = $allTargetPaths | Where-Object -Property TargetPath -eq $($shareInBackup.NASServerName.ToString())
+        $currentFolderTarget = $allTargetPaths | Where-Object -Property TargetPath -eq $NasShareDetailsResult
         
+
         #Add the information to this variable to failback the DFS targets
         $recoveredNASShares += Switch-DfsTarget -Path $currentFolderTarget.Path -originalPath $currentFolderTarget.TargetPath -NASRecoverySession $NASRecoverySessions[$NASRecoverySessions.Count – 1]
     }

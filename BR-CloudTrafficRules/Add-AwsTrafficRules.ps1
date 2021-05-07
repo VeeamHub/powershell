@@ -46,7 +46,7 @@ Param(
 
    [ValidateSet(“MbitPerSec”,”MbytePerSec”,"KbytePerSec")]
    [Parameter(Mandatory=$True)]
-   [int]$ThrottlingUnit,
+   [string]$ThrottlingUnit,
 
    [Parameter(Mandatory=$False)]
    [string]$LogFile="C:\ProgramData\awssubnet.log"
