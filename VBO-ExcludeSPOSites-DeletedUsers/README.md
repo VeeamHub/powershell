@@ -3,8 +3,6 @@ Powershell Script to automatically exclude from backup Sharepoint Online persona
 
 **Please note this script is unofficial and is not created nor supported by Veeam Software.**
 
-![VeeamPorter Logo](veeamporter-logo-02.png)
-
 ## Description
 ~~~~
 Version : 0.77 (June 11th, 2021)
@@ -19,25 +17,30 @@ For help or comments, contact the author on Twitter (@danilochiavari) or via e-m
 This script has been tested only with the following versions of Veeam Backup for Office 365:
 - v5.0.1.225
 
-##Notes
+## Notes
 - You will be asked to enter a credential. That credential will be used to connect to Azure AD and Sharepoint Online
 - Organization / Office 365 Tenant and Sharepoint Online Admin URL are automatically obtained based on the supplied credential
 
 ## Before you use the script
 
 The script is designed to be run locally, from the Veeam Backup for Office 365 server. Before starting, please make sure you have the two additional required Powershell modules:
-- Sharepoint Online *((Microsoft.Online.SharePoint.PowerShell))*
-- Azure AD *((AzureAD))*
-You can easily find these modules at https://www.PowershellGallery.com 
+- Sharepoint Online _(Microsoft.Online.SharePoint.PowerShell)_
+- Azure AD _(AzureAD)_
+
+You can easily find these modules at https://www.PowershellGallery.com. 
 
 Installation can be done directly from an administrative Powershell session:
+
 `PS> Install-Module -Name Microsoft.Online.SharePoint.PowerShell`
+
 `PS> Install-Module -Name AzureAD`
 
 NOTE: you can encounter errors during installation of the NuGet package and/or the Powershell modules. This is usually solved by forcing Powershell to use TLS 1.2:
+
 `PS> [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12`
 
 NOTE: you might need to manually specify that you “trust” the PSGallery repository, as it is “untrusted” by default. If you want, you can set it to trusted with the following command:
+
 `PS> Set-PSRepository -Name 'PSGallery' -InstallationPolicy Trusted`
 
 ## Parameters
@@ -46,3 +49,9 @@ _(optional)_ The backup job where exclusions will be created. If not specified (
 
 ## Examples
 `PS> .\VBO-ExcludeSPOSites-DeletedUsers.ps1 -Job MyBackupJob`
+
+## Screenshots
+![Screenshot-01](vboexclude-shot-01.png)
+![Screenshot-02](vboexclude-shot-02.png)
+![Screenshot-03](vboexclude-shot-03.png)
+![Screenshot-04](vboexclude-shot-04.png)
