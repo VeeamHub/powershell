@@ -23,9 +23,11 @@ This script has been tested only with the following versions of Veeam Backup for
 
 ## Before you use the script
 
-The script is designed to be run locally, from the Veeam Backup for Office 365 server. Before starting, please make sure you have the two additional required Powershell modules:
-- Sharepoint Online _(Microsoft.Online.SharePoint.PowerShell)_
-- Azure AD _(AzureAD)_
+The script is designed to be run locally, from the Veeam Backup for Office 365 server. 
+
+Before starting, please make sure you have the two additional required Powershell modules:
+- **Sharepoint Online** _(Microsoft.Online.SharePoint.PowerShell)_
+- **Azure AD** _(AzureAD)_
 
 You can easily find these modules at https://www.PowershellGallery.com. 
 
