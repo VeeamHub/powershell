@@ -24,7 +24,7 @@
 $timestampFileName = get-date -Format "yyyy-mm-dd_HH-mm-ss"
 
 [string]$Script:LogFile = "VBO-CreateDynamicGroups.log" #logfile name
-[string]$Script:GroupNameFile = "DynamicGroupsList_$timestampFileName.log" #logfile name
+[string]$Script:GroupNameFile = "DynamicGroupsList_$timestampFileName.log" #file to export group names
 [string]$Script:strGroupNameStart = "VBO-UserBackup_"
 [string[]]$script:arrFirstChar = @("0","1","2","3","4","5","6","7","8","9","a","b","c","d","e","f") #array of characters for the regex
 [string[]]$Script:arrScndChar = @('0-3','4-7','8-9a-b','c-f')
