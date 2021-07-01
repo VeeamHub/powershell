@@ -1,0 +1,4 @@
+"Id","Name","Description","Info","HostId","Host","Type","IsDisabled","Options","MaxTasksCount","ChosenVm","ChassisType"
+"a5253b98-eac0-4b76-a3cc-4d0780c5c631","ausveeampxy01.lab.fullstackgeek.net","Austin Virtual Proxy #1","Veeam.Backup.Model.CBackupProxyInfo","c251e39e-3b10-4a71-94de-ddfdfc7e6e9c","Veeam.Backup.Core.Common.CHost","Vi","False","Veeam.Backup.Model.CDomViProxyOptions","4",,"ViVirtual"
+"18b661c1-d9dc-4233-90a0-7e7b10dc2d09","VMware Backup Proxy","Created by Veeam Backup & Replication","Veeam.Backup.Model.CBackupProxyInfo","6745a759-2205-4cd2-b172-8ec8f7e60ef8","Veeam.Backup.Core.Common.CHost","Vi","True","Veeam.Backup.Model.CDomViProxyOptions","2",,"ViVirtual"
+"38060fcc-91db-4e8e-9c1f-91684f420679","ausveeampxy02.lab.fullstackgeek.net","Austin Virtual Proxy #2","Veeam.Backup.Model.CBackupProxyInfo","90e93595-590b-4651-8081-d3588cee8b85","Veeam.Backup.Core.Common.CHost","Vi","False","Veeam.Backup.Model.CDomViProxyOptions","4",,"ViVirtual"
