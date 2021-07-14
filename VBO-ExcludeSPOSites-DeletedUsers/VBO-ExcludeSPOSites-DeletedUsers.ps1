@@ -1,4 +1,4 @@
-﻿<#
+<#
 
 .SYNOPSIS
 ----------------------------------------------------------------------
@@ -27,18 +27,25 @@ PS> .\VBO-ExcludeSPOSites-DeletedUsers.ps1 -Job MyBackupJob
 #>
 
 Param (
-   [string]$Job
+   [string]$Job,
+   [Switch]$MFA
 )
 
-# Get credential and use it to connect to Azure AD and Sharepoint Online
-$Cred = Get-Credential
+if (-not $MFA) {
+    # Get credential and use it to connect to Azure AD and Sharepoint Online
+    $Cred = Get-Credential
+}
 
 # Connect to VBO365 Server (localhost)
 Write-Host -ForegroundColor Yellow Connecting to Veeam Backup for Office 365...
 Connect-VBOServer
 
 Write-Host -ForegroundColor Yellow Connecting to Azure AD...
-Connect-AzureAD -Credential $cred >$null 2>&1
+if ($MFA) {
+    Connect-AzureAD >$null 2>&1
+} else{
+    Connect-AzureAD -Credential $cred >$null 2>&1
+}
 
 # Get Microsoft 365 tenant name based on the used credential (taking the first object in the VerifiedDomains array)
 $Tenant = (Get-AzureADTenantDetail).VerifiedDomains[0].Name
@@ -74,7 +81,11 @@ if (-not $BackupJob) {
 
 # Connect to Sharepoint Online (constructing the default SPO admin URL based on tenant name)
 Write-Host -ForegroundColor Yellow Connecting to Sharepoint Online...
-Connect-SPOService -Credential $Cred -Url https://$($Tenant.TrimEnd(".onmicrosoft.com"))-admin.sharepoint.com
+if ($MFA) {
+    Connect-SPOService -Url https://$($Tenant.TrimEnd(".onmicrosoft.com"))-admin.sharepoint.com
+} else {
+    Connect-SPOService -Credential $Cred -Url https://$($Tenant.TrimEnd(".onmicrosoft.com"))-admin.sharepoint.com
+}
 
 # Get Sharepoint Online Personal Sites 
 $PersonalSites = Get-SPOSite -IncludePersonalSite $true -Filter "Url -like '-my.sharepoint.com/personal/'"
