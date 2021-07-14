@@ -74,7 +74,7 @@ if (-not $BackupJob) {
 
 # Connect to Sharepoint Online (constructing the default SPO admin URL based on tenant name)
 Write-Host -ForegroundColor Yellow Connecting to Sharepoint Online...
-Connect-SPOService -Credential $Cred -Url https://$($Tenant.TrimEnd(".onmicrosoft.com"))-admin.sharepoint.com
+Connect-SPOService -Credential $Cred -Url https://$($Tenant -replace ".onmicrosoft.com$")-admin.sharepoint.com
 
 # Get Sharepoint Online Personal Sites 
 $PersonalSites = Get-SPOSite -IncludePersonalSite $true -Filter "Url -like '-my.sharepoint.com/personal/'"
