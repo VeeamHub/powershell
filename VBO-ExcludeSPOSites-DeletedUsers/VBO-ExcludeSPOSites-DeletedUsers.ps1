@@ -81,6 +81,7 @@ if (-not $BackupJob) {
 
 # Connect to Sharepoint Online (constructing the default SPO admin URL based on tenant name)
 Write-Host -ForegroundColor Yellow Connecting to Sharepoint Online...
+
 if ($MFA) {
     Connect-SPOService -Url https://$($Tenant.TrimEnd(".onmicrosoft.com"))-admin.sharepoint.com
 } else {
