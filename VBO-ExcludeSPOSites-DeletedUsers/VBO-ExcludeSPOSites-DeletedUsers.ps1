@@ -4,7 +4,7 @@
 ----------------------------------------------------------------------
 VBO-ExcludeSPOSites-DeletedUsers.ps1
 ----------------------------------------------------------------------
-Version : 0.79 (July 27th, 2021)
+Version : 0.9 (July 27th, 2021)
 Requires: Veeam Backup for Office 365 v4 or later
 Author  : Danilo Chiavari (@danilochiavari)
 Blog    : https://www.danilochiavari.com
@@ -21,6 +21,8 @@ Notes:
    - Organization / Office 365 Tenant and Sharepoint Online Admin URL are automatically obtained based on the supplied credential
 .PARAMETER Job
 (optional) The backup job where exclusions will be created. If not specified (or the provided one does not exist) the script will let you pick from a list of existing jobs for the selected Organization
+.PARAMETER MFA
+(optional) When set to $True, allows use of a MFA-secured user account when logging in. If not specified, a standard (non-MFA) user account is assumed (Thanks to user @kosli for implementing and testing MFA, plus fixing an issue with obtaining admin URLs)
 .EXAMPLE
 PS> .\VBO-ExcludeSPOSites-DeletedUsers.ps1 -Job MyBackupJob
 
@@ -89,7 +91,7 @@ if ($MFA) {
 }
 
 # Get Sharepoint Online Personal Sites 
-$PersonalSites = Get-SPOSite -IncludePersonalSite $true -Filter "Url -like '-my.sharepoint.com/personal/'"
+$PersonalSites = Get-SPOSite -IncludePersonalSite $true -Filter "Url -like '-my.sharepoint.com/personal/'" -Limit ALL
 
 # Initialize Exclusions array
 $Exclusions = @()
@@ -100,7 +102,7 @@ ForEach ($Site in $PersonalSites) {
     $SiteOwner = $Site.Owner.ToString()
     #Write-Host "Site owner:" $SiteOwner
     # Check if Site's owner exists in Azure AD
-    $UserCheck = Get-AzureADUser | ? {$_.UserPrincipalName -eq $SiteOwner}
+    $UserCheck = Get-AzureADUser -All $True | ? {$_.UserPrincipalName -eq $SiteOwner}
     If ($UserCheck -eq $null) {
         Write-Host -ForegroundColor Yellow User $SiteOwner was **NOT** found in Azure AD - Exclusion will be applied `n
         $Exclusions += New-VBOBackupItem -Site $(Get-VBOOrganizationSite -Organization $BackupOrg -URL $Site.Url)
