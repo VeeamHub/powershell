@@ -4,7 +4,7 @@
 ----------------------------------------------------------------------
 VBO-ExcludeSPOSites-DeletedUsers.ps1
 ----------------------------------------------------------------------
-Version : 0.77 (June 11th, 2021)
+Version : 0.79 (July 27th, 2021)
 Requires: Veeam Backup for Office 365 v4 or later
 Author  : Danilo Chiavari (@danilochiavari)
 Blog    : https://www.danilochiavari.com
@@ -83,9 +83,9 @@ if (-not $BackupJob) {
 Write-Host -ForegroundColor Yellow Connecting to Sharepoint Online...
 
 if ($MFA) {
-    Connect-SPOService -Url https://$($Tenant.TrimEnd(".onmicrosoft.com"))-admin.sharepoint.com
+    Connect-SPOService -Url https://$($Tenant -replace ".onmicrosoft.com$")-admin.sharepoint.com
 } else {
-    Connect-SPOService -Credential $Cred -Url https://$($Tenant.TrimEnd(".onmicrosoft.com"))-admin.sharepoint.com
+    Connect-SPOService -Credential $Cred -Url https://$($Tenant -replace ".onmicrosoft.com$")-admin.sharepoint.com
 }
 
 # Get Sharepoint Online Personal Sites 
