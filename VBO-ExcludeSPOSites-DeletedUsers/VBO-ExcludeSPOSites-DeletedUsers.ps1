@@ -17,8 +17,8 @@ This script has been tested with the following versions of Veeam Backup for Offi
    - v5.0.1.225
 
 Notes:
-   - You will be asked to enter a credential. That credential will be used to connect to Azure AD and Sharepoint Online
-   - Organization / Office 365 Tenant and Sharepoint Online Admin URL are automatically obtained based on the supplied credential
+   - You will be prompted to log in to Azure AD and Sharepoint Online. You can use either a standard credential or one secured by Multi-Factor Authentication (MFA).
+   - Organization / Office 365 Tenant and Sharepoint Online Admin URLs are automatically obtained based on the supplied credential
 .PARAMETER Job
 (optional) The backup job where exclusions will be created. If not specified (or the provided one does not exist) the script will let you pick from a list of existing jobs for the selected Organization
 .PARAMETER MFA
