@@ -5,6 +5,8 @@
    .DESCRIPTION
    !!! You need to use the AzureADPreview module since the parameter "MembershipRule" is only available in the beta of GraphAPI.
    -> Install-Module AzureADPreview -Scope CurrentUser -AllowClobber !!!
+   
+   Requires: Microsoft subscription which includes at least Azure AD Premium P1 features.
 
    This script creates AzureAD dynamic groups to split up the users of a whole tenant based on the first two characters of their ObjectID. The number of groups beeing created is depending on the array of first and second character.
    In the default verion of this script you will end up with 64 groups since the first charakter will be from "0" to "f" and the second character will be part of 4 grouping expressions.
