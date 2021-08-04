@@ -5,7 +5,7 @@ Powershell Script to automatically exclude from backup Sharepoint Online persona
 
 ## Description
 ~~~~
-Version : 0.77 (June 11th, 2021)
+Version : 0.9 (July 27th, 2021)
 Requires: Veeam Backup for Office 365 v4 or later
 Author  : Danilo Chiavari (@danilochiavari)
 Blog    : https://www.danilochiavari.com
@@ -18,8 +18,8 @@ This script has been tested only with the following versions of Veeam Backup for
 - v5.0.1.225
 
 ## Notes
-- You will be asked to enter a credential. That credential will be used to connect to Azure AD and Sharepoint Online
-- Organization / Office 365 Tenant and Sharepoint Online Admin URL are automatically obtained based on the supplied credential
+- You will be prompted to log in to Azure AD. You can use either a standard credential or one secured by Multi-Factor Authentication (MFA). See "Parameters" and "Examples" below
+- Organization / Office 365 Tenant and Sharepoint Online Admin URLs are automatically obtained based on the logged on user
 
 ## Before you use the script
 
@@ -49,11 +49,23 @@ NOTE: you might need to manually specify that you “trust” the PSGallery repo
 `Job`
 _(optional)_ The backup job where exclusions will be created. If not specified (or the provided one does not exist) the script will let you pick from a list of existing jobs for the selected Organization (via Out-GridView, see screenshots)
 
+`MFA`
+_(optional)_ When set to $True, allows use of a MFA-secured user account when logging in. If not specified, a standard (non-MFA) user account is assumed _(Thanks to user @kosli for implementing and testing MFA, plus fixing an issue with obtaining admin URLs)_
+
 ## Examples
+`PS> .\VBO-ExcludeSPOSites-DeletedUsers.ps1 -MFA $True`
+
 `PS> .\VBO-ExcludeSPOSites-DeletedUsers.ps1 -Job MyBackupJob`
+
+`PS> .\VBO-ExcludeSPOSites-DeletedUsers.ps1 -Job MyBackupJob -MFA $True`
 
 ## Screenshots
 ![Screenshot-01](vboexclude-shot-01.png)
 ![Screenshot-02](vboexclude-shot-02.png)
 ![Screenshot-03](vboexclude-shot-03.png)
 ![Screenshot-04](vboexclude-shot-04.png)
+
+## Acknowledgments
+Thanks to the following people for their time and effort in testing and improving this script:
+* __[KoS](https://github.com/kosli)__ (MFA implementation, admin URL construction)
+* __Tom De Puysseleyr__ (Fix for default partial results of `Get-AzureADUser` and `Get-SPOSite`)
