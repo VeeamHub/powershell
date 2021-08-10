@@ -36,7 +36,7 @@ vm_subnet = The subnet you want the vm to use
 
 vm_network = The vnet you want the vm to use
 
-az_proxy_name = The proxy name of the veeam proxy appliance in azure. This is reccomended to improve performance. (learn more here = https://helpcenter.veeam.com/docs/backup/azure_integration/add_vbazure_appliance.html?ver=110)
+az_proxy_name = The proxy name of the veeam proxy appliance in azure. This is reccomended to improve performance. [Learn More Here](https://helpcenter.veeam.com/docs/backup/azure_integration/add_vbazure_appliance.html?ver=110 "Veeam Helpcenter")
 
 az_subscription = The name of the subscription to restore to.  (each vm can be a different subscription)
 
