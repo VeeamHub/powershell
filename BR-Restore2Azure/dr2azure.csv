@@ -1,3 +1,3 @@
 VM_Name,vm_size,Location,Resource_Group,vm_subnet,vm_network,az_proxy_name,az_subscription,az_storage_acct,az_account_login
-dr2cloudvm2-2,Standard_F2s_v2,eastus,da-rg1,default,da-rg1-vnet,da-proxy.eastus.cloudapp.azure.com,Enterprise - PM - Alliances,dadr2aztest,dustin.albertson@veeam.com
-dr2cloudvm1-2,Standard_A4_v2,eastus,da-rg1,default,da-rg1-vnet,da-proxy.eastus.cloudapp.azure.com,Enterprise - PM - Alliances,dadr2aztest,dustin.albertson@veeam.com
+dr2cloudvm2-2,Standard_F2s_v2,eastus,da-rg1,default,da-test-vnet,test-proxy.eastus.cloudapp.azure.com,test,teststgacct,test@veeam.com
+dr2cloudvm1-2,Standard_A4_v2,eastus,da-rg1,default,da-test-vnet,test-proxy.eastus.cloudapp.azure.com,test,teststgacct,test@veeam.com
