@@ -4,7 +4,7 @@
 
    .DESCRIPTION
    !!! You need to use the AzureADPreview module since the parameter "MembershipRule" is only available in the beta of GraphAPI.
-   -> Install-Module AzureADPreview -Scope CurrentUser -AllowClobber !!!
+   -> Install-Module AzureADPreview -Scope CurrentUser -AllowClobber !!
    
    Requires: Microsoft subscription which includes at least Azure AD Premium P1 features.
 
