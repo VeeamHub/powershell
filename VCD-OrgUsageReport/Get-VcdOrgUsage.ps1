@@ -51,11 +51,13 @@
 
 .NOTES
 	NAME:  Get-VcdOrgUsage.ps1
-	VERSION: 1.2
+	VERSION: 1.3
 	AUTHOR: Chris Arceneaux
 	TWITTER: @chris_arceneaux
 	GITHUB: https://github.com/carceneaux
-
+	CONTRIBUTOR: Artem Philippov
+	GITHUB: https://github.com/beshkaa
+	
     A big thanks to Yuri Sukhov ([@wombatairlines](https://twitter.com/wombatairlines))! I used his [code](https://github.com/wombatonfire/veeam-powershell/tree/master/New-OrgBackupReport) as a starting point for this project.
 
 .LINK
@@ -112,28 +114,51 @@ $vcdOrgItems = $vcdItems | Where-Object { $_.Type -eq "Organization" }
 Write-Verbose "Retrieved $($vcdOrgItems.count) Organizations from Veeam"
 
 # Retrieving all Veeam repositories
-$repos = Get-VBRBackupRepository
-$repos += Get-VBRBackupRepository -ScaleOut
+$repoLegacy = Get-VBRBackupRepository
+$repoScale = Get-VBRBackupRepository -ScaleOut
+
+$repos = @()
+
+foreach ($item in $repoLegacy) {
+    $repo = "" | select Id,Name
+    $repo.Id = $item.Id
+    $repo.Name = $item.Name
+    $repos += $repo
+}
+
+foreach ($item in $repoScale) {
+    $repo = "" | select Id,Name
+    $repo.Id = $item.Id
+    $repo.Name = $item.Name
+    $repos += $repo
+}
+
+
+
 Write-Verbose "Retrieved $($repos.count) Repositories from Veeam"
 
 # Retrieving VSSP backups usage :: Looping through all VCD Organizations
 foreach ($item in $vcdOrgItems) {
     Write-Verbose "$($item.Name): Retrieving VSSP Backups for Organization"
+    #Get server name from Path of vCD Org property
+    $server = Get-VBRServer -Name $($item.Path.Split('\')[0].split(' '))
+    $siteRef = ($server.Info.Options | select-xml -XPath '/root/VcdConnectionOptions/LocalSiteUid').Node.InnerXml
+    $hostIdRef = [Veeam.Backup.Model.CVcdRef]::Make($siteRef)
     # Creating CVcdOrganization object. Required for subsequent API call.
     $vcdOrg = New-Object -TypeName Veeam.Backup.Model.CVcdOrganization `
-        -ArgumentList $item.VcdId, $item.VcdRef, $item.Name
+        -ArgumentList $item.VcdId,  $hostIdRef, $item.VcdRef, $item.Name
     
     # Looping through all Veeam repositories
     foreach ($repo in $repos) {
-        Write-Verbose "$($item.Name): Searching '$($repo.Name)' for VSSP quota..."
-        # Retrieving VSSP quota if exists
-        $orgQuota = [Veeam.Backup.Core.CJobQuota]::FindByOrganization($vcdOrg, $repo.Id.Guid)
-        $orgQuotaId = $orgQuota.Id
+        Write-Verbose "$($item.Name): Searching for VSSP quota..." #TBD
+        $orgQuota = [Veeam.Backup.Core.CJobQuota]::FindByOrganization($vcdOrg, $repo.Id)
+        #$orgQuotaIds = New-Object -TypeName System.Collections.Generic.List[guid]
+        #$orgQuotaIds.Add($orgQuota.Id)
 
         # If VSSP quota exists
-        if ($orgQuotaId) {
+        if ($orgQuota) {
             Write-Verbose "$($item.Name): VSSP quota found: $orgQuotaId"
-            $orgBackupIds = [Veeam.Backup.DBManager.CDBManager]::Instance.Backups.FindBackupsByQuotaIds($orgQuotaId).Id
+            $orgBackupIds = [Veeam.Backup.DBManager.CDBManager]::Instance.VcdMultiTenancy.FindOrganizationBackups($vcdOrg)
             # Aggregate by Org VDC
             if ($AggregateByOrgVdc) {
                 Write-Verbose "$($item.Name): Aggregating by Org VDC..."
@@ -142,10 +167,15 @@ foreach ($item in $vcdOrgItems) {
                     if ($IncludeAllVcdBackups) {
                         $selfServiceBackupIds.Add($backupId)
                     }
-
                     # Retrieving backup using backup ID
                     $backup = [Veeam.Backup.Core.CBackup]::Get($backupId)
-                    
+                    #Create records per repository
+                    if ($backup.RepositoryId -notlike $repo.Id) { 
+                        continue 
+                    }
+                    $OrgName = $vcdOrg.OrgName +' - '+$(($repos | where -Property Id -eq $backup.RepositoryId).Name)
+
+
                     # Retrieving backup files
                     $storages = $backup.GetAllStorages()
 
@@ -158,19 +188,19 @@ foreach ($item in $vcdOrgItems) {
                             $vcdVAppLocation = Get-VcdVAppLocation -Backup $backup -VAppObjectId $object.Id
                         }
                         $orgVdcName = $vcdVAppLocation.OrgVdcName
-                        if (!$orgReports.Contains($vcdOrg.OrgName)) {
-                            $orgReports[$vcdOrg.OrgName] = @{}
+                        if (!$orgReports.Contains($OrgName)) {
+                            $orgReports[$OrgName] = @{}
                         }
-                        if (!$orgReports[$vcdOrg.OrgName].Contains($orgVdcName)) {
-                            $orgReports[$vcdOrg.OrgName][$orgVdcName] = [PSCustomObject]@{
+                        if (!$orgReports[$OrgName].Contains($orgVdcName)) {
+                            $orgReports[$OrgName][$orgVdcName] = [PSCustomObject]@{
                                 vcdId            = $vcdOrg.HostId;
                                 vcdName          = ($vcdItems | Where-Object { $_.Id -eq $vcdOrg.HostId }).Name;
                                 organizationRef  = $vcdOrg.OrgRef;
                                 organizationName = $vcdOrg.OrgName;
                                 orgVdcRef        = $vcdVAppLocation.OrgVdcRef;
                                 orgVdcName       = $orgVdcName;
-                                repositoryId     = $repo.Id;
-                                repositoryName   = $repo.Name;
+                                repositoryId     = $backup.RepositoryId;
+                                repositoryName   = ($repos | where -Property Id -eq $backup.RepositoryId).Name;
                                 protectedVms     = 0;
                                 quotaId          = $orgQuotaId;
                                 quotaGb          = $orgQuota.QuotaSize.InGigabytes;
@@ -179,7 +209,7 @@ foreach ($item in $vcdOrgItems) {
                         }
                         if ($object.Type -eq "VM") {
                             if ($object.Id -notin $knownVmIds) {
-                                $orgReports[$vcdOrg.OrgName][$orgVdcName].protectedVms += 1
+                                $orgReports[$OrgName][$orgVdcName].protectedVms += 1
                                 $knownVmIds.Add($object.Id)
                             }
                         }
@@ -187,7 +217,7 @@ foreach ($item in $vcdOrgItems) {
                         $sizePerObjectStorage = ($storages | Where-Object -FilterScript { $_.ObjectId -eq $object.Id }).Stats.BackupSize
                         # Summing up size for all backup files per object
                         foreach ($size in $sizePerObjectStorage) {
-                            $orgReports[$vcdOrg.OrgName][$orgVdcName].usedSpace += $size
+                            $orgReports[$OrgName][$orgVdcName].usedSpace += $size
                         }
                     }
                 }
@@ -203,14 +233,21 @@ foreach ($item in $vcdOrgItems) {
                     }
                     # Retrieving backup using backup ID
                     $backup = [Veeam.Backup.Core.CBackup]::Get($backupId)
-                    if (!$orgReports.Contains($vcdOrg.OrgName)) {
-                        $orgReports[$vcdOrg.OrgName] = [PSCustomObject]@{
+                    
+                    #Create records per repository
+                    if ($backup.RepositoryId -notlike $repo.Id) { 
+                        continue 
+                    }
+                    $OrgName = $vcdOrg.OrgName +' - '+$(($repos | where -Property Id -eq $backup.RepositoryId).Name)
+
+                    if (!$orgReports.Contains($OrgName)) {
+                        $orgReports[$OrgName] = [PSCustomObject]@{
                             vcdId            = $vcdOrg.HostId;
                             vcdName          = ($vcdItems | Where-Object { $_.Id -eq $vcdOrg.HostId }).Name;
                             organizationRef  = $vcdOrg.OrgRef;
                             organizationName = $vcdOrg.OrgName;
-                            repositoryId     = $repo.Id;
-                            repositoryName   = $repo.Name;
+                            repositoryId     = $backup.RepositoryId;
+                            repositoryName   = ($repos | where -Property Id -eq $backup.RepositoryId).Name;
                             protectedVms     = 0;
                             quotaId          = $orgQuotaId;
                             quotaGb          = $orgQuota.QuotaSize.InGigabytes;
@@ -220,7 +257,7 @@ foreach ($item in $vcdOrgItems) {
                     # Looping through backup objects
                     foreach ($object in $backup.GetObjects() | Where-Object -FilterScript { $_.Type -eq "VM" }) {
                         if ($object.Id -notin $knownVmIds) {
-                            $orgReports[$vcdOrg.OrgName].protectedVms += 1
+                            $orgReports[$OrgName].protectedVms += 1
                             $knownVmIds.Add($object.Id)
                         }
                     }
@@ -228,7 +265,7 @@ foreach ($item in $vcdOrgItems) {
                     $sizePerStorage = $backup.GetAllStorages().Stats.BackupSize
                     # Summing up size for all backup files per object
                     foreach ($size in $sizePerStorage) {
-                        $orgReports[$vcdOrg.OrgName].usedSpace += $size
+                        $orgReports[$OrgName].usedSpace += $size
                     }
                 }
             }
@@ -327,6 +364,7 @@ if ($IncludeAllVcdBackups) {
                         $knownVmIds.Add($object.Id)
                     }
                 }
+                Write-Verbose $
                 # Retrieving size for all backup files
                 $sizePerObjectStorage = ($storages | Where-Object -FilterScript { $_.ObjectId -eq $object.Id }).Stats.BackupSize
                 # Summing up size for all backup files per object
@@ -383,3 +421,4 @@ else {
 
 # Outputting usage statistics
 return $usage
+
