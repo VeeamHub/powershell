@@ -307,7 +307,7 @@ if ($IncludeAllVcdBackups) {
                         vcdId            = $vcdVAppLocation.VcdInstanceDbId;
                         vcdName          = ($vcdItems | Where-Object { $_.Id -eq $vcdVAppLocation.VcdInstanceDbId}).Name;
                         organizationRef  = $vcdVAppLocation.OrgRef;
-                        organizationName = $orgName;
+                        organizationName = $vcdOrg.OrgName;
                         orgVdcRef        = $vcdVAppLocation.OrgVdcRef;
                         orgVdcName       = $orgVdcName;
                         repositoryId     = $null;
@@ -388,7 +388,7 @@ if ($AggregateByOrgVdc) {
                     #VcdId        = $orgVdcReportEntry.Value.vcdId;
                     VCD          = $orgVdcReportEntry.Value.vcdName;
                     #OrganizationRef = $orgVdcReportEntry.Value.organizationRef;
-                    Organization = $orgReportEntry.Key;
+                    Organization = $orgVdcReportEntry.Value.organizationName;
                     #OrgVdcRef    = $orgVdcReportEntry.Value.orgVdcRef
                     OrgVDC       = $orgVdcReportEntry.Key;
                     #RepositoryId = $orgVdcReportEntry.Value.repositoryId;
@@ -408,7 +408,7 @@ else {
                 #VcdId        = $orgReportEntry.Value.vcdId;
                 VCD          = $orgReportEntry.Value.vcdName;
                 #OrganizationRef = $orgReportEntry.Value.organizationRef;
-                Organization = $orgReportEntry.Key;
+                Organization = $orgReportEntry.Value.organizationName;
                 #RepositoryId = $orgReportEntry.Value.repositoryId;
                 Repository   = $orgReportEntry.Value.repositoryName;
                 ProtectedVMs = $orgReportEntry.Value.protectedVms;
