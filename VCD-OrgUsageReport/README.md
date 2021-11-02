@@ -28,7 +28,8 @@ The scope of the usage returned is also customizable. It can be limited to self-
 
 ## Requirements
 
-* Veeam Backup & Replication 11
+* Veeam Backup & Replication 11a
+  * [Link to script that works with v11 builds prior to v11a](https://github.com/VeeamHub/powershell/tree/a6e04d85e894c56f3ae913025f6444eac9aa57e1/VCD-OrgUsageReport)
   * _Does not work with previous versions_
 * Backups must be stored in a Backup Repository with [per-machine backup files enabled](https://helpcenter.veeam.com/docs/backup/vsphere/repository_repository.html?ver=110)
   * This is because the size of the backups is calculated using backup files, and it's impossible to reliably attribute per-machine consumption to the correct Organization/Org VDC when a backup file contains several VMs from different Organizations/Org VDCs.
