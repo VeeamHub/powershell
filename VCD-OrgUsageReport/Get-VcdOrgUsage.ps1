@@ -120,14 +120,14 @@ $repoScale = Get-VBRBackupRepository -ScaleOut
 $repos = @()
 
 foreach ($item in $repoLegacy) {
-    $repo = "" | select Id,Name
+    $repo = "" | Select-Object Id, Name
     $repo.Id = $item.Id
     $repo.Name = $item.Name
     $repos += $repo
 }
 
 foreach ($item in $repoScale) {
-    $repo = "" | select Id,Name
+    $repo = "" | Select-Object Id, Name
     $repo.Id = $item.Id
     $repo.Name = $item.Name
     $repos += $repo
@@ -146,18 +146,16 @@ foreach ($item in $vcdOrgItems) {
     $hostIdRef = [Veeam.Backup.Model.CVcdRef]::Make($siteRef)
     # Creating CVcdOrganization object. Required for subsequent API call.
     $vcdOrg = New-Object -TypeName Veeam.Backup.Model.CVcdOrganization `
-        -ArgumentList $item.VcdId,  $hostIdRef, $item.VcdRef, $item.Name
+        -ArgumentList $item.VcdId, $hostIdRef, $item.VcdRef, $item.Name
     
     # Looping through all Veeam repositories
     foreach ($repo in $repos) {
         Write-Verbose "$($item.Name): Searching for VSSP quota..." #TBD
         $orgQuota = [Veeam.Backup.Core.CJobQuota]::FindByOrganization($vcdOrg, $repo.Id)
-        #$orgQuotaIds = New-Object -TypeName System.Collections.Generic.List[guid]
-        #$orgQuotaIds.Add($orgQuota.Id)
 
         # If VSSP quota exists
         if ($orgQuota) {
-            Write-Verbose "$($item.Name): VSSP quota found: $orgQuotaId"
+            Write-Verbose "$($item.Name): VSSP quota found: $($orgQuota.Id)"
             $orgBackupIds = [Veeam.Backup.DBManager.CDBManager]::Instance.VcdMultiTenancy.FindOrganizationBackups($vcdOrg)
             # Aggregate by Org VDC
             if ($AggregateByOrgVdc) {
@@ -173,7 +171,7 @@ foreach ($item in $vcdOrgItems) {
                     if ($backup.RepositoryId -notlike $repo.Id) { 
                         continue 
                     }
-                    $OrgName = $vcdOrg.OrgName +' - '+$(($repos | where -Property Id -eq $backup.RepositoryId).Name)
+                    $OrgName = $vcdOrg.OrgName + ' - ' + $(($repos | Where-Object -Property Id -eq $backup.RepositoryId).Name)
 
 
                     # Retrieving backup files
@@ -200,9 +198,9 @@ foreach ($item in $vcdOrgItems) {
                                 orgVdcRef        = $vcdVAppLocation.OrgVdcRef;
                                 orgVdcName       = $orgVdcName;
                                 repositoryId     = $backup.RepositoryId;
-                                repositoryName   = ($repos | where -Property Id -eq $backup.RepositoryId).Name;
+                                repositoryName   = ($repos | Where-Object -Property Id -eq $backup.RepositoryId).Name;
                                 protectedVms     = 0;
-                                quotaId          = $orgQuotaId;
+                                quotaId          = $orgQuota.Id;
                                 quotaGb          = $orgQuota.QuotaSize.InGigabytes;
                                 usedSpace        = 0
                             }
@@ -238,7 +236,7 @@ foreach ($item in $vcdOrgItems) {
                     if ($backup.RepositoryId -notlike $repo.Id) { 
                         continue 
                     }
-                    $OrgName = $vcdOrg.OrgName +' - '+$(($repos | where -Property Id -eq $backup.RepositoryId).Name)
+                    $OrgName = $vcdOrg.OrgName + ' - ' + $(($repos | Where-Object -Property Id -eq $backup.RepositoryId).Name)
 
                     if (!$orgReports.Contains($OrgName)) {
                         $orgReports[$OrgName] = [PSCustomObject]@{
@@ -247,9 +245,9 @@ foreach ($item in $vcdOrgItems) {
                             organizationRef  = $vcdOrg.OrgRef;
                             organizationName = $vcdOrg.OrgName;
                             repositoryId     = $backup.RepositoryId;
-                            repositoryName   = ($repos | where -Property Id -eq $backup.RepositoryId).Name;
+                            repositoryName   = ($repos | Where-Object -Property Id -eq $backup.RepositoryId).Name;
                             protectedVms     = 0;
-                            quotaId          = $orgQuotaId;
+                            quotaId          = $orgQuota.Id;
                             quotaGb          = $orgQuota.QuotaSize.InGigabytes;
                             usedSpace        = 0
                         }
@@ -305,7 +303,7 @@ if ($IncludeAllVcdBackups) {
                 if (!$orgReports[$orgName].Contains($orgVdcName)) {
                     $orgReports[$orgName][$orgVdcName] = [PSCustomObject]@{
                         vcdId            = $vcdVAppLocation.VcdInstanceDbId;
-                        vcdName          = ($vcdItems | Where-Object { $_.Id -eq $vcdVAppLocation.VcdInstanceDbId}).Name;
+                        vcdName          = ($vcdItems | Where-Object { $_.Id -eq $vcdVAppLocation.VcdInstanceDbId }).Name;
                         organizationRef  = $vcdVAppLocation.OrgRef;
                         organizationName = $vcdOrg.OrgName;
                         orgVdcRef        = $vcdVAppLocation.OrgVdcRef;
@@ -341,7 +339,7 @@ if ($IncludeAllVcdBackups) {
                 if (!$orgReports.Contains($orgName)) {
                     $orgReports[$orgName] = [PSCustomObject]@{
                         vcdId            = $vcdVAppLocation.VcdInstanceDbId;
-                        vcdName          = ($vcdItems | Where-Object { $_.Id -eq $vcdVAppLocation.VcdInstanceDbId}).Name;
+                        vcdName          = ($vcdItems | Where-Object { $_.Id -eq $vcdVAppLocation.VcdInstanceDbId }).Name;
                         organizationRef  = $vcdVAppLocation.OrgRef;
                         organizationName = $orgName;
                         repositoryId     = $null;
@@ -364,7 +362,6 @@ if ($IncludeAllVcdBackups) {
                         $knownVmIds.Add($object.Id)
                     }
                 }
-                Write-Verbose $
                 # Retrieving size for all backup files
                 $sizePerObjectStorage = ($storages | Where-Object -FilterScript { $_.ObjectId -eq $object.Id }).Stats.BackupSize
                 # Summing up size for all backup files per object
