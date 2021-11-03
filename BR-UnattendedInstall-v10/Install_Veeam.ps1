@@ -535,7 +535,7 @@ if ($RunVBRExplorerInstall -AND !($Script:RebootNeeded)) {
         throw "Veeam SQL Explorer Install Failed, please check logs in '$InstallLogDir'."
     }
 
-    #endregion SharePoint Explorer
+    #endregion SQL Explorer
 
     Write-Log -Path $LogFile -Severity 'Information' -LogOutput 'Completed Veeam Explorers Install'
 
