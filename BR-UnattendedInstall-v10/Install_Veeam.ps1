@@ -368,7 +368,11 @@ if ($RunVBRInstall -AND !($Script:RebootNeeded)) {
     $Backup_Server_MSIArguments = $Script:MSIArgs -f $Script:MSIPath, $Script:LogPath
 
     if ($Script:SQLInstanceName) {
+        if ($Script:SQLInstanceName -eq "MSSQLSERVER") {
+            $Backup_Server_MSIArguments = $Backup_Server_MSIArguments + " VBR_SQLSERVER_SERVER=`"$($env:COMPUTERNAME)`""
+        } else {
         $Backup_Server_MSIArguments = $Backup_Server_MSIArguments + " VBR_SQLSERVER_SERVER=`"$($env:COMPUTERNAME + "\" + $Script:SQLInstanceName)`""
+        }
     } else {
         $Backup_Server_MSIArguments = $Backup_Server_MSIArguments + " VBR_SQLSERVER_SERVER=`"$($env:COMPUTERNAME + "\VEEAMSQL2016")`""
     }
