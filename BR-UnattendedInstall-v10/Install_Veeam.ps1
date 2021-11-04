@@ -365,6 +365,10 @@ if ($RunVBRInstall -AND !($Script:RebootNeeded)) {
     $Script:MSIPath = $Script:VBR_MSIFile
     $Script:LogPath = $Script:VBR_LogPath
 
+    if ($Script:VBR_Upgrade_Components) {
+        $Backup_Server_MSIArguments = $Backup_Server_MSIArguments + " VBR_AUTO_UPGRADE=`"1`""
+    }
+
     $Backup_Server_MSIArguments = $Script:MSIArgs -f $Script:MSIPath, $Script:LogPath
 
     if ($Script:SQLInstanceName) {
