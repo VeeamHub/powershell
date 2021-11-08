@@ -157,7 +157,7 @@ function Find-LicenseFile {
   }
 }
 
-function Test-vPowerNFSDir {
+function Test-DirPath {
 
   param(
     [Parameter(Mandatory = $True)]

@@ -360,8 +360,8 @@ if ($RunVBRInstall -AND !($Script:RebootNeeded)) {
 
     Write-Log -Path $LogFile -Severity 'Information' -LogOutput 'Beginning Veeam Backup & Replication Server Install'
 
-    Test-vPowerNFSDir -Path $Script:vPowerNFSPath
-    Test-vPowerNFSDir -Path $Script:IRWriteCache
+    Test-DirPath -Path $Script:vPowerNFSPath
+    Test-DirPath -Path $Script:IRWriteCache
 
     $Script:MSIPath = $Script:VBR_MSIFile
     $Script:LogPath = $Script:VBR_LogPath
