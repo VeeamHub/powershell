@@ -137,7 +137,7 @@ if ($RunVBRPrereqCheck) {
         Find-MSSQL
     }
 
-    $MissingComponents = [bool]($Script:dotNETRequired -AND $Script:LicenseFileMissing -AND $Script:SQL2014_CLR_Missing -AND $Script:SQL2014_SMO_Missing -AND $Script:MSReportViewer2015_Missing)
+    $MissingComponents = [bool]($Script:dotNETRequired -OR $Script:LicenseFileMissing -OR $Script:SQL2014_CLR_Missing -OR $Script:SQL2014_SMO_Missing -OR $Script:MSReportViewer2015_Missing)
 
     if (!($MissingComponents) -AND $Script:SQLInstanceName) {
         [bool]$Script:VBRAllPrereqs = $true
