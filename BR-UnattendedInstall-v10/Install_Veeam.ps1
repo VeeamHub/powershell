@@ -398,7 +398,7 @@ if ($RunVBRInstall -AND !($Script:RebootNeeded)) {
 
     $Backup_Server_MSIArguments = $Backup_Server_MSIArguments + $Script:ServerEULA + $Script:ThirdPartyLicenses
 
-    if ($Script:LicenseFile) {
+    if ($Script:LicenseFile -AND (!($Script:LicenseFileMissing))) {
         $Script:LicenseFileArg = ' VBR_LICENSE_FILE="{0}"' -f $Script:LicenseFile
         $Backup_Server_MSIArguments = $Backup_Server_MSIArguments + $Script:LicenseFileArg
     }
