@@ -361,12 +361,17 @@ if ($RunVBRInstall -AND !($Script:RebootNeeded)) {
     Write-Log -Path $LogFile -Severity 'Information' -LogOutput 'Beginning Veeam Backup & Replication Server Install'
 
     Test-vPowerNFSDir -Path $Script:vPowerNFSPath
+    Test-vPowerNFSDir -Path $Script:IRWriteCache
 
     $Script:MSIPath = $Script:VBR_MSIFile
     $Script:LogPath = $Script:VBR_LogPath
 
     if ($Script:vPowerNFSPath) {
         $Backup_Server_MSIArguments = $Backup_Server_MSIArguments + " VBR_NFSDATASTORE=`"$Script:vPowerNFSPath`""
+    }
+
+    if ($Script:IRWriteCache) {
+        $Backup_Server_MSIArguments = $Backup_Server_MSIArguments + " VBR_IRCACHE=`"$Script:IRWriteCache`""
     }
 
     if (!($Script:VBR_Check_Updates)) {
