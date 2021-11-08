@@ -149,9 +149,10 @@ function Find-LicenseFile {
   )
 
   if (!(Test-Path -Path $LicenseFile)) {
-    $Script:LicenseFileMissing
+    [bool]$Script:LicenseFileMissing = $true
     Write-Log -Path $LogFile -Severity 'WARNING' -LogOutput 'License File not detected, Veeam Backup & Recovery will install in Community Edition mode.  Enterprise Manager installations will fail.'
   } else {
+    [bool]$Script:LicenseFileMissing = $false
     Write-Log -Path $LogFile -Severity 'Information' -LogOutput 'File found at license file path, Veeam Backup & Recovery will attempt to use this.'
     Write-Log -Path $LogFile -Severity 'Information' -LogOutput 'NOTE: This check does not ensure a valid license file, only that it exists.'
   }
