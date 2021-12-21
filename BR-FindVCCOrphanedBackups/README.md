@@ -8,7 +8,7 @@ Chris Arceneaux (@chris_arceneaux)
 
 This script looks for backups that are no longer tied to an active Backup Job and then filters the results depending on the parameters specified.
 
-***NOTE:*** This script is designed to be executed on a Veeam Backup & Replication server that sends backups to a (Cloud Connect) Cloud Repository. IT WILL NOT WORK IF EXECUTED ON A CLOUD CONNECT SERVER.
+***NOTE:*** This script is designed to be executed on a Veeam Backup & Replication server that sends backups to a (Cloud Connect) Cloud Repository. **It will not work if executed on a Cloud Connect server.**
 
 ## Known Issues
 
