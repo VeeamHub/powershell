@@ -16,8 +16,7 @@ This script looks for backups that are no longer tied to an active Backup Job an
 
 ## Requirements
 
-* Veeam Backup & Replication
-  * v11
+* Veeam Backup & Replication v11
   * *might work with other versions but untested*
 
 ## Usage
