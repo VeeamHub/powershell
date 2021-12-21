@@ -127,12 +127,12 @@ foreach ($backup in $backupsFiltered) {
         if ($Age) {
             # Is restore point older than defined threshold?
             if ($rp.CreationTime -lt $date.AddDays(- $Age)) {
-                Write-Verbose "Stale Restore Point found: $($rp.Id.Guid)"
+                Write-Verbose "Restore Point ($($rp.Id.Guid)) found older than $Age days."
                 $orphans.Add($rp)
             }
         }
         else {
-            Write-Verbose "Adding Restore Point to output object: $($rp.Id.Guid)"
+            Write-Verbose "Adding Restore Point ($($rp.Id.Guid)) to output object."
             $orphans.Add($rp)
         }
         
