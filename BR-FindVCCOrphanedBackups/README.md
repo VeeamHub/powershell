@@ -21,7 +21,7 @@ For example:
 * Multiple VBR servers using the same Cloud Repository
 * Backup agents (VAW/VAL/VAM) not managed by the VBR server using the same Cloud Repository
 
-WORKAROUND: Return *restore points* by specifying the `-AsRestorePoints` flag in the script as well as filter out current restore points by *age* using built-in script functionality. Sample code to only return restore points older than 30 days:
+WORKAROUND: Return *restore points* by specifying the `-AsRestorePoints` flag in the script as well as filter out current restore points by `Age` using built-in script functionality. Sample code to only return restore points older than 30 days:
 
 ```powershell
 .\Find-VCCOrphanedBackups.ps1 -Age 30 -AsRestorePoints
