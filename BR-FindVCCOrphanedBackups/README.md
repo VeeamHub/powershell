@@ -19,7 +19,7 @@ Further background info on this script... When a Copy Job (or Backup Job) is del
 For example:
 
 * Multiple VBR servers using the same Cloud Repository
-* Backup agents not managed by the VBR server (VSPC-managed or standalone) using the same Cloud Repository
+* Backup agents (VAW/VAL/VAM) not managed by the VBR server using the same Cloud Repository
 
 WORKAROUND: Return *restore points* by specifying the `-AsRestorePoints` flag in the script as well as filter out current restore points by *age* using built-in script functionality. Sample code to only return restore points older than 30 days:
 
