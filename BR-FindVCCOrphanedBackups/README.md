@@ -14,7 +14,18 @@ Further background info on this script... When a Copy Job (or Backup Job) is del
 
 ## Known Issues
 
-* No known issues
+**If multiple entities, not managed by the Veeam Backup & Replication server, send backups to the same Cloud Repository, this results in backups being classified as orphaned erroneously.**
+
+For example:
+
+* Multiple VBR servers using the same Cloud Repository
+* Backup agents managed by VSPC using the same Cloud Repository
+
+WORKAROUND: Return *restore points* by specifying the `-AsRestorePoints` flag in the script as well as filter out current restore points by *age* using built-in script functionality. Sample code to only return restore points older than 30 days:
+
+```powershell
+.\Find-VCCOrphanedBackups.ps1 -Age 30 -AsRestorePoints
+```
 
 ## Requirements
 
