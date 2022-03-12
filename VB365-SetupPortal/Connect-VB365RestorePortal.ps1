@@ -6,7 +6,7 @@
   The script logs in to a tenant Microsoft 365 environment and grants the required permissions so the tenant can leverage a service provider's Veeam Backup for Microsoft 365 Restore Portal.
 	
 .PARAMETER ApplicationId
-	Service Provider (Enterprise Application) Application ID
+	Service Provider (Enterprise Application) Application ID. THIS IS PROVIDED BY YOUR SERVICE PROVIDER.
 
 .OUTPUTS
 	Connect-VB365RestorePortal returns string output to guide the user
@@ -52,6 +52,7 @@
 
 [CmdletBinding()]
 param(
+  [Parameter(Mandatory=$true)]
     [string]$ApplicationId
 )
 
