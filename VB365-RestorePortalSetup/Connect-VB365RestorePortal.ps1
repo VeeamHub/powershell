@@ -12,14 +12,14 @@
 	Connect-VB365RestorePortal returns string output to guide the user
 
 .EXAMPLE
-	Connect-VB365RestorePortal.ps1 -ApplicationId 37a0f8e1-97bd-4804-ba69-bde1db293273
+	Connect-VB365RestorePortal.ps1 -ApplicationId 58a0f8e1-97bd-4804-ba69-bde1db293223
 
 	Description
 	-----------
 	Connects a Microsoft 365 environment to the specified (Enterprise Application) Application ID
 
 .EXAMPLE
-	Connect-VB365RestorePortal.ps1 -Verbose
+	Connect-VB365RestorePortal.ps1 -ApplicationId 58a0f8e1-97bd-4804-ba69-bde1db293223 -Verbose
 
 	Description
 	-----------
