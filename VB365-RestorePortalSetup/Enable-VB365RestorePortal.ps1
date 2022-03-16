@@ -52,173 +52,137 @@
 [CmdletBinding()]
 param(
   [Parameter(Mandatory=$true)]
-    [string]$ApplicationId
+    [string]$AppId,
+  [Parameter(Mandatory=$true)]
+    [string]$AppThumbprint,
+  [Parameter(Mandatory=$false)]
+    [int]$Port = 4443
 )
 
-# connecting to all things Microsoft
+function Get-RandomPassword {
+  param (
+      [Parameter(Mandatory)]
+      [int] $length,
+      [int] $amountOfNonAlphanumeric = 1
+  )
+  Add-Type -AssemblyName 'System.Web'
+  return [System.Web.Security.Membership]::GeneratePassword($length, $amountOfNonAlphanumeric)
+}
+
+# setting default PowerShell action to halt on error
+$ErrorActionPreference = "Stop"
+
+# importing Veeam PowerShell modules
+Import-Module "C:\Program Files\Veeam\Backup365\Veeam.Archiver.PowerShell\Veeam.Archiver.PowerShell.psd1"
+Import-Module "C:\Program Files\Veeam\Backup and Replication\Explorers\Exchange\Veeam.Exchange.PowerShell\Veeam.Exchange.PowerShell.psd1"
+Import-Module "C:\Program Files\Veeam\Backup and Replication\Explorers\SharePoint\Veeam.SharePoint.PowerShell\Veeam.SharePoint.PowerShell.psd1"
+Import-Module "C:\Program Files\Veeam\Backup and Replication\Explorers\Teams\Veeam.Teams.PowerShell\Veeam.Teams.PowerShell.psd1"
+
+# determine if connected to Veeam
 try {
-  Write-Verbose "Connecting to Microsoft Azure account"
-  Connect-AzAccount -ErrorAction Stop | Out-Null
-  $context = Get-AzContext
-  Write-Verbose "Connecting to Azure AD account"
-  Connect-AzureAD -TenantId $context.Tenant.TenantId -AccountId $context.Account.Id -ErrorAction Stop | Out-Null
-  Write-Host "$($context.Account.Id) is now connected to Microsoft Azure" -ForegroundColor Green
+  if (Get-VBORestAPISettings) {
+    Write-Host "Connected to Veeam Backup for Microsoft 365" -ForegroundColor Green
+  }
 } catch {
-  Write-Error "An issue occurred while logging into Microsoft. Please double-check your credentials and ensure you have sufficient access."
+  Write-Error "An error was encountered when accessing Veeam. Please ensure you have sufficient access."
   throw $_
 }
 
+# initializing variables
+$server = [System.Net.Dns]::GetHostByName($env:computerName).HostName
+$folder = $PSScriptRoot
 
+# performing REST API configuration
+try {
+  # creating self-signed certificate for REST API
+  Write-Verbose "Creating self-signed certificate for the REST API"
+  $cert = New-SelfSignedCertificate -Type Custom -KeyExportPolicy Exportable -KeyUsage None -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256 -NotAfter (Get-Date).AddYears(10) -Subject "CN=$server" -FriendlyName "VB365 REST API"
+  Write-Verbose "Certificate $($cert.Thumbprint) has been created and saved to the Local Machine certificate store"
 
-#Get Service Principal of Microsoft Graph Resource API 
-$graphSP =  Get-AzureADServicePrincipal -All $true | Where-Object {$_.DisplayName -eq "Microsoft Graph"}
- 
-#Initialize RequiredResourceAccess for Microsoft Graph Resource API 
-$requiredGraphAccess = New-Object Microsoft.Open.AzureAD.Model.RequiredResourceAccess
-$requiredGraphAccess.ResourceAppId = $graphSP.AppId
-$requiredGraphAccess.ResourceAccess = New-Object System.Collections.Generic.List[Microsoft.Open.AzureAD.Model.ResourceAccess]
+  # exporting certificate so it can be used for REST API configuration
+  Write-Verbose "Exporting newly created certificate ($($cert.Thumbprint))"
+  $securestring = ConvertTo-SecureString -String "$(Get-RandomPassword 50)" -Force -AsPlainText
+  Export-PfxCertificate -Cert $cert -FilePath "$folder\temp.pfx" -Password $securestring | Out-Null
 
-#Get required delegated permission
-$reqPermission = $graphSP.Oauth2Permissions | Where-Object {$_.Value -eq 'User.Read'}
-$resourceAccess = New-Object Microsoft.Open.AzureAD.Model.ResourceAccess
-$resourceAccess.Type = "Scope"
-$resourceAccess.Id = $reqPermission.Id   
+  # enabling the REST API
+  Write-Verbose "Enabling the VB365 RESTful API"
+  Set-VBORestAPISettings -EnableService -CertificateFilePath "$folder\temp.pfx" -CertificatePassword $securestring -HTTPSPort $Port | Out-Null
+  Write-Host "VB365 RESTful API has been enabled successfully" -ForegroundColor Green
 
-#Add required delegated permission
-$requiredGraphAccess.ResourceAccess.Add($resourceAccess)
-
-#Add required resource accesses
-$requiredResourcesAccess = New-Object System.Collections.Generic.List[Microsoft.Open.AzureAD.Model.RequiredResourceAccess]
-$requiredResourcesAccess.Add($requiredGraphAccess)
-
-# creating App registration
-$app = New-AzureADApplication -DisplayName "Restore Portal Test" -AvailableToOtherTenants $true -RequiredResourceAccess $requiredResourcesAccess -PublicClient $true
-#-ReplyUrls @("https://vb365.arsano.ninja")
-#Set-AzureADApplication -ObjectId $app.ObjectId -IdentifierUris "api://$($app.AppId)"
-
-# settin current user as owner
-$currentUser = (Get-AzureADUser -ObjectId (Get-AzureADCurrentSessionInfo).Account.Id)
-Add-AzureADApplicationOwner -ObjectId $app.ObjectId -RefObjectId $currentUser.ObjectId
-
-# creating self-signed certificate
-$cert = New-SelfSignedCertificate -Type Custom -KeyExportPolicy Exportable -KeyUsage None -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA1 -NotAfter (Get-Date).AddYears(10) -Subject "CN=vb365.arsano.ninja" -FriendlyName "VB365 Restore Portal"
-
-# exporting PFX certificate for storage
-$pwd = ConvertTo-SecureString -String "testing" -Force -AsPlainText
-Export-PfxCertificate -Cert $cert -FilePath "C:\Users\chris\Documents\vb365.arsano.ninja.pfx" -Password $pwd | Out-Null
-
-# adding certificate to application
-$bin = $cert.GetRawCertData()
-$base64Value = [System.Convert]::ToBase64String($bin)
-$bin = $cert.GetCertHash()
-$base64Thumbprint = [System.Convert]::ToBase64String($bin)
-New-AzureADApplicationKeyCredential -ObjectId $app.ObjectId -CustomKeyIdentifier $base64Thumbprint -Type AsymmetricX509Cert -Usage Verify -Value $base64Value -StartDate ([System.DateTime]::Now) -EndDate $cert.GetExpirationDateString() | Out-Null
-
-# retrieving newly created application object
-$object = Get-AzureADMSApplication -ObjectId $app.ObjectId
-$api = $object.Api
-$scopes = New-Object System.Collections.Generic.List[Microsoft.Open.MsGraph.Model.PermissionScope]
-
-# checking if default API scope already exists
-if ($api.Oauth2PermissionScopes){
-  # updating default API scope
-  $permissionScope = New-Object Microsoft.Open.MsGraph.Model.PermissionScope
-  $permissionScope.Id = $api.Oauth2PermissionScopes[0].Id
-} else { 
-  # creating new API scope
-  $permissionScope = New-Object Microsoft.Open.MsGraph.Model.PermissionScope
-  $permissionScope.Id = New-Guid  
+  # deleting exported certificate
+  Remove-Item "$folder\temp.pfx" -Force
+} catch {
+  Write-Error "An unexpected error occurred while configuring the VB365 RESTful API."
+  throw $_
 }
-$permissionScope.Value = "access_as_user"
-$permissionScope.Type = "Admin"
-$permissionScope.IsEnabled = $true
-$permissionScope.UserConsentDisplayName = "Access Veeam Backup for Microsoft 365 Restore Portal"
-$permissionScope.UserConsentDescription = "Allows access to Veeam Backup for Microsoft 365 Restore Portal on your behalf"
-$permissionScope.AdminConsentDisplayName = "Access Veeam Backup for Microsoft 365 Restore Portal"
-$permissionScope.AdminConsentDescription = "Allows access to Veeam Backup for Microsoft 365 Restore Portal as the signed-in user"
 
-# adding access_as_user permission scope
-$scopes.Add($permissionScope)
-$api.Oauth2PermissionScopes = $scopes
+# performing Operator Authentication configuration
+try {
+  # creating self-signed certificate for Operator Authentication
+  Write-Verbose "Creating self-signed certificate for Operator Authentication"
+  $cert = New-SelfSignedCertificate -Type Custom -KeyExportPolicy Exportable -KeyUsage None -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256 -NotAfter (Get-Date).AddYears(10) -Subject "CN=$server" -FriendlyName "VB365 Operator Authentication"
+  Write-Verbose "Certificate $($cert.Thumbprint) has been created and saved to the Local Machine certificate store"
 
-# creating web application
-$webApplication = New-Object Microsoft.Open.MSGraph.Model.WebApplication
-$webApplication.ImplicitGrantSettings = New-Object Microsoft.Open.MSGraph.Model.ImplicitGrantSettings
-$webApplication.ImplicitGrantSettings.EnableAccessTokenIssuance = $false
-$webApplication.ImplicitGrantSettings.EnableIdTokenIssuance = $false
+  # exporting certificate so it can be used for Operator Authentication configuration
+  Write-Verbose "Exporting newly created certificate ($($cert.Thumbprint))"
+  $securestring = ConvertTo-SecureString -String "$(Get-RandomPassword 50)" -Force -AsPlainText
+  Export-PfxCertificate -Cert $cert -FilePath "$folder\temp.pfx" -Password $securestring | Out-Null
 
-# updating application object
-Set-AzureADMSApplication -ObjectId $object.Id -Api $api -IdentifierUris "api://$($app.AppId)" -Web $webApplication
+  # enabling Operator Authentication
+  Write-Verbose "Enabling VB365 Operator Authentication"
+  Set-VBOOperatorAuthenticationSettings -EnableAuthentication -CertificateFilePath "$folder\temp.pfx" -CertificatePassword $securestring | Out-Null
+  Write-Host "VB365 Operator Authentication has been enabled successfully" -ForegroundColor Green
 
-# creating single page application
-$redirectUris = @("https://vb365.arsano.ninja")
-$accesstoken = (Get-AzAccessToken -Resource "https://graph.microsoft.com/").Token
-$header = @{
-    'Content-Type' = 'application/json'
-    'Authorization' = 'Bearer ' + $accesstoken
+  # deleting exported certificate
+  Remove-Item "$folder\temp.pfx" -Force
+} catch {
+  Write-Error "An unexpected error occurred while configuring Operator Authentication."
+  throw $_
 }
-$body = @{
-    'spa' = @{
-        'redirectUris' = $redirectUris
-    }
-} | ConvertTo-Json
-Invoke-RestMethod -Method Patch -Uri "https://graph.microsoft.com/v1.0/applications/$($app.ObjectId)" -Headers $header -Body $body
 
-##### Create Enterprise Application
-#Provide Application (client) Id
-$appId=$app.AppId
-#$appId="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-$servicePrincipal = New-AzureADServicePrincipal -AppId $appId -Tags @("WindowsAzureActiveDirectoryIntegratedApp")
+# performing Tenant Authentication configuration
+try {
+  # creating self-signed certificate for Tenant Authentication
+  Write-Verbose "Creating self-signed certificate for Tenant Authentication"
+  $cert = New-SelfSignedCertificate -Type Custom -KeyExportPolicy Exportable -KeyUsage None -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256 -NotAfter (Get-Date).AddYears(10) -Subject "CN=$server" -FriendlyName "VB365 Tenant Authentication"
+  Write-Verbose "Certificate $($cert.Thumbprint) has been created and saved to the Local Machine certificate store"
 
-##### ONLY REQUIRED IF SERVICE PROVIDER WANTS TO USE RESTORE PORTAL FOR THEIR OWN MICROSOFT 365 ENVIRONMENT
-# granting admin consent
-$token = [Microsoft.Azure.Commands.Common.Authentication.AzureSession]::Instance.AuthenticationFactory.Authenticate($context.Account, $context.Environment, $context.Tenant.TenantId, $null, "Never", $null, "74658136-14ec-4630-ad9b-26e160ff0fc6")
-$headers = @{
-  'Authorization' = 'Bearer ' + $token.AccessToken
-  'X-Requested-With'= 'XMLHttpRequest'
-  'x-ms-client-request-id'= New-Guid
-  'x-ms-correlation-id' = New-Guid
+  # exporting certificate so it can be used for Tenant Authentication configuration
+  Write-Verbose "Exporting newly created certificate ($($cert.Thumbprint))"
+  $securestring = ConvertTo-SecureString -String "$(Get-RandomPassword 50)" -Force -AsPlainText
+  Export-PfxCertificate -Cert $cert -FilePath "$folder\temp.pfx" -Password $securestring | Out-Null
+
+  # enabling Tenant Authentication
+  Write-Verbose "Enabling VB365 Tenant Authentication"
+  Set-VBOTenantAuthenticationSettings -EnableAuthentication -CertificateFilePath "$folder\temp.pfx" -CertificatePassword $securestring | Out-Null
+  Write-Host "VB365 Tenant Authentication has been enabled successfully" -ForegroundColor Green
+
+  # deleting exported certificate
+  Remove-Item "$folder\temp.pfx" -Force
+} catch {
+  Write-Error "An unexpected error occurred while configuring Tenant Authentication."
+  throw $_
 }
-$url = "https://main.iam.ad.ext.azure.com/api/RegisteredApplications/$($app.AppId)/Consent?onBehalfOfAll=true"
 
+# performing Restore Portal configuration
+try {
+  # exporting certificate so it can be used for Restore Portal configuration
+  Write-Verbose "Exporting Enterprise Application certificate ($($cert.Thumbprint))"
+  $cert = Get-ChildItem -Path cert:\localMachine\my | Where-Object {$_.Thumbprint -eq $AppThumbprint}
+  $securestring = ConvertTo-SecureString -String "$(Get-RandomPassword 50)" -Force -AsPlainText
+  Export-PfxCertificate -Cert $cert -FilePath "$folder\temp.pfx" -Password $securestring | Out-Null
 
-# # creating link to Service Provider Enterprise Application
-# try {
-#   Write-Verbose "Creating new Azure AD Service Principal"
-#   $sp = New-AzureADServicePrincipal -AppId $ApplicationId -ErrorAction Stop
-#   Write-Host "$($sp.DisplayName) ($($sp.AppId)) has been linked your account" -ForegroundColor Green
-# } catch {
-#   Write-Error "An unexpected error occurred while linking the Enterprise Application to your account."
-#   throw $_
-# }
+  # enabling Restore Portal
+  Write-Verbose "Enabling the VB365 Restore Portal"
+  Set-VBORestorePortalSettings -EnableService -ApplicationId $AppId -CertificateFilePath "$folder\temp.pfx" -CertificatePassword $securestring | Out-Null
+  Write-Host "VB365 Restore Portal has been enabled successfully" -ForegroundColor Green
 
+  # deleting exported certificate
+  Remove-Item "$folder\temp.pfx" -Force
+} catch {
+  Write-Error "An unexpected error occurred while configuring the VB365 Restore Portal."
+  throw $_
+}
 
-# # granting admin consent
-# $token = [Microsoft.Azure.Commands.Common.Authentication.AzureSession]::Instance.AuthenticationFactory.Authenticate($context.Account, $context.Environment, $context.Tenant.TenantId, $null, "Never", $null, "74658136-14ec-4630-ad9b-26e160ff0fc6")
-# $headers = @{
-#   'Authorization' = 'Bearer ' + $token.AccessToken
-#   'X-Requested-With'= 'XMLHttpRequest'
-#   'x-ms-client-request-id'= [guid]::NewGuid()
-#   'x-ms-correlation-id' = [guid]::NewGuid()
-# }
-# $url = "https://main.iam.ad.ext.azure.com/api/RegisteredApplications/$($sp.AppId)/Consent?onBehalfOfAll=true"
-# Write-Verbose "Granting admin consent to the newly linked Azure AD Service Principal"
-
-# # loop waiting for change to actually take place
-# while ($true){
-#   try {
-#     Invoke-RestMethod -Uri $url -Headers $headers -Method POST -ErrorAction Stop | Out-Null
-#     break
-#   } catch {
-#     Write-Host "Waiting to grant admin consent... (this can take up to 15 minutes)" 
-#     Start-Sleep -Seconds 5
-#   }
-# }
-# Write-Host "$($sp.DisplayName) ($($sp.AppId)) has been granted admin consent" -ForegroundColor Green
-# Write-Host "You can now login to the Service Provider's VB365 Restore Portal!" -ForegroundColor Green
-
-# logging out of remote sessions
-Write-Verbose "Logging out of Azure AD account"
-Disconnect-AzureAD | Out-Null
-Write-Verbose "Logging out of Microsoft Azure account"
-Disconnect-AzAccount | Out-Null
+# logging out of Veeam session
+Disconnect-VBOServer
