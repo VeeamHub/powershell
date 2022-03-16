@@ -69,22 +69,27 @@ try {
   throw $_
 }
 
-
-# creating link to Service Provider Enterprise Application
-try {
-  Write-Verbose "Creating new Azure AD Service Principal"
-  $sp = New-AzureADServicePrincipal -AppId $ApplicationId -ErrorAction Stop
-  Write-Host "$($sp.DisplayName) ($($sp.AppId)) has been linked your account" -ForegroundColor Green
-} catch {
-  Write-Error "An unexpected error occurred while linking the Enterprise Application to your account."
-  throw $_
+# check if Enterprise Application already exists
+$sp = Get-AzureADServicePrincipal -Filter "AppId eq '$ApplicationId'"
+if ($sp){
+  Write-Verbose "Enterprise Application ($ApplicationId) already exists"
+} else {
+  # creating link to Service Provider Enterprise Application
+  try {
+    Write-Verbose "Creating new Azure AD Service Principal"
+    $sp = New-AzureADServicePrincipal -AppId $ApplicationId -ErrorAction Stop
+    Write-Host "$($sp.DisplayName) ($($sp.AppId)) has been linked your account" -ForegroundColor Green
+  } catch {
+    Write-Error "An unexpected error occurred while linking the Enterprise Application to your account."
+    throw $_
+  }
 }
 
 
 # granting admin consent
-$accesstoken = (Get-AzAccessToken -Resource "https://graph.microsoft.com/").Token
+$token = [Microsoft.Azure.Commands.Common.Authentication.AzureSession]::Instance.AuthenticationFactory.Authenticate($context.Account, $context.Environment, $context.Tenant.TenantId, $null, "Never", $null, "74658136-14ec-4630-ad9b-26e160ff0fc6")
 $headers = @{
-  'Authorization' = 'Bearer ' + $accesstoken
+  'Authorization' = 'Bearer ' + $token.AccessToken
   'X-Requested-With'= 'XMLHttpRequest'
   'x-ms-client-request-id'= [guid]::NewGuid()
   'x-ms-correlation-id' = [guid]::NewGuid()
@@ -99,6 +104,7 @@ while ($true){
     break
   } catch {
     Write-Host "Waiting to grant admin consent... (this can take up to 15 minutes)" 
+    Write-Verbose "Error: $_"
     Start-Sleep -Seconds 5
   }
 }
