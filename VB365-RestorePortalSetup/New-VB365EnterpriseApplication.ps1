@@ -42,6 +42,9 @@
   https://helpcenter.veeam.com/docs/vbo365/guide/ssp_ad_application_permissions.html
 
 .LINK
+  https://docs.microsoft.com/en-us/powershell/module/azuread/?view=azureadps-2.0#applications
+
+.LINK
 	https://arsano.ninja/
 
 #>

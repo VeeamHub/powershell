@@ -42,6 +42,9 @@
   https://f12.hu/2021/01/13/grant-admin-consent-to-an-azuread-application-via-powershell/
 
 .LINK
+  https://docs.microsoft.com/en-us/powershell/module/azuread/?view=azureadps-2.0#applications
+  
+.LINK
 	https://arsano.ninja/
 
 #>
