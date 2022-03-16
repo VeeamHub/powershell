@@ -82,9 +82,9 @@ try {
 
 
 # granting admin consent
-$token = [Microsoft.Azure.Commands.Common.Authentication.AzureSession]::Instance.AuthenticationFactory.Authenticate($context.Account, $context.Environment, $context.Tenant.TenantId, $null, "Never", $null, "74658136-14ec-4630-ad9b-26e160ff0fc6")
+$accesstoken = (Get-AzAccessToken -Resource "https://graph.microsoft.com/").Token
 $headers = @{
-  'Authorization' = 'Bearer ' + $token.AccessToken
+  'Authorization' = 'Bearer ' + $accesstoken
   'X-Requested-With'= 'XMLHttpRequest'
   'x-ms-client-request-id'= [guid]::NewGuid()
   'x-ms-correlation-id' = [guid]::NewGuid()
