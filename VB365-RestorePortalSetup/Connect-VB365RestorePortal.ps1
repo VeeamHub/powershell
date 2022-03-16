@@ -91,8 +91,8 @@ $token = [Microsoft.Azure.Commands.Common.Authentication.AzureSession]::Instance
 $headers = @{
   'Authorization' = 'Bearer ' + $token.AccessToken
   'X-Requested-With'= 'XMLHttpRequest'
-  'x-ms-client-request-id'= [guid]::NewGuid()
-  'x-ms-correlation-id' = [guid]::NewGuid()
+  'x-ms-client-request-id'= New-Guid
+  'x-ms-correlation-id' = New-Guid
 }
 $url = "https://main.iam.ad.ext.azure.com/api/RegisteredApplications/$($sp.AppId)/Consent?onBehalfOfAll=true"
 Write-Verbose "Granting admin consent to the newly linked Azure AD Service Principal"
@@ -110,6 +110,7 @@ while ($true){
 }
 Write-Host "$($sp.DisplayName) ($($sp.AppId)) has been granted admin consent" -ForegroundColor Green
 Write-Host "You can now login to the Service Provider's VB365 Restore Portal!" -ForegroundColor Green
+Write-Warning "If you receive an error, wait 15 minutes and attempt again."
 
 # logging out of remote sessions
 Write-Verbose "Logging out of Azure AD account"
