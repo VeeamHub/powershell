@@ -21,7 +21,7 @@
 	Port used by both the VB365 RESTful API & the Restore Portal
 
 .PARAMETER SaveCerts
-	Flag enabling the certs for the VB365 RESTful API & the Restore Portal to be saved to the same folder as the script (this also means you'll be prompted to enter a password to protect them)
+	Flag enabling the certificates to be saved to the same folder as the script (this also means you'll be prompted to enter a password to protect them)
 
 .OUTPUTS
 	Enable-VB365RestorePortal returns string output to guide the user
@@ -45,7 +45,7 @@
 
 	Description
 	-----------
-	Saves the VB365 RESTful API & Restore Portal certificates to the script folder
+	Saves certificates to the script folder
 
 .EXAMPLE
 	Enable-VB365RestorePortal.ps1 -AppId 37a0f8e1-97bd-4804-ba69-bde1db293273 -AppThumbprint ccf2c168a2a4253532e27dba7e0093d6b6351f93 -SaveCerts -Verbose
@@ -156,16 +156,16 @@ try {
   if ( -not($SaveCerts)){
     $securestring = ConvertTo-SecureString -String "$(Get-RandomPassword 50)" -Force -AsPlainText
   }
-  Export-PfxCertificate -Cert $cert -FilePath "$folder\temp.pfx" -Password $securestring | Out-Null
-  Import-PfxCertificate -CertStoreLocation cert:\LocalMachine\Root -FilePath "$folder\temp.pfx" -Password $securestring | Out-Null
+  Export-PfxCertificate -Cert $cert -FilePath "$folder\vb365-operator-auth.pfx" -Password $securestring | Out-Null
+  Import-PfxCertificate -CertStoreLocation cert:\LocalMachine\Root -FilePath "$folder\vb365-operator-auth.pfx" -Password $securestring | Out-Null
 
   # enabling Operator Authentication
   Write-Verbose "Enabling VB365 Operator Authentication"
-  Set-VBOOperatorAuthenticationSettings -EnableAuthentication -CertificateFilePath "$folder\temp.pfx" -CertificatePassword $securestring | Out-Null
+  Set-VBOOperatorAuthenticationSettings -EnableAuthentication -CertificateFilePath "$folder\vb365-operator-auth.pfx" -CertificatePassword $securestring | Out-Null
   Write-Host "VB365 Operator Authentication has been enabled successfully" -ForegroundColor Green
 
   # deleting exported certificate
-  Remove-Item "$folder\temp.pfx" -Force
+  if ( -not($SaveCerts)){ Remove-Item "$folder\vb365-operator-auth.pfx" -Force }
 } catch {
   Write-Error "An unexpected error occurred while configuring Operator Authentication."
   throw $_
@@ -183,16 +183,16 @@ try {
   if ( -not($SaveCerts)){
     $securestring = ConvertTo-SecureString -String "$(Get-RandomPassword 50)" -Force -AsPlainText
   }
-  Export-PfxCertificate -Cert $cert -FilePath "$folder\temp.pfx" -Password $securestring | Out-Null
-  Import-PfxCertificate -CertStoreLocation cert:\LocalMachine\Root -FilePath "$folder\temp.pfx" -Password $securestring | Out-Null
+  Export-PfxCertificate -Cert $cert -FilePath "$folder\vb365-tenant-auth.pfx" -Password $securestring | Out-Null
+  Import-PfxCertificate -CertStoreLocation cert:\LocalMachine\Root -FilePath "$folder\vb365-tenant-auth.pfx" -Password $securestring | Out-Null
 
   # enabling Tenant Authentication
   Write-Verbose "Enabling VB365 Tenant Authentication"
-  Set-VBOTenantAuthenticationSettings -EnableAuthentication -CertificateFilePath "$folder\temp.pfx" -CertificatePassword $securestring | Out-Null
+  Set-VBOTenantAuthenticationSettings -EnableAuthentication -CertificateFilePath "$folder\vb365-tenant-auth.pfx" -CertificatePassword $securestring | Out-Null
   Write-Host "VB365 Tenant Authentication has been enabled successfully" -ForegroundColor Green
 
   # deleting exported certificate
-  Remove-Item "$folder\temp.pfx" -Force
+  if ( -not($SaveCerts)){ Remove-Item "$folder\vb365-tenant-auth.pfx" -Force }
 } catch {
   Write-Error "An unexpected error occurred while configuring Tenant Authentication."
   throw $_

@@ -35,7 +35,7 @@ New-VB365EnterpriseApplication.ps1 -Name "Veeam Restore Portal" -URL "https://ve
   * Follows steps outlined in [Veeam documentation](https://helpcenter.veeam.com/docs/vbo365/guide/ssp_configuration.html)
   * ***AppId:*** Enterprise Application Id (created in previous step)
   * ***AppThumbprint:*** Certificate thumbprint used when creating the Enterprise Application
-  * ***SaveCerts:*** (optional) Saves RESTful API & Restore Portal certificates to the script folder
+  * ***SaveCerts:*** (optional) Saves all certificates to the script folder
     * This is useful when configuring REST API on a [separate computer](https://helpcenter.veeam.com/docs/vbo365/guide/vbo_installing_rest.html?ver=60).
 
 ```powershell
