@@ -22,7 +22,7 @@
 	Creates an Enterprise Application in Azure AD with the specified name using the specified redirect URL
 
 .EXAMPLE
-	New-VB365EnterpriseApplication.ps1 New-VB365EnterpriseApplication.ps1 -Name "Veeam Restore Portal" -URL "https://veeam.domain:4443" -Verbose
+	New-VB365EnterpriseApplication.ps1 -Name "Veeam Restore Portal" -URL "https://veeam.domain:4443" -Verbose
 
 	Description
 	-----------
