@@ -7,7 +7,7 @@ Based on https://github.com/marcohorstmann/psscripts/tree/master/NASBackup by Ma
 
 Important: IsilonPlatform and SSLValidation are required to run this here successfully and can be found here: https://github.com/vchrisb/Isilon-POSH
 
-This is version 1.3
+This is version 1.4
 
 # Example
-.\Invoke-IsilonNASBackup.ps1 -IsilonName "192.168.60.220" -IsilonCluster "isilon01" -IsilonShare "VeeamShare" -IsilonCredentialFile 'C:\Scripts\isilon-system-credentials.xml' -IsilonSnapExpireDays "2"
+.\Invoke-IsilonNASBackup_v1.4.ps1 -IsilonName "192.168.60.218" -IsilonCluster "isiloncl01" -IsilonAccessZone "demo01" -IsilonShare "az01share01" -IsilonCredentialFile 'C:\Scripts\isilon-system-credentials.xml' -IsilonSnapExpireDays "2"
