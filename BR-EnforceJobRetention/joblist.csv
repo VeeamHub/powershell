@@ -1,0 +1,6 @@
+JobName,JobType,RestorePoints
+default,VMware Backup,30
+default,vCloud Backup,7
+vmware,,7
+misc,,7
+templates,,7
