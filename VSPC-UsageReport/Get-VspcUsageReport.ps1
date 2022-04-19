@@ -88,6 +88,8 @@ param(
 	[String] $Server,
 	[Parameter(Mandatory = $true, ParameterSetName = "UsePass")]
 	[String] $Username,
+	[Parameter(Mandatory = $false, ParameterSetName = "UsePass")]
+	[String] $Password = $true,
 	[Parameter(Mandatory = $true, ParameterSetName = "UseCred")]
 	[System.Management.Automation.PSCredential]$Credential,
 	[Parameter(Mandatory = $false)]
