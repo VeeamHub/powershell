@@ -244,9 +244,7 @@ if ($Credential) {
 } else {
     if ($Password -eq $true) {
         $secPass = Read-Host "Enter password for '$($Username)'" -AsSecureString
-        
-    } else {
-        $secPass = ConvertTo-SecureString $Password -AsPlainText -Force
+        $Password = ConvertFrom-SecureString -SecureString $secPass -AsPlainText
     }
 }
 
