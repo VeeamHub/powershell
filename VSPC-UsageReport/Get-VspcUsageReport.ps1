@@ -235,26 +235,17 @@ Function Get-AsyncAction {
 # 	}
 # }
 
-# # Allow Self-Signed Certificates (not recommended)
-# if ($AllowSelfSignedCerts) {
-# 	add-type -TypeDefinition  @"
-#         using System.Net;
-#         using System.Security.Cryptography.X509Certificates;
-#         public class TrustAllCertsPolicy : ICertificatePolicy {
-#             public bool CheckValidationResult(
-#                 ServicePoint srvPoint, X509Certificate certificate,
-#                 WebRequest request, int certificateProblem) {
-#                 return true;
-#             }
-#         }
-# "@
-# 	[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
-# }
-
 # Processing Credentials
 if ($Credential) {
 	$Username = $Credential.GetNetworkCredential().Username
 	$Password = $Credential.GetNetworkCredential().Password
+} else {
+    if ($Password -eq $true) {
+        $secPass = Read-Host "Enter password for '$($Username)'" -AsSecureString
+        
+    } else {
+        $secPass = ConvertTo-SecureString $Password -AsPlainText -Force
+    }
 }
 
 # POST - /token - Authorization
