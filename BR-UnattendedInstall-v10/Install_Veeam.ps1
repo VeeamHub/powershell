@@ -365,10 +365,26 @@ if ($RunVBRInstall -AND !($Script:RebootNeeded)) {
     $Script:MSIPath = $Script:VBR_MSIFile
     $Script:LogPath = $Script:VBR_LogPath
 
+    if ($Script:vPowerNFSPath) {
+        $Backup_Server_MSIArguments = $Backup_Server_MSIArguments + " VBR_NFSDATASTORE=`"$Script:vPowerNFSPath`""
+    }
+
+    if (!($Script:VBR_Check_Updates)) {
+        $Backup_Server_MSIArguments = $Backup_Server_MSIArguments + " VBR_CHECK_UPDATES=`"0`""
+    }
+
+    if ($Script:VBR_Upgrade_Components) {
+        $Backup_Server_MSIArguments = $Backup_Server_MSIArguments + " VBR_AUTO_UPGRADE=`"1`""
+    }
+
     $Backup_Server_MSIArguments = $Script:MSIArgs -f $Script:MSIPath, $Script:LogPath
 
     if ($Script:SQLInstanceName) {
+        if ($Script:SQLInstanceName -eq "MSSQLSERVER") {
+            $Backup_Server_MSIArguments = $Backup_Server_MSIArguments + " VBR_SQLSERVER_SERVER=`"$($env:COMPUTERNAME)`""
+        } else {
         $Backup_Server_MSIArguments = $Backup_Server_MSIArguments + " VBR_SQLSERVER_SERVER=`"$($env:COMPUTERNAME + "\" + $Script:SQLInstanceName)`""
+        }
     } else {
         $Backup_Server_MSIArguments = $Backup_Server_MSIArguments + " VBR_SQLSERVER_SERVER=`"$($env:COMPUTERNAME + "\VEEAMSQL2016")`""
     }
@@ -535,7 +551,7 @@ if ($RunVBRExplorerInstall -AND !($Script:RebootNeeded)) {
         throw "Veeam SQL Explorer Install Failed, please check logs in '$InstallLogDir'."
     }
 
-    #endregion SharePoint Explorer
+    #endregion SQL Explorer
 
     Write-Log -Path $LogFile -Severity 'Information' -LogOutput 'Completed Veeam Explorers Install'
 

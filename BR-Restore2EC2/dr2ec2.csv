@@ -1,0 +1,2 @@
+VM_NAME,instance_size,Region,AZ,VPC_ID,SecurityGroupName,SubnetCIDR
+ExampleVM,t3.xlarge,us-east-1,us-east-1c,vpc-9ce49be7,default,172.31.100.0/24
