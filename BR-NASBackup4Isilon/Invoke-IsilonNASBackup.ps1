@@ -107,8 +107,8 @@ PROCESS {
     }
 
     function Set-IsilonSnapExpireDate($IsilonSnapExpireDays) {
-        #$IsilonSnapExpireDate = ((get-date -date (get-date).AddDays($IsilonSnapExpireDays) -UFormat %s)).split(',')[0]
-        $IsilonSnapExpireDate = ((get-date -date ((get-date).ToUniversalTime()).AddDays(2) -UFormat %s)).split(',')[0]
+        $IsilonSnapExpireDate = ((get-date -date (get-date).AddDays($IsilonSnapExpireDays) -UFormat %s)).split(',')[0]
+        #$IsilonSnapExpireDate = ((get-date -date ((get-date).ToUniversalTime()).AddDays(2) -UFormat %s)).split(',')[0]
         
         Write-Log -Info "Calculated the snapshot expiry date to $IsilonSnapExpireDate" -Status Info
         return($IsilonSnapExpireDate)
