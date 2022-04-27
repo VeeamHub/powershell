@@ -12,17 +12,17 @@ Add-Type @"
 "@
 [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
 
-$server = 'ausveeambem'
-$username = 'jhoughes'
-$report_filepath = 'D:\temp\api_backup_session_report.csv'
+$server = "https://YOURVEMFQDNORIP:9398/api/"
+$username = 'YOURUSERNAME'
+$report_filepath = 'C:\temp\api_backup_session_report.csv'
 
 #get the api
-$r_api = Invoke-WebRequest -Method Get -Uri "https://$($server):9398/api/" 
+$r_api = Invoke-WebRequest -Method Get -Uri $server -UseBasicParsing
 $r_api_xml = [xml]$r_api.Content
-$r_api_links = @($r_api_xml.EnterpriseManager.SupportedVersions.SupportedVersion | Where-Object { $_.Name -eq "v1_4" })[0].Links
+$r_api_links = @($r_api_xml.EnterpriseManager.SupportedVersions.SupportedVersion | Where-Object { $_.Name -eq "v1_6" })[0].Links
 
 #login
-$r_login = Invoke-WebRequest -method Post -Uri $r_api_links.Link.Href -Credential (Get-Credential -Message "Basic Auth" -UserName "$username")
+$r_login = Invoke-WebRequest -method Post -Uri $r_api_links.Link.Href -UseBasicParsing -Credential (Get-Credential -Message "Basic Auth" -UserName "$username")
 
 $sessionheadername = "X-RestSvcSessionId"
 $sessionid = $r_login.Headers[$sessionheadername]
@@ -34,7 +34,7 @@ $r_login_links_base = $r_login_links | Where-Object {$_.Type -eq 'EnterpriseMana
 
 #get list of all backup jobs
 $r_jobs_query = $r_login_links_base.Href + 'query?type=Job&filter=JobType==Backup'
-$r_jobs = Invoke-WebRequest -Method Get -Headers @{$sessionheadername = $sessionid} -Uri $r_jobs_query
+$r_jobs = Invoke-WebRequest -Method Get -Headers @{$sessionheadername = $sessionid} -Uri $r_jobs_query -UseBasicParsing
 $r_jobs_xml = [xml]$r_jobs.Content
 $r_jobs_list = $r_jobs_xml.QueryResult.Refs.Ref.Href
 
@@ -42,29 +42,29 @@ $r_jobs_list = $r_jobs_xml.QueryResult.Refs.Ref.Href
 foreach ($r_jobs_link in $r_jobs_list) {
 
     #gather included tags detail
-    $r_job_detail_link = Invoke-WebRequest -Method Get -Headers @{$sessionheadername = $sessionid} -Uri $(($r_jobs_link) + "?format=Entity")
+    $r_job_detail_link = Invoke-WebRequest -Method Get -Headers @{$sessionheadername = $sessionid} -Uri $(($r_jobs_link) + "?format=Entity") -UseBasicParsing
     $r_job_detail_link_xml = [xml]$r_job_detail_link.Content
     $r_job_detail_included_tags = $r_job_detail_link_xml.Job.JobInfo.BackupJobInfo.Includes.ObjectInJob | Where-Object HierarchyObjRef -like "*InventoryServiceTag*"
 
     #gather backup session entities
     $r_backup_session_entity_list = @()
-    $r_backup_session_link = Invoke-WebRequest -Method Get -Headers @{$sessionheadername = $sessionid} -Uri $(($r_jobs_link) + "/backupSessions")
+    $r_backup_session_link = Invoke-WebRequest -Method Get -Headers @{$sessionheadername = $sessionid} -Uri $(($r_jobs_link) + "/backupSessions") -UseBasicParsing
     $r_backup_session_link_xml = [xml]$r_backup_session_link.Content
     $r_backup_session_entity_list = $r_backup_session_link_xml.EntityReferences.Ref.Links.Link | Where-Object Type -eq 'BackupJobSession' | Select-Object -ExpandProperty Href
 
     #gather task sessions
     foreach ($r_backup_session_entity in $r_backup_session_entity_list) {
-        $r_backup_session_entity_link = Invoke-WebRequest -Method Get -Headers @{$sessionheadername = $sessionid} -Uri $r_backup_session_entity
+        $r_backup_session_entity_link = Invoke-WebRequest -Method Get -Headers @{$sessionheadername = $sessionid} -Uri $r_backup_session_entity -UseBasicParsing
         $r_backup_session_entity_link_xml = [xml]$r_backup_session_entity_link
         $r_task_session_ref = $r_backup_session_entity_link_xml.BackupJobSession.Links.Link | Where-Object Type -eq BackupTaskSessionReferenceList | Select-Object -ExpandProperty Href
-        $r_task_session_link = Invoke-WebRequest -Method Get -Headers @{$sessionheadername = $sessionid} -Uri $r_task_session_ref
+        $r_task_session_link = Invoke-WebRequest -Method Get -Headers @{$sessionheadername = $sessionid} -Uri $r_task_session_ref -UseBasicParsing
         $r_task_session_link_xml = [xml]$r_task_session_link
         $r_task_session_list = $r_task_session_link_xml.EntityReferences.Ref.Href
       
         #gather task session details
         foreach ($r_task_session in $r_task_session_list) {
             $r_task_session_entity = $($r_task_session + "?format=Entity")
-            $r_task_session_entity_link = Invoke-WebRequest -Method Get -Headers @{$sessionheadername = $sessionid} -Uri $r_task_session_entity
+            $r_task_session_entity_link = Invoke-WebRequest -Method Get -Headers @{$sessionheadername = $sessionid} -Uri $r_task_session_entity -UseBasicParsing
             $r_task_session_entity_link_xml = [xml]$r_task_session_entity_link
             $r_task_session_detail = $r_task_session_entity_link_xml.BackupTaskSession
 
@@ -74,12 +74,12 @@ foreach ($r_jobs_link in $r_jobs_list) {
             #gather VM restore point entities & details
             if ([bool]$r_vm_restore_point_link) {
                 $r_vm_restore_point_entity_link = $r_vm_restore_point_link | Select-Object -ExpandProperty Href
-                $r_vm_restore_point_entity = Invoke-WebRequest -Method Get -Headers @{$sessionheadername = $sessionid} -Uri $r_vm_restore_point_entity_link
+                $r_vm_restore_point_entity = Invoke-WebRequest -Method Get -Headers @{$sessionheadername = $sessionid} -Uri $r_vm_restore_point_entity_link -UseBasicParsing
                 $r_vm_restore_point_entity_xml = [xml]$r_vm_restore_point_entity
                 $r_vm_restore_point_entity_detail = $r_vm_restore_point_entity_xml.VmRestorePoint
 
                 $r_vm_backup_file_link = $(($r_vm_restore_point_entity_xml.VmRestorePoint.Links.Link | Where-Object Href -like "*backupFiles*" | Select-Object -ExpandProperty Href) + "?format=Entity")
-                $r_vm_backup_file_entity = Invoke-WebRequest -Method Get -Headers @{$sessionheadername = $sessionid} -Uri $r_vm_backup_file_link
+                $r_vm_backup_file_entity = Invoke-WebRequest -Method Get -Headers @{$sessionheadername = $sessionid} -Uri $r_vm_backup_file_link -UseBasicParsing
                 $r_vm_backup_file_entity_xml = [xml]$r_vm_backup_file_entity
                 $r_vm_backup_file_entity_detail = $r_vm_backup_file_entity_xml.BackupFile
 
