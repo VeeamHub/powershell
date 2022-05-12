@@ -15,10 +15,15 @@ Local Administrator or higher privileges on Guest OS where logs are collected.
 Manually collecting logs isn't fun, and having to follow more than one KB article just to collect all the needed logs is even less fun. Why do things the hard way when you can do them the easy way, save time, and collect just about every log that could possibly be needed for 95% of cases so you don't have to play log scavenger hunt with your support engineer.
 
 ## **Usage:** <br>
-Execute on guest OS server locally (run with Administrator privileges): 
-    .\Collect-GuestLogs.ps1
-Execute from remote server (run with Administrator privileges): 
-    Invoke-Command -FilePath <PATH_TO_THIS_SCRIPT> -ComputerName <GUEST_OS_SERVERNAME> -Credentials (Get-Credential)
+Execute on guest OS server locally (run with Administrator privileges):
+```
+.\Collect-GuestLogs.ps1
+```
+To generate logs on guest OS from remote server (run with Administrator privileges):
+```
+Invoke-Command -FilePath <PATH_TO_THIS_SCRIPT> -ComputerName <GUEST_OS_SERVERNAME> -Credentials (Get-Credential) 
+```
+**NOTE:** You will need to collect the generated log bundle from the guest OS once completed. Default location is _"C:\ProgramData\Veeam\Backup\Case_Logs\"_
 
 ## **Features**
 This script will collect the following logs and details about the guest OS:
