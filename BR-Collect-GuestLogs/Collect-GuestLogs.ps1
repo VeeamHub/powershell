@@ -1,19 +1,19 @@
 <# 
-    .SYNOPSIS 
+   .Synopsis 
     Automated collection of Windows guest OS logs for troubleshooting of Veeam Backup jobs with 
     Application Aware Processing enabled (SQL/Exchange/Active Directory/SharePoint/Oracle).
-    .EXAMPLE 
+   .Example 
 	Execute on guest OS server locally (run with Administrator privileges): 
-        .\Collect-GuestLogs.ps1
-    .EXAMPLE
+        .\Collect_Veeam_Guest_Logs.ps1
     Execute from remote server (run with Administrator privileges): 
         Invoke-Command -FilePath <PATH_TO_THIS_SCRIPT> -ComputerName <GUEST_OS_SERVERNAME> -Credentials (Get-Credential)
-    .NOTES 
-    NAME: Collect-GuestLogs.ps1
+   .Notes 
+    NAME: Collect_Veeam_Guest_Logs.ps1
     AUTHOR: Chris Evans, Veeam Software
-    LASTEDIT: 05-09-2022
+    LASTEDIT: 06-01-2022
     KEYWORDS: Log collection, AAiP, Guest Processing
 #> 
+#Requires -Version 4.0
 
 function Write-Console (
     [string] $message = "Done.",
@@ -126,8 +126,8 @@ function Wait-Zip (
         Throw "The expected number of items in the zip file must be specified."
     }
     
-    Write-Host -NoNewLine "Waiting for zip operation to finish..." -ForegroundColor White -BackgroundColor Black
-    #ensure zip operation had time to start
+    Write-Host -NoNewLine "Waiting for zip operation to finish..." -ForegroundColor Green
+    #Ensure zip operation had time to start
             
     [int] $waitTime = 0
     [int] $maxWaitTime = 60 * 10000 # [milliseconds]
@@ -232,8 +232,8 @@ $date = Get-Date -f yyyy-MM-ddTHHmmss_
 $temp = "C:\temp"
 $hostname = hostname
 $logvolume = Split-Path -Path $veeamDir -Parent
-$logDir = "$logvolume\Case_Logs"
-$directory = "$logDir\$date$hostname"
+$logDir = Join-Path -Path $logVolume -ChildPath "Case_Logs" 
+$directory = Join-Path -Path $logDir -ChildPath $date$hostname
 $VBR = "$directory\Backup"
 $Events = "$directory\Events"
 $VSS = "$directory\VSS"
@@ -314,7 +314,7 @@ Write-Console
 #Get local accounts
 Write-Console "Getting list of accounts with Local Administrator privileges..." "White" 1
 if ($PSVersion -lt 5) {
-    WMIC UserAccount get AccountType,Caption,LocalAccount,SID,Domain > "$directory\local_accounts.log"
+    WMIC UserAccount GET AccountType,Caption,LocalAccount,SID,Domain > "$directory\local_accounts.log"
 } 
 else {
     Get-LocalGroupMember Administrators > "$directory\local_accounts.log"
@@ -328,7 +328,7 @@ Write-Console
 
 #Get status of Services
 Write-Console "Getting status of Windows Services..." "White" 1
-Get-Service | Select-Object DisplayName, Status | Format-Table -AutoSize > "$directory\services.log"
+Get-Service | Select-Object DisplayName, Status | Sort-Object DisplayName | Format-Table -AutoSize > "$directory\services.log"
 Write-Console
 
 #Get network security settings (This is where customizations such as disabling TLS 1.0/1.1 or key exchange algorithms are done)
@@ -362,6 +362,7 @@ wevtutil al "$Events\System_$hostname.evtx"
 Write-Console
 
 #Check if this is a Server edition of Windows. Workstations do not contain Get-WindowsFeature cmdlet and will throw an error.
+#Check if Hyper-V role enabled. If so, collect VMMS event logs.
 if ((Get-CimInstance -ClassName Win32_OperatingSystem).ProductType -ne 1) {
     if ((Get-WindowsFeature -Name Hyper-V).Installed) {
         Write-Console "Hyper-V server detected. Collecting Hyper-V VMMS Event Viewer logs..." "White" 1
@@ -374,6 +375,7 @@ if ((Get-CimInstance -ClassName Win32_OperatingSystem).ProductType -ne 1) {
     }
 }
 
+#Check if this is a Server edition of Windows. Workstations do not contain Get-WindowsFeature cmdlet and will throw an error. Get list of installed features.
 #Get list of installed features
 if ((Get-CimInstance -ClassName Win32_OperatingSystem).ProductType -ne 1) {
     Write-Console "Retrieving list of installed features..." "White" 1
@@ -381,8 +383,9 @@ if ((Get-CimInstance -ClassName Win32_OperatingSystem).ProductType -ne 1) {
     Write-Console
 }
 
+#Need to stop transcript here, otherwise we will fail to cleanup the temporary directory due to the transcript file being in use.
 Stop-Transcript > $null
-		
+
 #Compress folder containing data
 Write-Console "Compressing and zipping collected logs..." "White" 1
 #Get large files count
@@ -397,7 +400,7 @@ elseif (($PSVersion -lt '5') -or ($largefiles -gt '0')) {
 Write-Console
 
 #Remove temporary log folder
-Write-Console "Removing temporary log folder..." "White" 1
+Write-Console "Removing temporary log folder..." "White" 5
 Remove-Item "$directory" -Recurse -Force -Confirm:$false
 if (!(Test-Path -Path $directory)) {
     Write-Console
@@ -406,6 +409,7 @@ else {
     Write-Console "Problem encountered cleaning up temporary log folder. Manual cleanup may be necessary. Location: $directory" "Yellow" 3
 }
 
+#Test if %ProgramData%\Veeam\Backup\ exists (will be present on any Veeam component or server that is being backed up by a job with AAiP)
 if (!(Test-Path -Path $veeamDir)) {
     Write-Console "Not all logs could be collected. Please verify you are executing this script on the correct server (ie. guest OS where troubleshooting is necessary)." "Yellow" 3
     Write-Console "Please find any collected logs at $logDir" "Green" 2
@@ -414,6 +418,7 @@ else {
     Write-Console "Log collection finished. Please find the collected logs at $logDir" "Green" 3
 }
 
+#Open Windows Explorer to the location of the created .zip file
 Explorer $logDir
 Start-Sleep 2
 Exit
