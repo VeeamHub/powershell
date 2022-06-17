@@ -10,17 +10,19 @@
    .Notes 
     NAME: Collect_Veeam_Guest_Logs.ps1
     AUTHOR: Chris Evans, Veeam Software
-    LASTEDIT: 06-01-2022
+    CONTACT: chris.evans@veeam.com
+    LASTEDIT: 06-15-2022
     KEYWORDS: Log collection, AAiP, Guest Processing
 #> 
 #Requires -Version 4.0
+#Requires -RunAsAdministrator
 
 function Write-Console (
     [string] $message = "Done.",
     [string] $fgcolor = "Green",
     [int] $seconds = 1) {
-    ""
     Write-Host $message -ForegroundColor $fgcolor
+    ""
     Start-Sleep $seconds
 }
     
@@ -28,42 +30,78 @@ function New-Dir (
     [string[]] $path) {
     New-Item -ItemType Directory -Force -Path $path -ErrorAction SilentlyContinue > $null
 }
-    
-function Measure-ZipFiles (
-    [__ComObject] $zipFile) {
-    if ($null -eq $zipFile) {
-        Throw "Value cannot be null: zipFile"
-    }
-            
-    Write-Console ("Counting items in zip file (" + $zipFile.Self.Path + ")...")
-            
-    [int] $count = Measure-ZipFilesRecursive($zipFile)
-            
-    Write-Console ($count.ToString() + " items in zip file (" + $zipFile.Self.Path + ").")
-            
-    return $count
+
+function GetDBUserInfo($Database)
+{
+    #Ensure DB is online before checking
+    if ($Database.Status -eq "Normal") {
+        $Users = $Database.Users
+        foreach ($User in $Users) {
+            if ($User) {
+                #Get permissions for each user
+                $DBRoles = $User.EnumRoles()
+                foreach ($role in $DBRoles) {
+                    ("`t" + $role + " on " + $Database.Name)  | Out-File "$directory\SQL_Permissions.log" -Append
+                } 
+                #Get any explicitily granted permissions
+                foreach ($Permission in $Database.EnumObjectPermissions($User.Name)) {
+                    ("`t" + $Permission.PermissionState + " " + $Permission.PermissionType + " on " + $Permission.ObjectName + " in " + $Database.Name)  | Out-File "$directory\SQL_Permissions.log" -Append
+                } 
+            } 
+        } 
+    } 
 }
-    
-function Measure-ZipFilesRecursive (
-    [__ComObject] $parent) {
-    if ($null -eq $parent) {
-        Throw "Value cannot be null: parent"
-    }
-            
-    [int] $count = 0
-    
-    $parent.Items() |
-    ForEach-Object {
-        $count += 1
-                    
-        if ($_.IsFolder) {
-            $count += Measure-ZipFilesRecursive($_.GetFolder)
-        }
-    }
-    
-    return $count
+
+function LogSQLPermissions($SQLServerInstance)
+{
+    foreach ($SQLServer in $SQLServerInstance) {
+        $Server = New-Object ("Microsoft.SqlServer.Management.Smo.Server") $SQLServer
+         "=================================================================================" | Out-File "$directory\SQL_Permissions.log" -Append
+         ("SQL Instance: " + $Server.Name) | Out-File "$directory\SQL_Permissions.log" -Append 
+         ("SQL Version: " + $Server.VersionString) | Out-File "$directory\SQL_Permissions.log" -Append
+         ("Edition: " + $Server.Edition) | Out-File "$directory\SQL_Permissions.log" -Append
+         ("Login Mode: " + $Server.LoginMode) | Out-File "$directory\SQL_Permissions.log" -Append
+         "=================================================================================" | Out-File "$directory\SQL_Permissions.log" -Append
+        $SQLLogins = $Server.Logins
+        foreach ($SQLLogin in $SQLLogins) {
+             ("Login          : " + $SQLLogin.Name) | Out-File "$directory\SQL_Permissions.log" -Append
+             ("Login Type     : " + $SQLLogin.LoginType) | Out-File "$directory\SQL_Permissions.log" -Append
+             ("Created        : " + $SQLLogin.CreateDate) | Out-File "$directory\SQL_Permissions.log" -Append
+             ("Default DB     : " + $SQLLogin.DefaultDatabase) | Out-File "$directory\SQL_Permissions.log" -Append
+             ("Disabled       : " + $SQLLogin.IsDisabled) | Out-File "$directory\SQL_Permissions.log" -Append
+            $SQLRoles = $SQLLogin.ListMembers()
+            if ($SQLRoles) {
+                ("Server Role    : " + $SQLRoles) | Out-File "$directory\SQL_Permissions.log" -Append
+            } else { 
+                 "Server Role    :  Public" | Out-File "$directory\SQL_Permissions.log" -Append
+            } 
+            #Get individuals in any Windows domain groups
+            if ($SQLLogin.LoginType -eq "WindowsGroup") {   
+                 "Group Members: " | Out-File "$directory\SQL_Permissions.log" -Append
+                try {
+                    $ADGRoupMembers = Get-ADGroupMember  $SQLLogin.Name.Split("\")[1] -Recursive
+                    foreach($Member in $ADGRoupMembers) {
+                         ("   Account: " + $Member.Name + "(" + $Member.SamAccountName + ")") | Out-File "$directory\SQL_Permissions.log" -Append
+                    } 
+                } catch {
+                    #Sometimes there are 'ghost' groups left behind that are no longer in the domain. This highlights those still in SQL.
+                    ("Unable to locate group " + $SQLLogin.Name.Split("\")[1] + " in the AD Domain.") | Out-File "$directory\SQL_Permissions.log" -Append
+                } 
+            } 
+            #Check the permissions in the DBs the Login is linked to.
+            if ($SQLLogin.EnumDatabaseMappings()) { 
+                 "Permissions: " | Out-File "$directory\SQL_Permissions.log" -Append
+                foreach ($DB in $Server.Databases) {
+                    GetDBUserInfo($DB)
+                } 
+            } else {
+                 "None." | Out-File "$directory\SQL_Permissions.log" -Append
+            } 
+             "----------------------------------------------------------------------------" | Out-File "$directory\SQL_Permissions.log" -Append
+        } 
+    } 
 }
-    
+
 function Test-FileLock (
     [string] $path) {
     if ([string]::IsNullOrEmpty($path)) {
@@ -122,9 +160,6 @@ function Wait-Zip (
     if ($null -eq $zipFile) {
         Throw "Value cannot be null: zipFile"
     }
-    elseif ($sumZipItems -lt 1) {
-        Throw "The expected number of items in the zip file must be specified."
-    }
     
     Write-Host -NoNewLine "Waiting for zip operation to finish..." -ForegroundColor Green
     #Ensure zip operation had time to start
@@ -155,17 +190,6 @@ function Wait-Zip (
         Throw "Timeout exceeded waiting for zip operation."
     }
             
-    [int] $count = Measure-ZipFiles($zipFile)
-            
-    if ($count -eq $sumZipItems) {
-        Write-Console "The zip operation completed succesfully."
-    }
-    elseif ($count -eq 0) {
-        Throw ("Something went wrong. Zip file is empty.")
-    }
-    elseif ($count -gt $expectedCount) {
-        Throw "Zip file contains more than the expected number of items."
-    }
 }
     
 function Compress-Folder(
@@ -200,9 +224,6 @@ function Compress-Folder(
         Throw "Failed to get zip file object."
     }
             
-    [int] $expectedCount = (Get-ChildItem $directory -Force -Recurse).Count
-    $expectedCount += 1 #Account for the top-level folder
-            
     $zipFile.CopyHere($directory.FullName)
     
     Wait-Zip $zipFile $expectedCount
@@ -210,18 +231,16 @@ function Compress-Folder(
     Write-Console ("Successfully created zip file for folder (" + $directory.FullName + ").") 
 }
 
- #Verify running PowerShell as Administrator
- Write-Console "Checking elevation rights..." "White" 1
- if (!(New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-     Write-Console "PowerShell does not have elevated rights. Please open a PowerShell window as Administrator and run the script again." "Red" 3
-     Exit
- }
- else { 
-     Write-Console "PowerShell is running with Administrator privileges. Starting data collection..."
- }
+#Check to make sure we are not running this on the VBR server
+$isVBR = Get-Service -Name "VeeamBackupSvc" -ErrorAction Ignore
+if ($isVBR) {
+    Write-Console "This script is meant to be executed on the server which has Guest Processing errors, NOT the Veeam Backup Server." "Red" 3
+    Write-Console "Please re-run this script on the GUEST server." "Red" 3
+    Exit
+}
  
 #Initialize variables
-if ((Get-Item -Path 'HKLM:\SOFTWARE\Veeam\Veeam Backup and Replication').Property -contains "LogDirectory") {
+if ((Get-Item -Path 'HKLM:\SOFTWARE\Veeam\Veeam Backup and Replication').Property -Contains "LogDirectory") {
     $veeamDir = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Veeam\Veeam Backup and Replication').LogDirectory
 }
 else {
@@ -238,6 +257,7 @@ $VBR = "$directory\Backup"
 $Events = "$directory\Events"
 $VSS = "$directory\VSS"
 $PSVersion = $PSVersionTable.PSVersion.Major
+$invalidkeys = @()
 
 #Create directories & execution log
 Write-Console "Creating temporary directories..." "White" 1
@@ -290,7 +310,11 @@ Write-Console
 
 #Check all the reg key names to detect any names with leading or trailing whitespace
 Write-Console "Checking for any invalid registry values..." "White" 1
-$invalidkeys = (Get-ItemProperty "HKLM:\SOFTWARE\Veeam\Veeam Backup and Replication\").PSObject.Properties.Name | Where-Object { $_.EndsWith(" ") -or $_.StartsWith(" ") } | ForEach-Object { "'{0}'" -f $_ }
+$VBRKeys = (Get-ItemProperty "HKLM:\SOFTWARE\Veeam\Veeam Backup and Replication\").PSObject.Properties.Name 
+if ($VBRKeys) {
+    $invalidkeys = $VBRkeys | Where-Object { $_.EndsWith(" ") -or $_.StartsWith(" ") } | ForEach-Object { "'{0}'" -f $_ }
+}
+
 #If any invalid keys were detected, log them to file
 if ($invalidkeys) {
     Write-Output "The following registry value names were found to have leading or trailing whitespace:" > "$directory\invalid_registry_keys.log"
@@ -306,6 +330,23 @@ Write-Console "Getting list of installed software..." "White" 1
 Get-WmiObject Win32_Product | Sort-Object Name | Format-Table IdentifyingNumber, Name, LocalPackage -AutoSize > "$directory\installed_software.log"
 Write-Console
 
+#Check if this server is running any SQL instances
+Write-Host "Are there any running SQL instances here? - " -ForegroundColor White -NoNewline; Start-Sleep 1
+$hasSQL = Get-Service -Name MSSQL* | Where-Object { $_.Status -eq "Running" -and ($_.Name -ne 'MSSQLFDLauncher') }
+$hasSMO = [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Smo")
+$SQLServerInstance = @()
+if ($hasSQL -and $hasSMO) {
+    Write-Console "Yes. Enumerating permissions for each database." "White" 1
+    foreach ($instance in $hasSQL) {
+            $SQLServerInstance += ($instance.Name -replace '^.*\$',($hostname + "\"))
+    }
+    LogSQLPermissions($SQLServerInstance)
+} else {
+    Write-Output "No running SQL instances were detected. If you suspect this is in error, please report it to this script's maintainer." | Out-File "$directory\SQL_Permissions.log"
+    Write-Console "No. Unable to detect any running SQL instances. Continuing..." "White" 1
+}
+Write-Console
+
 #Get volume information
 Write-Console "Getting volume information..." "White" 1
 Get-Volume | Select-Object DriveLetter, FriendlyName, FileSystemType, DriveType, HealthStatus, OperationalStatus, SizeRemaining, Size, @{n = "% Free"; e = { ($_.SizeRemaining / $_.size).toString("P") } } | Sort-Object DriveLetter | Format-Table -AutoSize > "$directory\volume_info.log"
@@ -313,12 +354,7 @@ Write-Console
 
 #Get local accounts
 Write-Console "Getting list of accounts with Local Administrator privileges..." "White" 1
-if ($PSVersion -lt 5) {
-    WMIC UserAccount GET AccountType,Caption,LocalAccount,SID,Domain > "$directory\local_accounts.log"
-} 
-else {
-    Get-LocalGroupMember Administrators > "$directory\local_accounts.log"
-}
+Get-WmiObject Win32_UserAccount | Select-Object AccountType, Caption, LocalAccount, SID, Domain | Format-Table -AutoSize > "$directory\local_accounts.log"
 Write-Console
 
 #Get Windows Firewall profile
@@ -350,7 +386,7 @@ Write-Console
 #Check if 'LocalAccountTokenFilterPolicy' registry value is enabled
 Write-Console "Checking if 'Remote UAC' is disabled..." "White" 1
 Write-Output "If 'LocalAccountTokenFilterPolicy' = 1 then 'RemoteUAC' has been disabled. If it does not exist or is set to '0' then it is still enabled." > "$directory\System_Policies.log"
-(Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System").PSObject.Properties | Select-Object Name, Value -SkipLast 5 >> "$directory\System_Policies.log"
+(Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System").PSObject.Properties | Select-Object Name, Value >> "$directory\System_Policies.log"
 Write-Console
 
 #Export event viewer logs
