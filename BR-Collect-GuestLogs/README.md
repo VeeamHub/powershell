@@ -34,6 +34,7 @@ This script will collect the following logs and details about the guest OS:
 * Collects various registry values (Veeam Backup and Replication/SCHANNEL/System) to check for various settings that affect in-guest processing
 * Checks for Veeam registry values which may have leading or trailing whitespace which would cause them not to work as intended
 * Collects list of installed software
+* Collects permissions for all SQL users for each database if running SQL instances have been detected
 * Collects information about connected volumes
 * Collects list of accounts with Local Administrator permissions
 * Collects status of Windows Services
