@@ -11,7 +11,7 @@
     NAME: Collect_Veeam_Guest_Logs.ps1
     AUTHOR: Chris Evans, Veeam Software
     CONTACT: chris.evans@veeam.com
-    LASTEDIT: 06-15-2022
+    LASTEDIT: 06-25-2022
     KEYWORDS: Log collection, AAiP, Guest Processing
 #> 
 #Requires -Version 4.0
@@ -20,7 +20,9 @@
 function Write-Console (
     [string] $message = "Done.",
     [string] $fgcolor = "Green",
-    [int] $seconds = 1) {
+    [int] $seconds = 1
+)
+{
     Write-Host $message -ForegroundColor $fgcolor
     ""
     Start-Sleep $seconds
@@ -28,10 +30,12 @@ function Write-Console (
     
 function New-Dir (
     [string[]] $path) {
-    New-Item -ItemType Directory -Force -Path $path -ErrorAction SilentlyContinue > $null
+    New-Item -ItemType Directory -Force -Path $path > $null
 }
 
-function GetDBUserInfo($Database)
+function GetDBUserInfo (
+    $Database
+)
 {
     #Ensure DB is online before checking
     if ($Database.Status -eq "Normal") {
@@ -52,14 +56,16 @@ function GetDBUserInfo($Database)
     } 
 }
 
-function LogSQLPermissions($SQLServerInstance)
+function LogSQLPermissions (
+    $SQLServerInstance
+)
 {
     foreach ($SQLServer in $SQLServerInstance) {
         $Server = New-Object ("Microsoft.SqlServer.Management.Smo.Server") $SQLServer
          "=================================================================================" | Out-File "$directory\SQL_Permissions.log" -Append
          ("SQL Instance: " + $Server.Name) | Out-File "$directory\SQL_Permissions.log" -Append 
          ("SQL Version: " + $Server.VersionString) | Out-File "$directory\SQL_Permissions.log" -Append
-         ("Edition: " + $Server.Edition) | Out-File "$directory\SQL_Permissions.log" -Append
+         ("Edition: " + $Server.Edition) | Out-File "$directory\SQL_Permissions.log" -Append 
          ("Login Mode: " + $Server.LoginMode) | Out-File "$directory\SQL_Permissions.log" -Append
          "=================================================================================" | Out-File "$directory\SQL_Permissions.log" -Append
         $SQLLogins = $Server.Logins
@@ -72,7 +78,8 @@ function LogSQLPermissions($SQLServerInstance)
             $SQLRoles = $SQLLogin.ListMembers()
             if ($SQLRoles) {
                 ("Server Role    : " + $SQLRoles) | Out-File "$directory\SQL_Permissions.log" -Append
-            } else { 
+            } 
+            else { 
                  "Server Role    :  Public" | Out-File "$directory\SQL_Permissions.log" -Append
             } 
             #Get individuals in any Windows domain groups
@@ -88,22 +95,27 @@ function LogSQLPermissions($SQLServerInstance)
                     ("Unable to locate group " + $SQLLogin.Name.Split("\")[1] + " in the AD Domain.") | Out-File "$directory\SQL_Permissions.log" -Append
                 } 
             } 
-            #Check the permissions in the DBs the Login is linked to.
+            #Check the permissions in the DBs the Login is linked to. (Errors suppressed for all SQL logins that exist but are disabled)
+            $ErrorActionPreference = "SilentlyContinue"
             if ($SQLLogin.EnumDatabaseMappings()) { 
-                 "Permissions: " | Out-File "$directory\SQL_Permissions.log" -Append
+                "Permissions: " | Out-File "$directory\SQL_Permissions.log" -Append
                 foreach ($DB in $Server.Databases) {
                     GetDBUserInfo($DB)
-                } 
-            } else {
-                 "None." | Out-File "$directory\SQL_Permissions.log" -Append
+                }
             } 
+            else {
+                 "None." | Out-File "$directory\SQL_Permissions.log" -Append
+            }
+            $ErrorActionPreference = "Continue"
              "----------------------------------------------------------------------------" | Out-File "$directory\SQL_Permissions.log" -Append
         } 
     } 
 }
 
 function Test-FileLock (
-    [string] $path) {
+    [string] $path
+)
+{
     if ([string]::IsNullOrEmpty($path)) {
         Throw "The path must be specified."
     }
@@ -142,7 +154,9 @@ function Test-FileLock (
 }
         
 function GetWaitInterval (
-    [int] $waitTime) {
+    [int] $waitTime
+)
+{
     if ($waitTime -lt 1000) {
         return 100
     }
@@ -155,14 +169,14 @@ function GetWaitInterval (
 }
     
 function Wait-Zip (
-    [__ComObject] $zipFile,
-    [int] $sumZipItems) {
+    [__ComObject] $zipFile
+)
+{
     if ($null -eq $zipFile) {
         Throw "Value cannot be null: zipFile"
     }
     
-    Write-Host -NoNewLine "Waiting for zip operation to finish..." -ForegroundColor Green
-    #Ensure zip operation had time to start
+    Write-Host -NoNewLine "Waiting for zip operation to finish" -ForegroundColor Green
             
     [int] $waitTime = 0
     [int] $maxWaitTime = 60 * 10000 # [milliseconds]
@@ -189,11 +203,13 @@ function Wait-Zip (
     if ($waitTime -gt $maxWaitTime) {
         Throw "Timeout exceeded waiting for zip operation."
     }
-            
+                
 }
     
-function Compress-Folder(
-    [IO.DirectoryInfo] $directory) {
+function Compress-Folder (
+    [IO.DirectoryInfo] $directory
+)
+{
     if ($null -eq $directory) {
         Throw "Value cannot be null: directory"
     }
@@ -226,13 +242,32 @@ function Compress-Folder(
             
     $zipFile.CopyHere($directory.FullName)
     
-    Wait-Zip $zipFile $expectedCount
+    Wait-Zip $zipFile
             
     Write-Console ("Successfully created zip file for folder (" + $directory.FullName + ").") 
 }
 
+function Add-FileToZip (
+    [string]$ZipName,
+    [string]$FileToAdd
+)
+{
+
+    try {
+        [Reflection.Assembly]::LoadWithPartialName('System.IO.Compression.FileSystem') > $null
+        $zip = [System.IO.Compression.ZipFile]::Open($ZipName,"Update")
+        $addedFile = [System.IO.Path]::GetFileName($FileToAdd)
+        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip,$FileToAdd,$addedFile,"Optimal") > $null
+        $zip.Dispose()
+    } 
+    catch {
+        Write-Output "Failed to add $FileToAdd to $ZipName. Details: $_" > $null
+    }
+
+}
+
 #Check to make sure we are not running this on the VBR server
-$isVBR = Get-Service -Name "VeeamBackupSvc" -ErrorAction Ignore
+$isVBR = Get-Service -Name "VeeamBackupSv*"
 if ($isVBR) {
     Write-Console "This script is meant to be executed on the server which has Guest Processing errors, NOT the Veeam Backup Server." "Red" 3
     Write-Console "Please re-run this script on the GUEST server." "Red" 3
@@ -257,24 +292,23 @@ $VBR = "$directory\Backup"
 $Events = "$directory\Events"
 $VSS = "$directory\VSS"
 $PSVersion = $PSVersionTable.PSVersion.Major
-$invalidkeys = @()
-
-#Create directories & execution log
-Write-Console "Creating temporary directories..." "White" 1
-New-Dir $directory, $VBR, $Events, $VSS, $temp
-Write-Console
-    
-# Transcript all workflow
-Start-Transcript -Path $directory\Execution.log > $null
 
 Write-Console "This script is provided as is as a courtesy for collecting Guest Proccessing logs from a guest server. `
 Please be aware that due to certain Microsoft operations there may be a short burst `
 of high CPU activity, and that some Windows OSes and GPOs may affect script execution. `
 There is no support provided for this script, and should it fail, we ask that you please proceed to collect the required information manually." "Yellow" 5
 
+# Transcript all workflow
+Start-Transcript -Path $temp\Execution.log > $null
+
+#Create directories
+Write-Console "Creating temporary directories..." "White" 1
+New-Dir $directory, $VBR, $Events, $VSS, $temp
+Write-Console
+
 #Copy Backup Folder
 Write-Console "Copying Veeam guest operation logs..." "White" 1
-Get-ChildItem -Path $veeamDir | Copy-Item -Destination $VBR -Recurse -Force -ErrorAction SilentlyContinue 
+Get-ChildItem -Path $veeamDir | Copy-Item -Destination $VBR -Recurse -Force
 Write-Console
 
 #Export VSS logs
@@ -303,24 +337,21 @@ Write-Console "Exporting systeminfo..." "White" 1
 systeminfo > "$directory\systeminfo.log"
 Write-Console
 
-#Export VBR reg key values
+#Export VBR reg key values and check each value name for leading or trailing whitespace
 Write-Console "Exporting Veeam registry values..." "White" 1
-Get-ItemProperty "HKLM:\SOFTWARE\Veeam\Veeam Backup and Replication" > "$directory\registry_values.log"
-Write-Console
-
-#Check all the reg key names to detect any names with leading or trailing whitespace
-Write-Console "Checking for any invalid registry values..." "White" 1
-$VBRKeys = (Get-ItemProperty "HKLM:\SOFTWARE\Veeam\Veeam Backup and Replication\").PSObject.Properties.Name 
+$VBRKeys = Get-ItemProperty "HKLM:\SOFTWARE\Veeam\Veeam Backup and Replication\"
 if ($VBRKeys) {
-    $invalidkeys = $VBRkeys | Where-Object { $_.EndsWith(" ") -or $_.StartsWith(" ") } | ForEach-Object { "'{0}'" -f $_ }
-}
-
-#If any invalid keys were detected, log them to file
-if ($invalidkeys) {
-    Write-Output "The following registry value names were found to have leading or trailing whitespace:" > "$directory\invalid_registry_keys.log"
-    $invalidkeys >> "$directory\invalid_registry_keys.log"
-}
+    $VBRKeys > "$directory\registry_values.log"
+    
+    #Check all the reg key names to detect any names with leading or trailing whitespace
+    $invalidkeys = $VBRkeys.PSObject.Properties.Name | Where-Object { $_.EndsWith(" ") -or $_.StartsWith(" ") } | ForEach-Object { "'{0}'" -f $_ }
+    #Log invalid keys if any were found
+    if ($invalidkeys) {
+        Write-Output "The following registry value names were found to have leading or trailing whitespace:`n $invalidkeys" >> "$directory\invalid_registry_keys.log"
+    }
+} 
 else {
+    Write-Output "Veeam Backup and Replication registry hive contains zero registry key values (default setting)." > "$directory\registry_values.log"
     Write-Output "No invalid registry keys detected." > "$directory\invalid_registry_keys.log"
 }
 Write-Console
@@ -332,18 +363,25 @@ Write-Console
 
 #Check if this server is running any SQL instances
 Write-Host "Are there any running SQL instances here? - " -ForegroundColor White -NoNewline; Start-Sleep 1
-$hasSQL = Get-Service -Name MSSQL* | Where-Object { $_.Status -eq "Running" -and ($_.Name -ne 'MSSQLFDLauncher') }
+$hasSQLDefaultInstance = Get-Service -Name MSSQL* | Where-Object { $_.Status -eq "Running" -and $_.Name -eq "MSSQLSERVER" }
+$hasSQL = Get-Service -Name MSSQL* | Where-Object { $_.Status -eq "Running" -and ($_.Name -ne "MSSQLFDLauncher" -and $_.Name -ne "MSSQLSERVER") }
 $hasSMO = [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Smo")
 $SQLServerInstance = @()
-if ($hasSQL -and $hasSMO) {
-    Write-Console "Yes. Enumerating permissions for each database." "White" 1
-    foreach ($instance in $hasSQL) {
-            $SQLServerInstance += ($instance.Name -replace '^.*\$',($hostname + "\"))
-    }
-    LogSQLPermissions($SQLServerInstance)
-} else {
-    Write-Output "No running SQL instances were detected. If you suspect this is in error, please report it to this script's maintainer." | Out-File "$directory\SQL_Permissions.log"
+if (!($hasSQLDefaultInstance) -and !($hasSQL)) {
+    Write-Output "No running SQL instances were detected. If you suspect this is in error, please report it to this script's maintainer." >> "$directory\SQL_Permissions.log"
     Write-Console "No. Unable to detect any running SQL instances. Continuing..." "White" 1
+}
+else {
+    if ($hasSQL -and $hasSMO) {
+        Write-Console "Yes. Enumerating permissions for each database." "White" 1
+        foreach ($instance in $hasSQL) {
+                $SQLServerInstance = ($instance.Name -replace '^.*\$',($hostname + "\"))
+        }
+        LogSQLPermissions($SQLServerInstance)
+    }
+    if ($hasSQLDefaultInstance -and $hasSMO) {
+        LogSQLPermissions($hostname)
+    }
 }
 Write-Console
 
@@ -390,37 +428,28 @@ Write-Output "If 'LocalAccountTokenFilterPolicy' = 1 then 'RemoteUAC' has been d
 Write-Console
 
 #Export event viewer logs
-Write-Console "Exporting Windows Event Viewer logs ('Application' and 'System' only)..." "White" 1
+Write-Console "Exporting relevant Windows Event Viewer logs..." "White" 1
 wevtutil epl Application "$Events\Application_$hostname.evtx" 
 wevtutil al "$Events\Application_$hostname.evtx" 
 wevtutil epl System "$Events\System_$hostname.evtx"
 wevtutil al "$Events\System_$hostname.evtx"
-Write-Console
-
-#Check if this is a Server edition of Windows. Workstations do not contain Get-WindowsFeature cmdlet and will throw an error.
-#Check if Hyper-V role enabled. If so, collect VMMS event logs.
+#Check if this is a Server Edition of Windows.
 if ((Get-CimInstance -ClassName Win32_OperatingSystem).ProductType -ne 1) {
+    #Check if Hyper-V role enabled. If so, collect VMMS event logs.
     if ((Get-WindowsFeature -Name Hyper-V).Installed) {
-        Write-Console "Hyper-V server detected. Collecting Hyper-V VMMS Event Viewer logs..." "White" 1
         wevtutil epl Microsoft-Windows-Hyper-V-VMMS-Admin "$Events\VMMS_$hostname.evtx"
         wevtutil al "$Events\VMMS_$hostname.evtx"
         Write-Console
     }
     else {
-        Write-Console "Hyper-V role was not detected. Skipping collection of VMMS Event Logs." > $null
+        Write-Console
     }
-}
 
-#Check if this is a Server edition of Windows. Workstations do not contain Get-WindowsFeature cmdlet and will throw an error. Get list of installed features.
-#Get list of installed features
-if ((Get-CimInstance -ClassName Win32_OperatingSystem).ProductType -ne 1) {
+    #Get status of all Windows Features. This block included here because Workstation Edition servers would throw an error.
     Write-Console "Retrieving list of installed features..." "White" 1
     Get-WindowsFeature | Format-Table -AutoSize > "$directory\installed_features.log"
-    Write-Console
 }
-
-#Need to stop transcript here, otherwise we will fail to cleanup the temporary directory due to the transcript file being in use.
-Stop-Transcript > $null
+Write-Console
 
 #Compress folder containing data
 Write-Console "Compressing and zipping collected logs..." "White" 1
@@ -430,14 +459,15 @@ $largefiles = (Get-ChildItem -Path $directory -Recurse | Where-Object { ($_.Leng
 if (($PSVersion -gt '4') -and ($largefiles -lt '1')) {
     Compress-Archive "$directory" "$directory.zip" -Force
 }
-elseif (($PSVersion -lt '5') -or ($largefiles -gt '0')) {
+else {
     Compress-Folder $directory
 }
 Write-Console
 
 #Remove temporary log folder
-Write-Console "Removing temporary log folder..." "White" 5
+Write-Console "Removing temporary log folder..." "White" 1
 Remove-Item "$directory" -Recurse -Force -Confirm:$false
+Start-Sleep 5
 if (!(Test-Path -Path $directory)) {
     Write-Console
 }
@@ -453,6 +483,11 @@ if (!(Test-Path -Path $veeamDir)) {
 else { 
     Write-Console "Log collection finished. Please find the collected logs at $logDir" "Green" 3
 }
+
+#Stop transcript, copy Execution.log into the .zip archive, then cleanup Execution.log from C:\temp directory.
+Stop-Transcript > $null
+Add-FileToZip -FileToAdd "C:\temp\Execution.log" -ZipName ($directory + ".zip")
+Remove-Item "$temp\Execution.Log" -Force
 
 #Open Windows Explorer to the location of the created .zip file
 Explorer $logDir
