@@ -137,7 +137,7 @@ if ($RunVBRPrereqCheck) {
         Find-MSSQL
     }
 
-    $MissingComponents = [bool]($Script:dotNETRequired -AND $Script:LicenseFileMissing -AND $Script:SQL2014_CLR_Missing -AND $Script:SQL2014_SMO_Missing -AND $Script:MSReportViewer2015_Missing)
+    $MissingComponents = [bool]($Script:dotNETRequired -OR $Script:SQL2014_CLR_Missing -OR $Script:SQL2014_SMO_Missing -OR $Script:MSReportViewer2015_Missing)
 
     if (!($MissingComponents) -AND $Script:SQLInstanceName) {
         [bool]$Script:VBRAllPrereqs = $true
@@ -360,13 +360,18 @@ if ($RunVBRInstall -AND !($Script:RebootNeeded)) {
 
     Write-Log -Path $LogFile -Severity 'Information' -LogOutput 'Beginning Veeam Backup & Replication Server Install'
 
-    Test-vPowerNFSDir -Path $Script:vPowerNFSPath
+    Test-DirPath -Path $Script:vPowerNFSPath
+    Test-DirPath -Path $Script:IRWriteCache
 
     $Script:MSIPath = $Script:VBR_MSIFile
     $Script:LogPath = $Script:VBR_LogPath
 
     if ($Script:vPowerNFSPath) {
         $Backup_Server_MSIArguments = $Backup_Server_MSIArguments + " VBR_NFSDATASTORE=`"$Script:vPowerNFSPath`""
+    }
+
+    if ($Script:IRWriteCache) {
+        $Backup_Server_MSIArguments = $Backup_Server_MSIArguments + " VBR_IRCACHE=`"$Script:IRWriteCache`""
     }
 
     if (!($Script:VBR_Check_Updates)) {
@@ -393,7 +398,7 @@ if ($RunVBRInstall -AND !($Script:RebootNeeded)) {
 
     $Backup_Server_MSIArguments = $Backup_Server_MSIArguments + $Script:ServerEULA + $Script:ThirdPartyLicenses
 
-    if ($Script:LicenseFile) {
+    if ($Script:LicenseFile -AND (!($Script:LicenseFileMissing))) {
         $Script:LicenseFileArg = ' VBR_LICENSE_FILE="{0}"' -f $Script:LicenseFile
         $Backup_Server_MSIArguments = $Backup_Server_MSIArguments + $Script:LicenseFileArg
     }
