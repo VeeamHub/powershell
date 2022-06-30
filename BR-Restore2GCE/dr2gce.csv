@@ -1,0 +1,3 @@
+﻿VM_NAME,instance_type,Region,CZ,VPC_Name,SubnetName,disktype
+Example_VM1,e2-micro,US-CENTRAL1,us-central1-a,Example_VPC,Example_Subnet,StandardPersistent
+Example_DB,e2-small,US-CENTRAL1,us-central1-c,Example_VPC,Example_Subnet_DB,SSDPersistent
