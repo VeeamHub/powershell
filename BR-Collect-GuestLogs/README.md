@@ -6,9 +6,6 @@
 ## **Purpose**
 This script helps automate and simplify the Guest OS log collection process documented in [Veeam KB1789](https://www.veeam.com/kb1789).
 
-## **Description:**
-Automated collection of Windows **guest OS** logs for troubleshooting of Veeam Backup jobs with _Application Aware Processing_ enabled (ie. SQL/Exchange/Active Directory/SharePoint/Oracle).
-
 ## **Requirements** <br>
 Local Administrator permissions to be able to execute the script as Administrator.
 
