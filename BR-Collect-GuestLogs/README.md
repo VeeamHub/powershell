@@ -2,29 +2,32 @@
 
 # 📗 Documentation
 
-## Project Notes
-**Author:** Chris Evans <br>
+
+## **Purpose**
+This script helps automate and simplify the Guest OS log collection process documented in [Veeam KB1789](https://www.veeam.com/kb1789).
 
 ## **Description:**
 Automated collection of Windows **guest OS** logs for troubleshooting of Veeam Backup jobs with _Application Aware Processing_ enabled (ie. SQL/Exchange/Active Directory/SharePoint/Oracle).
 
-## **Requires:** <br>
+## **Requirements** <br>
 Local Administrator permissions to be able to execute the script as Administrator.
 
+
 ## **Usage:** <br>
-* Download the script (**Collect-GuestLogs.ps1**) and save it to the guest server where logs need to be collected.
-* Open PowerShell with Administrator permissions and navigate to the directory where you saved the script.
-* Run the following to execute the script.
+
+1. Download the script (**[Collect-GuestLogs.ps1](https://github.com/VeeamHub/powershell/blob/master/BR-Collect-GuestLogs/Collect-GuestLogs.ps1)**) and save it to the Windows machine where logs need to be collected.
+2. Open an Administrative PowerShell Console, and navigate to the directory where the script was saved.
+3. Run the following to execute the script:
      (Note: PowerShell's Execution Policy is set to _RemoteSigned_ by default on Windows Server machines. This is the reason _Unblock-File_ command is ran prior to calling the script.)
 ```
 Unblock-File .\Collect-GuestLogs.ps1
 .\Collect-GuestLogs.ps1
 ```
-* Wait for the script to finish executing. The PowerShell console will contain information about what's happening at each step of the process. Once it finishes it will automatically open Windows Explorer to the location of the created .zip file (*<datetime>_<servername>.zip*).
-* Upload the .zip file that was created to your Veeam support case.
+4. While the script runs, the PowerShell console will display information about what's happening during each step of the process. 
+5. [Attach the generated **.zip** file to the Veeam support case.](https://www.veeam.com/kb4162)
 
 ## **Features** <br>
-This script will collect the following information from the server and bundle everything together into a single .zip file.
+This script will collect the following information from the machine:
 
 * Collects _GuestHelper_, _GuestIndexer_ and other logs located in _%ProgramData%\Veeam\Backup\_ (or alternate configured directory)
 * Collects output of various VSSAdmin commands: Writers/Shadows/ShadowStorage/Providers
@@ -42,6 +45,9 @@ This script will collect the following information from the server and bundle ev
 * Collects status of Windows Firewall profiles
 * Collects settings of attached NICs
 * Collects list of installed features/roles
+
+## Project Notes
+**Author:** Chris Evans <br>
 
 ### **Feedback** <br>
 Should you encounter any issues or bugs in the script, please [submit an issue](https://github.com/VeeamHub/powershell/issues) and provide details so it can be looked into further.
