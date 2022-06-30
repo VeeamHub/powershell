@@ -15,7 +15,7 @@ Local Administrator permissions to be able to execute the script as Administrato
 
 ## **Usage:** <br>
 
-1. Download the script (**[Collect-GuestLogs.ps1](https://raw.githubusercontent.com/VeeamHub/powershell/master/BR-Collect-GuestLogs/Collect-GuestLogs.ps1)**) and save it to the Windows machine where logs need to be collected.
+1. Download the script **[Collect-GuestLogs.ps1](https://raw.githubusercontent.com/VeeamHub/powershell/master/BR-Collect-GuestLogs/Collect-GuestLogs.ps1)** (Right-click link > '_Save link as_') and save it to the Windows machine where logs need to be collected.
 2. Open an Administrative PowerShell Console, and navigate to the directory where the script was saved.
 3. Run the following to execute the script:
      (Note: PowerShell's Execution Policy is set to _RemoteSigned_ by default on Windows Server machines. This is the reason _Unblock-File_ command is ran prior to calling the script.)
