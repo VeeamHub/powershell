@@ -2,65 +2,54 @@
 
 # 📗 Documentation
 
-## Project Notes
-**Author:** Chris Evans <br>
+
+## **Purpose**
+This script helps automate and simplify the Guest OS log collection process documented in [Veeam KB1789](https://www.veeam.com/kb1789).
 
 ## **Description:**
-Automated collection of Windows guest OS logs for troubleshooting of Veeam Backup jobs with Application Aware Processing enabled (SQL/Exchange/Active Directory/SharePoint/Oracle).
+Automated collection of Windows **guest OS** logs for troubleshooting of Veeam Backup jobs with _Application Aware Processing_ enabled (ie. SQL/Exchange/Active Directory/SharePoint/Oracle).
 
-## **Requires:** <br>
-Local Administrator or higher privileges on Guest OS where logs are collected.
+## **Requirements** <br>
+Local Administrator permissions to be able to execute the script as Administrator.
 
-## **Background:** <br>
-Manually collecting logs isn't fun, and having to follow more than one KB article just to collect all the needed logs is even less fun. Why do things the hard way when you can do them the easy way, save time, and collect just about every log that could possibly be needed for 95% of cases so you don't have to play log scavenger hunt with your support engineer.
 
 ## **Usage:** <br>
-Execute on guest OS server locally (run with Administrator privileges):
+
+1. Download the script **[Collect-GuestLogs.ps1](https://raw.githubusercontent.com/VeeamHub/powershell/master/BR-Collect-GuestLogs/Collect-GuestLogs.ps1)** (Right-click link > '_Save link as_') and save it to the Windows machine where logs need to be collected.
+2. Open an Administrative PowerShell Console, and navigate to the directory where the script was saved.
+3. Run the following to execute the script:
+     (Note: PowerShell's Execution Policy is set to _RemoteSigned_ by default on Windows Server machines. This is the reason _Unblock-File_ command is ran prior to calling the script.)
 ```
+Unblock-File .\Collect-GuestLogs.ps1
 .\Collect-GuestLogs.ps1
 ```
-To generate logs on guest OS from remote server (run with Administrator privileges):
-```
-Invoke-Command -FilePath <PATH_TO_THIS_SCRIPT> -ComputerName <GUEST_OS_SERVERNAME> -Credentials (Get-Credential) 
-```
-**NOTE:** You will need to collect the generated log bundle from the guest OS once completed. Default location is _"C:\ProgramData\Veeam\Backup\Case_Logs\"_
+4. While the script runs, the PowerShell console will display information about what's happening during each step of the process. 
+5. [Attach the generated **.zip** file to the Veeam support case.](https://www.veeam.com/kb4162)
 
-## **Features**
-This script will collect the following logs and details about the guest OS:
+## **Features** <br>
+This script will collect the following information from the machine:
 
-* Collects GuestHelper, GuestIndexer and other logs located in %ProgramData%\Veeam\Backup\ (or alternate configured directory)
+* Collects _GuestHelper_, _GuestIndexer_ and other logs located in _%ProgramData%\Veeam\Backup\_ (or alternate configured directory)
 * Collects output of various VSSAdmin commands: Writers/Shadows/ShadowStorage/Providers
 * Collects output of SystemInfo.exe
-* Collects various registry values (Veeam Backup and Replication/SCHANNEL/System) to check for various settings that affect in-guest processing
+* Collects various registry values (_Veeam Backup and Replication_, _SCHANNEL_ and _System_ hives specifically) to check for various settings that affect In-Guest Processing
 * Checks for Veeam registry values which may have leading or trailing whitespace which would cause them not to work as intended
 * Collects list of installed software
-* Collects permissions for all SQL users for each database if running SQL instances have been detected
+* Collects permissions for all SQL users for each database if one or more running SQL instances have been detected
 * Collects information about connected volumes
 * Collects list of accounts with Local Administrator permissions
 * Collects status of Windows Services
-* Checks if 'File and Printer Sharing' is enabled/disabled
-* Collects Application and System Event Viewer logs
-* Collects VMMS Event Viewer logs if Hyper-V role is detected
+* Checks if '_File and Printer Sharing_' is enabled/disabled
+* Collects _Application_ and _System_ Event Viewer logs
+* Collects _VMMS_ Event Viewer logs if Hyper-V role is detected
 * Collects status of Windows Firewall profiles
 * Collects settings of attached NICs
 * Collects list of installed features/roles
 
-### VeeamHub
-Veeamhub projects are community driven projects, and are not created by Veeam R&D nor validated by Veeam Q&A. They are maintained by community members which might be or not be Veeam employees. 
+## Project Notes
+**Author:** Chris Evans <br>
 
-### 🤝🏾 License
-Copyright (c) 2022 VeeamHub
+### **Feedback** <br>
+Should you encounter any issues or bugs in the script, please [submit an issue](https://github.com/VeeamHub/powershell/issues) and provide details so it can be looked into further.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-### ✍ Contributions
-
-I welcome contributions from the community! I encourage you to create issues for bugs & feature requests and submit pull requests.
-
-### 🤔 Questions
-
-If you have any questions or something is unclear, please don't hesitate to reach out to me.
+ <sub>THIS SCRIPT IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.</sub>
