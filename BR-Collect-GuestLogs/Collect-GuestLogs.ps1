@@ -11,11 +11,18 @@
     NAME: Collect_Veeam_Guest_Logs.ps1
     AUTHOR: Chris Evans, Veeam Software
     CONTACT: chris.evans@veeam.com
-    LASTEDIT: 06-25-2022
+    LASTEDIT: 07-09-2022
     KEYWORDS: Log collection, AAiP, Guest Processing
 #> 
 #Requires -Version 4.0
 #Requires -RunAsAdministrator
+$ErrorActionPreference = "SilentlyContinue"
+
+#Check if script running in PowerShell ISE. If so, instruct to call the script again from a normal PowerShell console. This is due to PS ISE loading additional modules that can cause issues with transcription.
+if ($psISE) {
+    Write-Console "PowerShell ISE is not supported for this script. Please call the script from a PowerShell console (launched with Administrator privileges)." "Red" 5
+    Exit
+}
 
 function Write-Console (
     [string] $message = "Done.",
@@ -96,7 +103,6 @@ function LogSQLPermissions (
                 } 
             } 
             #Check the permissions in the DBs the Login is linked to. (Errors suppressed for all SQL logins that exist but are disabled)
-            $ErrorActionPreference = "SilentlyContinue"
             if ($SQLLogin.EnumDatabaseMappings()) { 
                 "Permissions: " | Out-File "$directory\SQL_Permissions.log" -Append
                 foreach ($DB in $Server.Databases) {
@@ -106,7 +112,6 @@ function LogSQLPermissions (
             else {
                  "None." | Out-File "$directory\SQL_Permissions.log" -Append
             }
-            $ErrorActionPreference = "Continue"
              "----------------------------------------------------------------------------" | Out-File "$directory\SQL_Permissions.log" -Append
         } 
     } 
@@ -318,7 +323,7 @@ vssadmin list shadows > "$VSS\vss_shadows.log"
 vssadmin list shadowstorage > "$VSS\vss_shadow_storage.log"
 
 #Handle vssadmin timeout taking more than 120 seconds
-$writersTimeout = 120;
+$writersTimeout = 180;
 $writersProcs = Start-Process -FilePath PowerShell.exe -ArgumentList '-Command "vssadmin list writers > C:\temp\vss_writers.log"' -PassThru -NoNewWindow
 try {
     $writersProcs | Wait-Process -Timeout $writersTimeout -ErrorAction Stop
@@ -339,7 +344,7 @@ Write-Console
 
 #Export VBR reg key values and check each value name for leading or trailing whitespace
 Write-Console "Exporting Veeam registry values..." "White" 1
-$VBRKeys = Get-ItemProperty "HKLM:\SOFTWARE\Veeam\Veeam Backup and Replication\"
+$VBRKeys = Get-ItemProperty "HKLM:\SOFTWARE\Veeam\Veeam Backup and Replication\" 
 if ($VBRKeys) {
     $VBRKeys > "$directory\registry_values.log"
     
@@ -364,7 +369,7 @@ Write-Console
 #Check if this server is running any SQL instances
 Write-Host "Are there any running SQL instances here? - " -ForegroundColor White -NoNewline; Start-Sleep 1
 $hasSQLDefaultInstance = Get-Service -Name MSSQL* | Where-Object { $_.Status -eq "Running" -and $_.Name -eq "MSSQLSERVER" }
-$hasSQL = Get-Service -Name MSSQL* | Where-Object { $_.Status -eq "Running" -and ($_.Name -ne "MSSQLFDLauncher" -and $_.Name -ne "MSSQLSERVER") }
+$hasSQL = Get-Service -Name "MSSQL*" | Where-Object { $_.Status -eq "Running" -and ($_.Name -ne "MSSQLFDLauncher" -and $_.Name -ne "MSSQLSERVER") }
 $hasSMO = [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Smo")
 $SQLServerInstance = @()
 if (!($hasSQLDefaultInstance) -and !($hasSQL)) {
