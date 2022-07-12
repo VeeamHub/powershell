@@ -265,7 +265,7 @@ catch {
 # End Authorization
 
 # GET - /api/v3/organizations - Retrieve Organizations (Service Provider, Resellers, & Companies)
-[String] $url = "https://" + $Server + ":" + $Port + "/api/v3/organizations"
+[String] $url = "https://" + $Server + ":" + $Port + "/api/v3/organizations?limit=1"
 Write-Verbose "GET - $url"
 $headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
 $headers.Add("Authorization", "Bearer $token")
