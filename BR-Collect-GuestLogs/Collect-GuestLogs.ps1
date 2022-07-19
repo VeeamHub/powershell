@@ -11,11 +11,18 @@
     NAME: Collect_Veeam_Guest_Logs.ps1
     AUTHOR: Chris Evans, Veeam Software
     CONTACT: chris.evans@veeam.com
-    LASTEDIT: 06-25-2022
+    LASTEDIT: 07-19-2022
     KEYWORDS: Log collection, AAiP, Guest Processing
 #> 
 #Requires -Version 4.0
 #Requires -RunAsAdministrator
+$ErrorActionPreference = "SilentlyContinue"
+
+#Check if script running in PowerShell ISE. If so, instruct to call the script again from a normal PowerShell console. This is due to PS ISE loading additional modules that can cause issues with transcription.
+if ($psISE) {
+    Write-Console "PowerShell ISE is not supported for this script. Please call the script from a PowerShell console (launched with Administrator privileges)." "Red" 5
+    Exit
+}
 
 function Write-Console (
     [string] $message = "Done.",
@@ -96,7 +103,6 @@ function LogSQLPermissions (
                 } 
             } 
             #Check the permissions in the DBs the Login is linked to. (Errors suppressed for all SQL logins that exist but are disabled)
-            $ErrorActionPreference = "SilentlyContinue"
             if ($SQLLogin.EnumDatabaseMappings()) { 
                 "Permissions: " | Out-File "$directory\SQL_Permissions.log" -Append
                 foreach ($DB in $Server.Databases) {
@@ -106,7 +112,6 @@ function LogSQLPermissions (
             else {
                  "None." | Out-File "$directory\SQL_Permissions.log" -Append
             }
-            $ErrorActionPreference = "Continue"
              "----------------------------------------------------------------------------" | Out-File "$directory\SQL_Permissions.log" -Append
         } 
     } 
@@ -293,6 +298,22 @@ $Events = "$directory\Events"
 $VSS = "$directory\VSS"
 $PSVersion = $PSVersionTable.PSVersion.Major
 
+Clear-Host
+
+#Resize PowerShell console so that output is not truncated unnecessarily.
+Write-Console "`n`nTemporarily resizing PowerShell console to prevent truncation of output." "Green" 2
+$PSHost = Get-Host
+$PSWindow = $PSHost.UI.RawUI
+$NewSize = $PSWindow.BufferSize
+$NewSize.Height = 3000
+$NewSize.Width = 270
+$PSWindow.BufferSize = $NewSize
+$NewSize = $PSWindow.WindowSize
+$NewSize.Height = 50
+$NewSize.Width = 270
+$PSWindow.WindowSize = $NewSize
+
+
 Write-Console "This script is provided as is as a courtesy for collecting Guest Proccessing logs from a guest server. `
 Please be aware that due to certain Microsoft operations there may be a short burst `
 of high CPU activity, and that some Windows OSes and GPOs may affect script execution. `
@@ -317,8 +338,8 @@ vssadmin list providers > "$VSS\vss_providers.log"
 vssadmin list shadows > "$VSS\vss_shadows.log"
 vssadmin list shadowstorage > "$VSS\vss_shadow_storage.log"
 
-#Handle vssadmin timeout taking more than 120 seconds
-$writersTimeout = 120;
+#Handle vssadmin timeout taking more than 180 seconds
+$writersTimeout = 180;
 $writersProcs = Start-Process -FilePath PowerShell.exe -ArgumentList '-Command "vssadmin list writers > C:\temp\vss_writers.log"' -PassThru -NoNewWindow
 try {
     $writersProcs | Wait-Process -Timeout $writersTimeout -ErrorAction Stop
@@ -337,21 +358,36 @@ Write-Console "Exporting systeminfo..." "White" 1
 systeminfo > "$directory\systeminfo.log"
 Write-Console
 
-#Export VBR reg key values and check each value name for leading or trailing whitespace
+#Export VBR reg key values (32-bit and 64-bit values)
 Write-Console "Exporting Veeam registry values..." "White" 1
-$VBRKeys = Get-ItemProperty "HKLM:\SOFTWARE\Veeam\Veeam Backup and Replication\"
-if ($VBRKeys) {
-    $VBRKeys > "$directory\registry_values.log"
-    
-    #Check all the reg key names to detect any names with leading or trailing whitespace
-    $invalidkeys = $VBRkeys.PSObject.Properties.Name | Where-Object { $_.EndsWith(" ") -or $_.StartsWith(" ") } | ForEach-Object { "'{0}'" -f $_ }
-    #Log invalid keys if any were found
-    if ($invalidkeys) {
-        Write-Output "The following registry value names were found to have leading or trailing whitespace:`n $invalidkeys" >> "$directory\invalid_registry_keys.log"
+$regKeys = @()
+#Must test to see if registry hives exist, otherwise would cause a stack overflow error.
+if (Test-Path 'HKLM:\SOFTWARE\Veeam') {
+    reg export 'HKLM\SOFTWARE\Veeam' "$directory\64-Bit_Veeam_Registry_Keys.log"
+    $regKeys += Get-ChildItem "HKLM:\Software\Veeam" -Recurse
+}
+if (Test-Path 'HKLM:\SOFTWARE\WOW6432Node\Veeam') {
+    reg export 'HKLM\SOFTWARE\WOW6432Node\Veeam' "$directory\32-Bit_Veeam_Registry_Keys.log"
+    $regKeys += Get-ChildItem "HKLM:\SOFTWARE\WOW6432Node\Veeam" -Recurse
+}
+
+if ($regKeys) {
+    $invalidKeys = @()
+
+    foreach ($regSubKey in $regKeys) {
+        $regSubKey.Property | ForEach-Object {
+            if (($_).Contains(' ')) {
+                $invalidKeys += "$regSubkey\'$_'"
+            }
+        }
     }
-} 
-else {
-    Write-Output "Veeam Backup and Replication registry hive contains zero registry key values (default setting)." > "$directory\registry_values.log"
+} else {
+    Write-Output "Veeam Backup and Replication registry hives contains zero registry key values (default setting)." > "$directory\registry_values.log"
+}
+
+if ($invalidKeys) {
+    Write-Output "The following registry value names were found to have leading or trailing whitespace (Invalid key will be wrapped in single quotes):`r`n" $invalidKeys >> "$directory\invalid_registry_keys.log"
+} else {
     Write-Output "No invalid registry keys detected." > "$directory\invalid_registry_keys.log"
 }
 Write-Console
@@ -364,7 +400,7 @@ Write-Console
 #Check if this server is running any SQL instances
 Write-Host "Are there any running SQL instances here? - " -ForegroundColor White -NoNewline; Start-Sleep 1
 $hasSQLDefaultInstance = Get-Service -Name MSSQL* | Where-Object { $_.Status -eq "Running" -and $_.Name -eq "MSSQLSERVER" }
-$hasSQL = Get-Service -Name MSSQL* | Where-Object { $_.Status -eq "Running" -and ($_.Name -ne "MSSQLFDLauncher" -and $_.Name -ne "MSSQLSERVER") }
+$hasSQL = Get-Service -Name "MSSQL*" | Where-Object { $_.Status -eq "Running" -and ($_.Name -ne "MSSQLFDLauncher" -and $_.Name -ne "MSSQLSERVER") }
 $hasSMO = [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Smo")
 $SQLServerInstance = @()
 if (!($hasSQLDefaultInstance) -and !($hasSQL)) {
@@ -407,13 +443,15 @@ Write-Console
 
 #Get network security settings (This is where customizations such as disabling TLS 1.0/1.1 or key exchange algorithms are done)
 Write-Console "Checking for network customizations (ie. Is TLS 1.0/1.1 disabled? Custom key exchange algorithms?)..." "White" 1
-Write-Output "Reference: https://docs.microsoft.com/en-us/windows-server/security/tls/tls-registry-settings" > "$directory\network_customizations.log"
-Get-ChildItem "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL" -Recurse >> "$directory\network_customizations.log"
+#Must test to see if registry hive exists, otherwise would cause a stack overflow error.
+if (Test-Path 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL') {
+    reg export "HKLM\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL" "$directory\network_customizations.log" 
+}
 Write-Console
 
 #Get status of 'File and Printer Sharing'
 Write-Console "Checking if 'File and Printer Sharing' is enabled..." "White" 1
-Get-NetAdapterBinding | Where-Object { $_.DisplayName -match "File and Printer Sharing" } > "$directory\file_and_printer_sharing.log"
+Get-NetAdapterBinding | Where-Object { $_.DisplayName -match "File and Printer Sharing" } | Format-Table -AutoSize > "$directory\file_and_printer_sharing.log"
 Write-Console
 
 #Get settings of attached NICs
@@ -423,8 +461,13 @@ Write-Console
 
 #Check if 'LocalAccountTokenFilterPolicy' registry value is enabled
 Write-Console "Checking if 'Remote UAC' is disabled..." "White" 1
-Write-Output "If 'LocalAccountTokenFilterPolicy' = 1 then 'RemoteUAC' has been disabled. If it does not exist or is set to '0' then it is still enabled." > "$directory\System_Policies.log"
-(Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System").PSObject.Properties | Select-Object Name, Value >> "$directory\System_Policies.log"
+#Must test to see if registry hive exists, otherwise would cause a stack overflow error.
+if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System') {
+    reg export "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" "$directory\System_Policies.log"
+    $content = Get-Content "$directory\System_Policies.log"
+    Write-Output "If 'LocalAccountTokenFilterPolicy' = 1 then 'RemoteUAC' has been disabled. If it does not exist or is set to '0' then it is still enabled.`r`n" > "$directory\System_Policies.log"
+    $content | Out-File "$directory\System_Policies.log" -Append
+}
 Write-Console
 
 #Export event viewer logs
@@ -486,6 +529,7 @@ else {
 
 #Stop transcript, copy Execution.log into the .zip archive, then cleanup Execution.log from C:\temp directory.
 Stop-Transcript > $null
+Start-Sleep -Seconds 1
 Add-FileToZip -FileToAdd "C:\temp\Execution.log" -ZipName ($directory + ".zip")
 Remove-Item "$temp\Execution.Log" -Force
 
