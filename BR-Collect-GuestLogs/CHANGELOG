@@ -1,0 +1,10 @@
+July 19 2022 Update:
+
+- Added code to resize the PowerShell console. If the PowerShell console buffer size / window size was too small, the output from many of the commands would be truncated to the point that the information would not be useful.
+- Reworked the way registry values are exported. Now uses 'reg.exe export <path\to\reg\hive>' as it gives better output and is more useful.
+- Included export of 32-bit Veeam registry values (HKLM\SOFTWARE\WOW6432Node\Veeam)
+
+Regression testing performed on: 
+    - Server 2012 R2 running PowerShell 4.0
+    - Server 2019 running PowerShell 5.1
+    - Windows 10 Pro for Workstations running PowerShell 5.1
