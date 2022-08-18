@@ -67,7 +67,7 @@ $orgNumber = Read-Host  "Enter organization number"
 $org = $orgs[$orgNumber]
 
 # no org chosen
-if ($org -eq $null)
+if ($null -eq $org)
 {
     Write-Error "No Organization chosen. Quitting script now."
     Exit
@@ -83,14 +83,14 @@ $session = Start-VBOExchangeItemRestoreSession -LatestState -Organization $org -
 try
 {
     $selection = $null
-    while ($selection -eq $null)
+    while ($null -eq $selection)
     {
         # retrieving user mailbox
         $database = Get-VEXDatabase -Session $session
         $mailbox = Get-VEXMailbox -Database $database -Name $email
 
         # check if mailboxes found
-        if ($mailbox -eq $null)
+        if ($null -eq $mailbox)
         {
             # no mailbox found
             Write-Warning "No mailboxes found for search: $email"
