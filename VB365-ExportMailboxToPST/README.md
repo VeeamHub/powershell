@@ -14,7 +14,8 @@ This script is designed to be executed on a Veeam Backup for Microsoft 365 (VB36
 
 ## Requirements
 
-* All scripts were tested using *Veeam Backup for Microsoft 365 v6*
+* Veeam Backup for Microsoft 365 v6
+  * *Other versions are untested*
 * Must be executed on Veeam Backup for Microsoft 365 server
 
 ## Usage
