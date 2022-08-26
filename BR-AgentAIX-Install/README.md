@@ -41,13 +41,13 @@ This script is designed to help automate the install of Veeam Agent for AIX depl
   * Find-Module Posh-SSH
   * Install-Module -Name Posh-SSH
 
-## Additional Infor
+## Additional Information
 
 If using a certificate file for authentication instead of a password:
 * SSH Private Key must be in OpenSSH format. Can use PuttyGen to convert.
 * Change script to use below inplace of creds from csv file
   $Credential = Get-Credential
-  $KeyFile = 'C:\SP CREDS\IBM\IBM PowerVS Keys\ibmpowervs-veeam-openssh'
+  $KeyFile = 'path to keyfile'
   $Sesh = New-SSHSession -ComputerName 'IP or FQDN' -Credential $Credential -KeyFile $KeyFile -Verbose
   Get-SSHTrustedHost
   Get-SSHSession | fl 
