@@ -1,4 +1,9 @@
-﻿Add-Type -AssemblyName PresentationFramework
+﻿param(
+    $jsonsrc = "internal"
+)
+
+write-host "Loading, if this is the first time you started superedit in this session, connection has to be made to VBR and this might take a while"
+Add-Type -AssemblyName PresentationFramework
 [xml]$xaml = @"
 <Window 
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -226,6 +231,44 @@ foreach (`$o in (`$totallist | ? { `$_.id -in `$idlist} )) {
 "@ 
 
 $modselectionitems = $modselectionitemsjson | ConvertFrom-Json
+
+
+if ($jsonsrc -ne "internal") {
+    $error = $false
+
+    if ($jsonsrc -match "^http[s]?://") {
+        write-host "Downloading script file from $jsonsrc"
+        $data = invoke-webrequest $jsonsrc
+        if ($data -ne "" -and $data.BaseResponse.StatusCode -eq "ok") {
+            $convertfromjson = $data.Content | ConvertFrom-Json
+            if ($convertfromjson) {
+                $modselectionitems =  $convertfromjson
+                write-host "Got Valid Remote JSON From $jsonsrc"
+            } else {
+                write-host "Conversion Failed for $jsonsrc"
+                $error = $true
+            }
+        } else {
+            write-host "Verify URL $jsonsrc"
+            $error = $true
+        }
+    } elseif (Test-Path -Path $jsonsrc -PathType Leaf) {
+        $convertfromjson = (Get-Content $jsonsrc) | ConvertFrom-Json
+        if ($convertfromjson) {
+            $modselectionitems =  $convertfromjson
+            write-host "Got Valid Remote JSON From $jsonsrc"
+        } else {
+                write-host "Conversion Failed for $jsonsrc"
+                $error = $true
+        }
+    } else {
+            write-host "Verify $jsonsrc, it is not an url nor a path"
+            $error = $true
+    }
+    if ($error) { write-host "Got error, using embedded json" }
+}
+
+
 
 $modselection.Items.Clear()
 
