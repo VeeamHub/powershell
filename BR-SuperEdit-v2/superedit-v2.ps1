@@ -86,7 +86,7 @@ function Set-SECyclesRetention {
   `$o.BackupStorageOptions.RetainCycles = `$val
   `$job | Set-VBRJobOptions -Options `$o
 }
-
+`$superedittag = ##tag##
 `$supereditval = ##val##
 `$idlist = @()
 ",
@@ -111,7 +111,7 @@ function Set-SEDaysRetention {
   `$job | Set-VBRJobOptions -Options `$o
 }
 
-
+`$superedittag = ##tag##
 `$supereditval = ##val##
 `$idlist = @()
 ",
@@ -136,7 +136,7 @@ function Set-SEBlockSize {
   `$job | Set-VBRJobOptions -Options `$o
 }
 
-
+`$superedittag = ##tag##
 `$supereditval = ##val##
 `$idlist = @()
 ",
@@ -170,7 +170,7 @@ function Set-SECyclesRetention {
   `$o.BackupStorageOptions.RetainCycles = `$val
   `$job | Set-VBRJobOptions -Options `$o
 }
-
+`$superedittag = ##tag##
 `$supereditval = ##val##
 `$idlist = @()
 ",
@@ -195,7 +195,7 @@ function Set-SEDaysRetention {
   `$job | Set-VBRJobOptions -Options `$o
 }
 
-
+`$superedittag = ##tag##
 `$supereditval = ##val##
 `$idlist = @()
 ",
@@ -221,7 +221,9 @@ foreach (`$job in (`$jobs | ? { `$_.id -in `$idlist} )) {
                 "ValueExpression": "(1..99)",
                 "ValueConvert": "int",
 				"PreExpression": "# VI Proxy Tasks Slots
+
 `$totallist = (get-vbrviproxy)
+`$superedittag = ##tag##
 `$supereditval = ##val##
 `$idlist = @()
 ",
@@ -378,13 +380,13 @@ function Update-SelectionList {
                         }
                     } else {
                         $global:globaltaglist[$tagkey] = @($itemtagval)
-                        $taglistupdate
+                        $taglistupdate = $true
                     }
                  }
 
                  
             }
-            
+             
 
             if($passedfilters -and $nf -ne "") {
                 $passedfilters = ($name -match $nf)
@@ -409,7 +411,7 @@ function Update-SelectionList {
                 $selectionlist.Items.Add($listitem) | Out-Null
             }
         }
-
+       
         if (-not $updatelistonly) {
             $modkey.Items.Clear()
             foreach($action in $modselected.Actions) {
@@ -432,6 +434,7 @@ function Update-SelectionList {
             }
         }
 
+        
         Update-SelectAll
 }
 
@@ -466,6 +469,16 @@ function Invoke-ExecutionEngine {
    
 
     $selval = (Convert-ToScriptOutput -c $mod.ValueConvert -v $modval.SelectedValue)
+    
+    
+    $seltag = ""
+    $selectedtagfilter = $tagfilter.SelectedValue
+    if ($selectedtagfilter.Category -ne "" -and $selectedtagfilter.Tag -ne "") {
+        $seltag = ("[{0}:{1}]" -f $selectedtagfilter.Category,$selectedtagfilter.Tag )
+    }
+
+    $seltag = (Convert-ToScriptOutput -c "string" -v $seltag)
+
     $expr = $mod.ForEachExpression
 
     $idpath =  $js.IdPath
@@ -473,7 +486,7 @@ function Invoke-ExecutionEngine {
     $script = @()
     $script += ("# Generated with SuperEdit v2 on {0} " -f (get-date).ToString())
     $script += ("#")
-    $script += $mod.PreExpression  -replace "##val##","$selval"
+    $script += $mod.PreExpression 
     foreach ($litem in $itemlist) {
         $item = $litem.OriginalObject
         $objectid = (Convert-ToScriptOutput -c $js.IdConvert -v ($item."$idpath"))
@@ -481,16 +494,18 @@ function Invoke-ExecutionEngine {
 
         $script += ("# {0}" -f $litem.Name)
         
-        $script += $mod.ForEachExpression -replace "##id##",$objectid -replace "##val##","$selval"
+        $script += $mod.ForEachExpression -replace "##id##",$objectid
     }
-    $script += $mod.PostExpression  -replace "##val##","$selval"
-    
+    $script += $mod.PostExpression  
+   
+
     $pspath = "scripts.ps1"
     if ($outpath.Text -ne "") {
         $pspath = $outpath.Text
     }
 
-    $script -join "`n" | Set-Content $pspath
+    $joined = $script -join "`n" 
+    $joined -replace "##val##","$selval"  -replace "##tag##","$seltag" | Set-Content $pspath
     [System.Windows.MessageBox]::Show("Script should be generated under $pspath") | out-null
 
 }
