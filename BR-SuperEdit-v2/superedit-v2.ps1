@@ -339,6 +339,7 @@ function Update-SelectAll {
 }
 
 
+$global:globaltaglist = @{}
 
 #update the selection table (the big thing in the middle)
 function Update-SelectionList {
@@ -353,7 +354,8 @@ function Update-SelectionList {
         
         $nf = $namefilter.Text
         # @{"cat1"=@("tag1","tag2");"cat2"=@("tag3","tag4")}
-        $newtaglist = @{}
+        
+        $taglistupdate = $false
 
         foreach($item in $newlist) {
             $passedfilters = $true
@@ -369,12 +371,14 @@ function Update-SelectionList {
                  foreach($tagkey in $itemtags.Keys) {
                     $itemtagval = $itemtags[$tagkey]
 
-                    if ($newtaglist.ContainsKey($tagkey)) {
-                        if($itemtagval -notin $newtaglist[$tagkey]) {
-                            $newtaglist[$tagkey] += $itemtagval
+                    if ($global:globaltaglist.ContainsKey($tagkey)) {
+                        if($itemtagval -notin $global:globaltaglist[$tagkey]) {
+                            $global:globaltaglist[$tagkey] += $itemtagval
+                            $taglistupdate = $true
                         }
                     } else {
-                        $newtaglist[$tagkey] = @($itemtagval)
+                        $global:globaltaglist[$tagkey] = @($itemtagval)
+                        $taglistupdate
                     }
                  }
 
@@ -386,8 +390,8 @@ function Update-SelectionList {
                 $passedfilters = ($name -match $nf)
             }
 
-            # only updating on select (meaning we have already listed all)
-            if ($updatelistonly -and $passedfilters -and (-not $tagfilter.Items.IsEmpty)) {
+           
+            if ($passedfilters -and (-not $tagfilter.Items.IsEmpty)) {
                 $tf = $tagfilter.SelectedValue
                 if ($tf -and $tf.Category -ne "" -and $tf.Tag -ne "") {
                     if ($itemtags.ContainsKey($tf.Category)) {
@@ -417,10 +421,13 @@ function Update-SelectionList {
                 Update-ValueList
             }
             
-            $tagfilter.items.Clear()
-            foreach($tagcat in ($newtaglist.keys | Sort-Object)) {
-                foreach($tag in ($newtaglist[$tagcat]| Sort-Object)) {
-                    $tagfilter.items.add((new-object -TypeName psobject -Property @{Name=("$tagcat : $tag");Category=$tagcat;Tag=$tag}))
+            if ($taglistupdate) {
+                $tagfilter.items.Clear()
+                $tagfilter.items.add((new-object -TypeName psobject -Property @{Name=("No Tag Filter");Category="";Tag=""})) | out-null
+                foreach($tagcat in ($global:globaltaglist.keys | Sort-Object)) {
+                    foreach($tag in ($global:globaltaglist[$tagcat]| Sort-Object)) {
+                        $tagfilter.items.add((new-object -TypeName psobject -Property @{Name=("$tagcat : $tag");Category=$tagcat;Tag=$tag}))  | out-null
+                    }
                 }
             }
         }
