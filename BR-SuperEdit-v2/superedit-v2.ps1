@@ -61,7 +61,6 @@ $modselectionitemsjson = @"
 		"Name": "Generic Backup Jobs",
         "ListExpression": "get-vbrjob | ? { `$_.jobtype -in @([Veeam.Backup.Model.EDbJobType]::Backup) }",
         "NamePath": "name",
-        "Id": 0,
 		"IdPath": "id",
         "IdConvert": "string",
 		"Actions": [{
@@ -145,7 +144,6 @@ foreach (`$job in (`$jobs | ? { `$_.id -in `$idlist} )) {
         "Name": "Generic Simple Backup Copy Jobs",
         "ListExpression": "`get-vbrjob | ? { `$_.jobtype -in @([Veeam.Backup.Model.EDbJobType]::SimpleBackupCopyPolicy) }",
         "NamePath": "name",
-        "Id": 1,
 		"IdPath": "id",
         "IdConvert": "string",
 		"Actions": [{
@@ -199,7 +197,31 @@ foreach (`$job in (`$jobs | ? { `$_.id -in `$idlist} )) {
 "
 			}
         ]
-	}
+	},
+    {
+        "Name": "VMware Proxies",
+        "ListExpression": "`get-vbrviproxy",
+        "NamePath": "name",
+		"IdPath": "id",
+        "IdConvert": "string",
+		"Actions": [{
+				"Name": "Task Slot",
+				"Values": [],
+                "ValueExpression": "(1..99)",
+                "ValueConvert": "int",
+				"PreExpression": "# VI Proxy Tasks Slots
+`$totallist = (get-vbrviproxy)
+`$supereditval = ##val##
+`$idlist = @()
+",
+				"ForEachExpression": "`$idlist += ##id##",
+				"PostExpression": "
+foreach (`$o in (`$totallist | ? { `$_.id -in `$idlist} )) {
+    `$o | Set-VBRViProxy -MaxTasks `$supereditval
+}
+"
+			}]
+    }
 ]
 "@ 
 
