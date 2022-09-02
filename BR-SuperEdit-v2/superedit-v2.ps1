@@ -22,7 +22,7 @@ Add-Type -AssemblyName PresentationFramework
 
         <Button Visibility="Hidden" x:Name="review" Content="Review" Margin="0,0,115,10"  Height="25" Width="100" VerticalAlignment="Bottom" HorizontalAlignment="Right" Grid.Column="2"/>
         <Button x:Name="execute" Content="Generate" Margin="0,0,10,10" Height="25" Width="100" VerticalAlignment="Bottom" HorizontalAlignment="Right" Grid.Column="2"/>
-        <ListView x:Name="selectionlist" Margin="10,81,10,50">
+        <ListView x:Name="selectionlist" Margin="10,107,10,50">
             <ListView.View>
                 <GridView>
                     <GridViewColumn x:Name="select" Header="Select" HeaderStringFormat="Select" Width="50" >
@@ -41,6 +41,8 @@ Add-Type -AssemblyName PresentationFramework
         <TextBox x:Name="scriptout" Margin="0,0,116,10" Text="superedit-batch.ps1" TextWrapping="Wrap" Height="25" VerticalAlignment="Bottom" HorizontalAlignment="Right" Width="168"/>
         <TextBox x:Name="namefilter" Margin="128,44,10,0" TextWrapping="Wrap" VerticalAlignment="Top"/>
         <Label x:Name="lblnamefilter" Content="Name Filter" HorizontalAlignment="Left" Margin="10,40,0,0" VerticalAlignment="Top" RenderTransformOrigin="-0.184,0.04" Height="26" Width="118"/>
+        <Label x:Name="lblsupereidtagfilter" Content="SE Tag Filter" HorizontalAlignment="Left" Margin="10,66,0,0" VerticalAlignment="Top" RenderTransformOrigin="-0.184,0.04" Height="26" Width="118"/>
+        <ComboBox x:Name="tagfilter" Margin="128,70,10,0" VerticalAlignment="Top" DisplayMemberPath="Name"/>
     </Grid>
 </Window>
 
@@ -59,12 +61,14 @@ $modval = $window.FindName("modval")
 $execute = $window.FindName("execute")
 $outpath = $window.FindName("scriptout")
 $namefilter = $window.FindName("namefilter")
+$tagfilter = $window.FindName("tagfilter")
 
 
 $modselectionitemsjson = @"
 [{
 		"Name": "Generic Backup Jobs",
         "ListExpression": "get-vbrjob | ? { `$_.jobtype -in @([Veeam.Backup.Model.EDbJobType]::Backup) }",
+        "TagPath": "description",
         "NamePath": "name",
 		"IdPath": "id",
         "IdConvert": "string",
@@ -148,6 +152,7 @@ foreach (`$job in (`$jobs | ? { `$_.id -in `$idlist} )) {
 	{
         "Name": "Generic Simple Backup Copy Jobs",
         "ListExpression": "`get-vbrjob | ? { `$_.jobtype -in @([Veeam.Backup.Model.EDbJobType]::SimpleBackupCopyPolicy) }",
+        "TagPath": "description",
         "NamePath": "name",
 		"IdPath": "id",
         "IdConvert": "string",
@@ -206,6 +211,7 @@ foreach (`$job in (`$jobs | ? { `$_.id -in `$idlist} )) {
     {
         "Name": "VMware Proxies",
         "ListExpression": "`get-vbrviproxy",
+        "TagPath": "description",
         "NamePath": "name",
 		"IdPath": "id",
         "IdConvert": "string",
@@ -281,6 +287,19 @@ $modselection.SelectedIndex = 0
 
 
 
+#sample "fsdfds [location:antwerp]  sfds [support:gold]"
+$global:tagmatch = [regex]::new("\[([a-z0-9A-Z]+):([a-z0-9A-Z]+)\]")
+function Get-SuperEditTags {
+    param($text)
+    $tags = @{}
+    $matches = $global:tagmatch.Matches($text)
+    foreach($match in $matches) {
+        $tags[$match.Groups[1].Value] = $match.Groups[2].value
+    }
+    return $tags
+}
+
+
 
 function Update-ValueList {
     $selected = $modkey.SelectedValue
@@ -319,6 +338,8 @@ function Update-SelectAll {
    
 }
 
+
+
 #update the selection table (the big thing in the middle)
 function Update-SelectionList {
         param($updatelistonly=$false)
@@ -327,20 +348,60 @@ function Update-SelectionList {
         $modselected = $modselection.SelectedValue.OriginalObject
 
         $npath = $modselected.NamePath
+        $tpath = $modselected.TagPath
         $newlist = Invoke-Expression  $modselected.ListExpression
         
         $nf = $namefilter.Text
+        # @{"cat1"=@("tag1","tag2");"cat2"=@("tag3","tag4")}
+        $newtaglist = @{}
 
         foreach($item in $newlist) {
             $passedfilters = $true
             $name = $item."$npath"
+            $tagfield = $item."$tpath"
+            
+            $itemtags = @{}
+
+            if ($tagfield -and $tagfield -ne "") {
+                 $itemtags = Get-SuperEditTags -text $tagfield
+           
+
+                 foreach($tagkey in $itemtags.Keys) {
+                    $itemtagval = $itemtags[$tagkey]
+
+                    if ($newtaglist.ContainsKey($tagkey)) {
+                        if($itemtagval -notin $newtaglist[$tagkey]) {
+                            $newtaglist[$tagkey] += $itemtagval
+                        }
+                    } else {
+                        $newtaglist[$tagkey] = @($itemtagval)
+                    }
+                 }
+
+                 
+            }
+            
 
             if($passedfilters -and $nf -ne "") {
                 $passedfilters = ($name -match $nf)
             }
 
+            # only updating on select (meaning we have already listed all)
+            if ($updatelistonly -and $passedfilters -and (-not $tagfilter.Items.IsEmpty)) {
+                $tf = $tagfilter.SelectedValue
+                if ($tf -and $tf.Category -ne "" -and $tf.Tag -ne "") {
+                    if ($itemtags.ContainsKey($tf.Category)) {
+                        if ($itemtags[$tf.Category] -ne $tf.Tag ) {
+                            $passedfilters = $false
+                        }
+                    } else {
+                        $passedfilters = $false
+                    }
+                }
+            }
+
             if ($passedfilters) {
-                $listitem = new-object -TypeName psobject -Property @{Name=$name;Include=$false;OriginalObject=$item}
+                $listitem = new-object -TypeName psobject -Property @{Name=$name;Include=$false;Tags=$itemtags;OriginalObject=$item}
                 $selectionlist.Items.Add($listitem) | Out-Null
             }
         }
@@ -348,12 +409,19 @@ function Update-SelectionList {
         if (-not $updatelistonly) {
             $modkey.Items.Clear()
             foreach($action in $modselected.Actions) {
-                    $action = new-object -TypeName psobject -Property @{Name=$action.Name;Id=$selected.Id;SubId=$action.SubId;OriginalObject=$action}
+                    $action = new-object -TypeName psobject -Property @{Name=$action.Name;OriginalObject=$action}
                     $modkey.Items.Add($action) | Out-Null 
             }
             if (-not $modkey.Items.IsEmpty) {
                 $modkey.SelectedIndex = 0
                 Update-ValueList
+            }
+            
+            $tagfilter.items.Clear()
+            foreach($tagcat in ($newtaglist.keys | Sort-Object)) {
+                foreach($tag in ($newtaglist[$tagcat]| Sort-Object)) {
+                    $tagfilter.items.add((new-object -TypeName psobject -Property @{Name=("$tagcat : $tag");Category=$tagcat;Tag=$tag}))
+                }
             }
         }
 
@@ -361,9 +429,11 @@ function Update-SelectionList {
 }
 
 
-function Update-SelectionListAfterNameChange {
+function Update-SelectionListAfterFilterChange {
     Update-SelectionList -updatelistonly $true  
 }
+
+
 
 function Convert-ToScriptOutput {
     param ($c,$v)
@@ -430,7 +500,8 @@ $selectall.Add_Unchecked({Update-SelectAll})
 $modkey.Add_SelectionChanged({Update-ValueList})
 
 
-$namefilter.Add_KeyDown({if ($_.Key -eq "Enter") {Update-SelectionListAfterNameChange}})
+$namefilter.Add_KeyDown({if ($_.Key -eq "Enter") {Update-SelectionListAfterFilterChange }})
+$tagfilter.Add_selectionChanged({Update-SelectionListAfterFilterChange})
 
 
 
