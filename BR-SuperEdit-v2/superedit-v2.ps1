@@ -18,7 +18,7 @@ Add-Type -AssemblyName PresentationFramework
         <CheckBox x:Name="selectall" Content="Select All" Margin="0,14,16,0" VerticalAlignment="Top" Height="25" IsChecked="True" HorizontalAlignment="Right" Width="70"/>
         <ComboBox x:Name="modselection" Margin="10,10,108,0" VerticalAlignment="Top" Height="25" DisplayMemberPath="Name" />
         <ComboBox x:Name="modkey" HorizontalAlignment="Left" Margin="10,0,0,10" VerticalAlignment="Bottom" Height="25" Width="220" DisplayMemberPath="Name"/>
-        <ComboBox x:Name="modval" HorizontalAlignment="Left" Margin="240,0,0,10" Width="220" Height="25" VerticalAlignment="Bottom" Grid.ColumnSpan="3" />
+        <ComboBox x:Name="modval" HorizontalAlignment="Left" Margin="240,0,0,10" Width="220" Height="25" VerticalAlignment="Bottom" Grid.ColumnSpan="3"  />
 
         <Button Visibility="Hidden" x:Name="review" Content="Review" Margin="0,0,115,10"  Height="25" Width="100" VerticalAlignment="Bottom" HorizontalAlignment="Right" Grid.Column="2"/>
         <Button x:Name="execute" Content="Generate" Margin="0,0,10,10" Height="25" Width="100" VerticalAlignment="Bottom" HorizontalAlignment="Right" Grid.Column="2"/>
@@ -467,13 +467,13 @@ function Invoke-ExecutionEngine {
     
     $itemlist = $selectionlist.Items | ? { $_.Include }
    
-
+    
     $selval = (Convert-ToScriptOutput -c $mod.ValueConvert -v $modval.SelectedValue)
     
     
     $seltag = ""
     $selectedtagfilter = $tagfilter.SelectedValue
-    if ($selectedtagfilter.Category -ne "" -and $selectedtagfilter.Tag -ne "") {
+    if ($selectedtagfilter -and $selectedtagfilter.Category -ne "" -and $selectedtagfilter.Tag -ne "") {
         $seltag = ("[{0}:{1}]" -f $selectedtagfilter.Category,$selectedtagfilter.Tag )
     }
 
