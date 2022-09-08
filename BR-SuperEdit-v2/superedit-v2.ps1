@@ -1,6 +1,10 @@
 ﻿param(
-    $jsonsrc = "internal"
+    $jsonsrc = "internal",
+    $cachejsonsrc = ""
 )
+
+#tls errors otherwise
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 write-host "Loading, if this is the first time you started superedit in this session, connection has to be made to VBR and this might take a while"
 Add-Type -AssemblyName PresentationFramework
@@ -146,6 +150,34 @@ foreach (`$job in (`$jobs | ? { `$_.id -in `$idlist} )) {
     Set-SEBlockSize -job `$job -val `$supereditval
 }
 "
+			},
+			{
+				"Name": "Staggered startup time (min)",
+				"Values": [],
+                "ValueConvert": "string",
+                "ValueExpression": "(1..60)",
+                "PreExpression": "# Staggered startup time
+`$jobs = get-vbrjob
+function Set-SEStaggeredTime {
+  param(`$job,`$i,`$minutes,`$start) 
+  `$starttime = `$start.addMinutes(`$i*`$minutes)
+  `$job | Set-VBRJobSchedule -Daily -At `$starttime
+}
+
+`$superedittag = ##tag##
+`$supereditval = ##val##
+`$idlist = @()
+",
+                "ForEachExpression": "`$idlist += ##id##",
+				"PostExpression": "
+`$i=0
+`$minutes=`$supereditval
+`$start = (get-date -Hour 22 -Minute 0 -Second 0 -Millisecond 0)
+foreach (`$job in (`$jobs | ? { `$_.id -in `$idlist} )) {
+    Set-SEStaggeredTime -job `$job -i `$i -minutes `$minutes -start `$start
+    `$i = `$i+1
+}
+"
 			}
 		]
 	},
@@ -241,39 +273,54 @@ foreach (`$o in (`$totallist | ? { `$_.id -in `$idlist} )) {
 $modselectionitems = $modselectionitemsjson | ConvertFrom-Json
 
 
+if ($cachejsonsrc -ne "" -and $jsonsrc -ne "internal") {
+    if (-not (Test-Path -PathType Leaf $jsonsrc)) {
+        write-host "Caching script file from $cachejsonsrc"
+        $data = invoke-webrequest $cachejsonsrc
+        if ($data -ne "" -and $data.BaseResponse.StatusCode -eq "ok") {
+            $windowsfile = $data.Content  -replace "`r?`n","`r`n" 
+            $convertfromjson = $windowsfile | ConvertFrom-Json
+            if ($convertfromjson) {
+                write-host "Conversion succeeded, writing the cache.."
+                $windowsfile | set-content -Path $jsonsrc
+            }
+        }
+    }
+}
+
 if ($jsonsrc -ne "internal") {
-    $error = $false
+    $goterror = $false
 
     if ($jsonsrc -match "^http[s]?://") {
         write-host "Downloading script file from $jsonsrc"
         $data = invoke-webrequest $jsonsrc
         if ($data -ne "" -and $data.BaseResponse.StatusCode -eq "ok") {
-            $convertfromjson = $data.Content | ConvertFrom-Json
+            $convertfromjson = $data.Content  -replace "`r?`n","`r`n" | ConvertFrom-Json
             if ($convertfromjson) {
                 $modselectionitems =  $convertfromjson
                 write-host "Got Valid Remote JSON From $jsonsrc"
             } else {
                 write-host "Conversion Failed for $jsonsrc"
-                $error = $true
+                $goterror = $true
             }
         } else {
             write-host "Verify URL $jsonsrc"
-            $error = $true
+            $goterror = $true
         }
     } elseif (Test-Path -Path $jsonsrc -PathType Leaf) {
         $convertfromjson = (Get-Content $jsonsrc) | ConvertFrom-Json
         if ($convertfromjson) {
             $modselectionitems =  $convertfromjson
-            write-host "Got Valid Remote JSON From $jsonsrc"
+            write-host "Got Valid Local JSON From $jsonsrc"
         } else {
                 write-host "Conversion Failed for $jsonsrc"
-                $error = $true
+                $goterror = $true
         }
     } else {
             write-host "Verify $jsonsrc, it is not an url nor a path"
-            $error = $true
+            $goterror = $true
     }
-    if ($error) { write-host "Got error, using embedded json" }
+    if ($goterror) { write-host "Got error, using embedded json" }
 }
 
 
