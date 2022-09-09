@@ -23,8 +23,5 @@ Optional parameters:
 
 Requires [Veeam Powershell module].
 
-[Back to overview](README.md)
-
-
 <!-- referenced links -->
 [Veeam PowerShell module]: https://helpcenter.veeam.com/docs/backup/powershell/getting_started.html

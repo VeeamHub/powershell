@@ -48,7 +48,6 @@ This example uses all parameters to check the backup window starting at 22:00 on
             -excludeVMs "_test" `
             -displayGrid
 ```
-[Back to overview](README.md)
 
 <!-- referenced links -->
 [Veeam PowerShell module]: https://helpcenter.veeam.com/docs/backup/powershell/getting_started.html
