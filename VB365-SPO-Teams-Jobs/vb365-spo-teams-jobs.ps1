@@ -20,7 +20,7 @@ Param(
     [Parameter()]
     # Maximum number of objects per job
     # When backing up teams the maximum is this number-1 because teams should be grouped with sites
-    [int] $objectsPerJob = 10,
+    [int] $objectsPerJob = 500,
 
     # Include teams when building jobs
     [switch] $withTeams = $true,
