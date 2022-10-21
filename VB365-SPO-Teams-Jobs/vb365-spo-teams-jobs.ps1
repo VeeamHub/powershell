@@ -1,7 +1,7 @@
 
 <#PSScriptInfo
 
-.VERSION 0.3.0
+.VERSION 0.4.0
 
 .GUID f3795945-b130-4740-84f4-e8248a847263
 
@@ -72,17 +72,20 @@ Param(
     [string] $scheduleDelay = "00:30:00",
 
     # Path to file with patterns to include when building jobs
-    # Includes will be processed before excludes
-    # If not set will try to load a file with the same name as the script and ending ".include"
+    # Checks patterns against Site/Teams names and SharePoint URLs
     # Patterns are case sensitive matched with regular expression syntax
-    # Specify one pattern per line and all will be checked
+    # Specify one pattern per line and all will be checked    
+    # Includes will be processed before excludes
+    # If not set will try to load a file with the same name as the script and ending ".include"    
     [string] $includeFile = $null,
 
-    # Path to file with patterns to exclude when building jobs (Excludes won't be added to jobs, they won't be excluded)
-    # Excludes will be processed after includes
-    # If not set will try to load a file with the same name as the script and ending ".exclude"
+    # Path to file with patterns to exclude when building jobs 
+    # Checks patterns against Site/Teams names and SharePoint URLs
     # Patterns are case sensitive matched with regular expression syntax
     # Specify one pattern per line and all will be checked
+    # Excluded objects won't  won't be added to jobs, they won't be excluded
+    # Excludes will be processed after includes
+    # If not set will try to load a file with the same name as the script and ending ".exclude"    
     [string] $excludeFile = $null
 
 )
@@ -96,9 +99,7 @@ DynamicParam {
     $ParameterAttribute = New-Object System.Management.Automation.ParameterAttribute    
     $ParameterAttribute.Mandatory = $true
     $AttributeCollection.Add($ParameterAttribute)    
-    $arrSet = Get-VBOOrganization | select -ExpandProperty Name
-    # Add .onmicrosoft.com name in case organization was renamed
-    $arrSet += Get-VBOOrganization | select -ExpandProperty OfficeName
+    $arrSet = Get-VBOOrganization | select -ExpandProperty Name    
     $ValidateSetAttribute = New-Object System.Management.Automation.ValidateSetAttribute($arrSet)    
     $AttributeCollection.Add($ValidateSetAttribute)    
     $ValidateNotNullOrEmptyAttribute = New-Object System.Management.Automation.ValidateNotNullOrEmptyAttribute
@@ -140,10 +141,12 @@ BEGIN {
     }
 
     
+    $includes = @()
     if ($includeFile) {
         $includes = Get-Content $includeFile
     }
 
+    $excludes = @()
     if ($excludeFile) {
         $excludes = Get-Content $excludeFile
     }
@@ -159,7 +162,7 @@ PROCESS {
     $teams = @()
 
     if (!$limitServiceTo -or $limitServiceTo -eq "SharePoint") {
-        $sites = Get-VBOOrganizationSite -Organization $org -NotInJob -WarningAction:SilentlyContinue    
+        $sites = Get-VBOOrganizationSite -Organization $org -NotInJob -Recurse -WarningAction:SilentlyContinue   
         "Found {0} SharePoint sites not yet in backup jobs" -f $sites.Count
     }
 
@@ -199,8 +202,7 @@ PROCESS {
     foreach ($o in $objects) {
 
         if ($includes) {
-            $include = $includes | Where-Object { $o.toString() -cmatch $_ }
-            if ($limitServiceTo -ne "Teams") { $include += $includes | Where-Object { $o.URL -cmatch $_ } }
+            $include = $includes | Where-Object { $o.toString() -cmatch $_ -or (($limitServiceTo -ne "Teams") -and ($o.URL -cmatch $_ )) }            
             if ($include) {
                 "Include {0} because of pattern {1}" -f $o.toString(),$include
             } else {
@@ -209,8 +211,7 @@ PROCESS {
         }
 
         if ($excludes) {
-            $exclude = $excludes | Where-Object { $o.toString() -cmatch $_ }
-            if ($limitServiceTo -ne "Teams") { $include += $includes | Where-Object { $o.URL -cmatch $_ } }
+            $exclude = $excludes | Where-Object { $o.toString() -cmatch $_ -or (($limitServiceTo -ne "Teams") -and ($o.URL -cmatch $_ )) }            
             if ($exclude) {
                 "Exclude {0} because of pattern {1}" -f $o.toString(),$exclude
                 continue
