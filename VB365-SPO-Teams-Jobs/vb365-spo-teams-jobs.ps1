@@ -65,6 +65,7 @@ Param(
     [switch] $withTeamsChats = $false,
 
     # Base schedule for 1st job
+    # Must be a VBO Schedule Policy like created with `New-VBOSchedulePolicy`
     [Object] $baseSchedule = $null,
 
     # Delay between the starttime of two jobs in HH:MM:SS format
@@ -73,13 +74,16 @@ Param(
     # Path to file with patterns to include when building jobs
     # Includes will be processed before excludes
     # If not set will try to load a file with the same name as the script and ending ".include"
+    # Patterns are case sensitive matched with regular expression syntax
+    # Specify one pattern per line and all will be checked
     [string] $includeFile = $null,
 
     # Path to file with patterns to exclude when building jobs (Excludes won't be added to jobs, they won't be excluded)
     # Excludes will be processed after includes
     # If not set will try to load a file with the same name as the script and ending ".exclude"
+    # Patterns are case sensitive matched with regular expression syntax
+    # Specify one pattern per line and all will be checked
     [string] $excludeFile = $null
-
 
 )
 DynamicParam {
@@ -196,6 +200,7 @@ PROCESS {
 
         if ($includes) {
             $include = $includes | Where-Object { $o.toString() -cmatch $_ }
+            if ($limitServiceTo -ne "Teams") { $include += $includes | Where-Object { $o.URL -cmatch $_ } }
             if ($include) {
                 "Include {0} because of pattern {1}" -f $o.toString(),$include
             } else {
@@ -205,6 +210,7 @@ PROCESS {
 
         if ($excludes) {
             $exclude = $excludes | Where-Object { $o.toString() -cmatch $_ }
+            if ($limitServiceTo -ne "Teams") { $include += $includes | Where-Object { $o.URL -cmatch $_ } }
             if ($exclude) {
                 "Exclude {0} because of pattern {1}" -f $o.toString(),$exclude
                 continue
