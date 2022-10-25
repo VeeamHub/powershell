@@ -123,6 +123,8 @@ DynamicParam {
     return $RuntimeParameterDictionary
 }
 BEGIN {
+    filter timelog { "$(Get-Date -Format "yyyy-mm-dd HH:mm:ss"): $_" }
+
     $organization = $PsBoundParameters[$OrganizationParameter]
     $repository = $PsBoundParameters[$RepositoryParameter]
 
@@ -162,26 +164,27 @@ PROCESS {
     $teams = @()
 
     if (!$limitServiceTo -or $limitServiceTo -eq "SharePoint") {
-        $sites = Get-VBOOrganizationSite -Organization $org -NotInJob -Recurse -WarningAction:SilentlyContinue   
-        "Found {0} SharePoint sites not yet in backup jobs" -f $sites.Count
+        "Reading SharePoint sites from organization - this can take a while" | timelog
+        $sites = Get-VBOOrganizationSite -Organization $org -NotInJob -WarningAction:SilentlyContinue   
+        "Found {0} SharePoint sites not yet in backup jobs" -f $sites.Count | timelog
     }
 
     if (!$limitServiceTo -or $limitServiceTo -eq "Teams") {
+        "Reading Teams from organization - this can take a while" | timelog
         $teams = Get-VBOOrganizationTeam -NotInJob -Organization $org 
-        "Found {0} Teams not yet in backup jobs" -f $teams.Count
+        "Found {0} Teams not yet in backup jobs" -f $teams.Count | timelog
     }
 
     # Iterate through teams only if no SP is selected, otherwise SP is always leading processing
     # Sort by UUIDs for randomizing and better load balancing
-    $objects = if ($limitServiceTo -eq "Teams") { $teams | sort -Property OfficeId } else { $sites | sort -Property SiteId } 
-    
+    $objects = if ($limitServiceTo -eq "Teams") { $teams | Sort-Object -Property OfficeId } else { $sites | Sort-Object -Property SiteId } 
 
     if ($includes) {
-        "Adding {0} include patterns to process from {1}" -f $includes.Count,$includeFile
+        "Adding {0} include patterns to process from {1}" -f $includes.Count,$includeFile | timelog
     }
     
     if ($excludes) {
-        "Adding {0} exclude patterns to process from {1}" -f $excludes.Count,$excludeFile
+        "Adding {0} exclude patterns to process from {1}" -f $excludes.Count,$excludeFile | timelog
     }
 
     $jobCounter = 1
@@ -198,13 +201,12 @@ PROCESS {
     # Adapt minimum free objects in job to stay below maximum when adding SP and Teams
     $minFreeObjects = if ($noTeams -or $noSharepoint) { 1 } else { 2 } 
 
-
     foreach ($o in $objects) {
 
         if ($includes) {
             $include = $includes | Where-Object { $o.toString() -cmatch $_ -or (($limitServiceTo -ne "Teams") -and ($o.URL -cmatch $_ )) }            
             if ($include) {
-                "Include {0} because of pattern {1}" -f $o.toString(),$include
+                "Include {0} because of pattern {1}" -f $o.toString(),$include | timelog
             } else {
                 continue
             }
@@ -213,7 +215,7 @@ PROCESS {
         if ($excludes) {
             $exclude = $excludes | Where-Object { $o.toString() -cmatch $_ -or (($limitServiceTo -ne "Teams") -and ($o.URL -cmatch $_ )) }            
             if ($exclude) {
-                "Exclude {0} because of pattern {1}" -f $o.toString(),$exclude
+                "Exclude {0} because of pattern {1}" -f $o.toString(),$exclude | timelog
                 continue
             }
         }
@@ -235,9 +237,9 @@ PROCESS {
             $currentJob = Get-VBOJob -Organization $org -Name $jobName -ErrorAction:SilentlyContinue
             if ($currentJob) {
                 $currentJobObjects = Get-VBOBackupItem -Job $currentJob
-                "Found existing job {0} with {1} objects" -f $currentJob,$currentJobObjects.Count
+                "Found existing job {0} with {1} objects" -f $currentJob,$currentJobObjects.Count | timelog
                 if ($currentJobObjects.Count -gt ($objectsPerJob - $minFreeObjects)) {
-                    "Skipping job, object limit already reached ({0})" -f $objectsPerJob
+                    "Skipping job, object limit already reached ({0})" -f $objectsPerJob | timelog
                     $lastSchedule = $currentJob.SchedulePolicy
                
                     # Won't use this job, search for next
@@ -245,7 +247,7 @@ PROCESS {
                     $jobCounter++
                     continue
                 }
-                "Adding objects to job {0}" -f $currentJob
+                "Adding objects to job {0}" -f $currentJob | timelog
                 $jobTouchedCounter++
                 
             } else {                
@@ -254,14 +256,14 @@ PROCESS {
                     $currentSchedule = New-VBOJobSchedulePolicy -EnableSchedule -Type $lastSchedule.Type -DailyType $lastSchedule.DailyType -DailyTime ($lastSchedule.DailyTime+$scheduleDelay)
                 }                
                 $currentJob = Add-VBOJob -Organization $org -Name $jobName -SchedulePolicy $currentSchedule -Repository $repoQueue.Dequeue() -SelectedItems $bObject -Description "Created by vbo-spo-teams-jobs v$($version) on $(Get-Date)"
-                "No usable job found - created new job {0}" -f $currentJob
+                "No usable job found - created new job {0}" -f $currentJob | timelog
                 $jobTouchedCounter++
                 $jobCreatedCounter++
             }            
         }
         
         Add-VBOBackupItem -Job $currentJob -BackupItem $bObject
-        "Added object to job {0}: {1}" -f $currentJob,$o
+        "Added object to job {0}: {1}" -f $currentJob,$o | timelog
         $objCounter++
         
         # If any service limit is set either do not process teams (limit to SP) or teams are already processed on $o level (limit to Teams)
@@ -272,14 +274,14 @@ PROCESS {
             if ($matchedTeam) {
                 $bTeam = New-VBOBackupItem -Team $matchedTeam -TeamsChats:$withTeamsChats                                
                 Add-VBOBackupItem -Job $currentJob -BackupItem $bTeam
-                "Added matching Team to job {0}: {1}" -f $currentJob,$matchedTeam
+                "Added matching Team to job {0}: {1}" -f $currentJob,$matchedTeam | timelog
                 $teamCounter++
             }
         }
         
         $currentJobObjects = Get-VBOBackupItem -Job $currentJob
         if ($currentJobObjects.Count -gt ($objectsPerJob - $minFreeObjects)) {
-            Write-Host "Reached object limit (${objectsPerJob})"
+            "Reached object limit ({0})" -f $objectsPerJob | timelog
             # Won't use this job, search for next
             $currentJob = $null
             $jobCounter++
@@ -290,7 +292,7 @@ PROCESS {
     $primaryObject = if ($limitServiceTo -eq "Teams") { "Teams" } else { "Sharepoint Sites" }
     $teamCountText = if (!$limitServiceTo) { "and ${teamCounter} teams " } else { "" }
 
-    Write-Host "Added ${objCounter} ${primaryObject} ${teamCountText}to ${jobTouchedCounter} touched and ${jobCreatedCounter} created backup jobs"     
+    "Added ${objCounter} ${primaryObject} ${teamCountText}to ${jobTouchedCounter} touched and ${jobCreatedCounter} created backup jobs"  | timelog    
 
 }
 
