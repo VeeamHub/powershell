@@ -20,6 +20,7 @@ The script offers the following major features:
 
 * Matching of SPO sites and Teams is based on the SPO URL and the Team's e-mail address. 
   Both don't change when a team is renamed.
+* Includes and Excludes will only work on primary site level
 
 ## Known Issues
 
