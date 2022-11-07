@@ -1,4 +1,4 @@
-# Scripts to automate setup of the VB365 Restore Portal
+# Teams Protected API Check
 
 ## Author
 
@@ -7,7 +7,9 @@
 
 ## Function
 
-This script leverages Veeam Backup for 365 (VB365) cmdlets and Microsoft Azure AD / Graph API cmdlets to validate whether access is present for the Microsoft Teams Protected API referenced in the KB article listed in the links.
+This script leverages Veeam Backup for 365 (VB365) cmdlets and Microsoft Azure AD / Graph API cmdlets to validate whether access is present for the Microsoft Teams Protected API referenced in the [KB article](https://www.veeam.com/kb4322).
+
+More information on why this script is beneficial can be found [here](https://community.veeam.com/script-library-67/verify-access-to-the-protected-teams-api-2931).
 
 ## Known Issues
 
