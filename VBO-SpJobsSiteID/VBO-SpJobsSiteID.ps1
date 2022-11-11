@@ -81,7 +81,7 @@ function handelUnprotected(){
     foreach ($VbUnprotectedSite in $VbUnprotectedSites) {
         
         # Get the name of the unprotected site
-        $VbUnprotectedSiteName = $VbUnprotectedSite.Name
+        $script:VbUnprotectedSiteName = $VbUnprotectedSite.Name
 
         # Get the SiteId as a string
         [string]$SiteID = $VbUnprotectedSite.SiteId
@@ -92,7 +92,7 @@ function handelUnprotected(){
         # Second character of the SiteId
         $SiteIdSecondtChar = $SiteID.substring(1,1)
 
-        if($debug="1"){Write-Host "SiteId start: $SiteIdFirstChar$SiteIdSecondtChar"}
+        if($debug -eq 1){Write-Host "SiteId start: $SiteIdFirstChar$SiteIdSecondtChar"}
 
         # Call function to add the site to a job
         AddCreateSPjobs
@@ -108,7 +108,7 @@ function AddCreateSPjobs(){
         
         # Check if the first array charater maches the first SiteId character
         if ($arrFirstChar[$i] -like $SiteIdFirstChar){
-            if($debug="1"){Write-Host "First Char match: $SiteIdFirstChar"} 
+            if($debug -eq 1){Write-Host "First Char match: $SiteIdFirstChar"} 
             
             # Go through the array for the second character in dimention 1
             $j=0
@@ -116,15 +116,15 @@ function AddCreateSPjobs(){
 
                 # Create the second character group name
                 $JobNameScndCharGroup = $arrScndChar[$j][0] + "-" + $arrScndChar[$j][-1]
-                if($debug="1"){Write-Host "JobNameScndCharGroup: $JobNameScndCharGroup"}
+                if($debug -eq 1){Write-Host "JobNameScndCharGroup: $JobNameScndCharGroup"}
 
                 # Building the end of the job name
                 $JobNameEnd = $arrFirstChar[$i] + $JobNameScndCharGroup
-                if($debug="1"){Write-Host "JobNameEnd: $JobNameEnd"}
+                if($debug -eq 1){Write-Host "JobNameEnd: $JobNameEnd"}
                 
                 # Building the complete job name
                 $JobName = $strJobNameStart + $JobNameEnd
-                if($debug="1"){Write-Host "JobName: $JobName"}
+                if($debug -eq 1){Write-Host "JobName: $JobName"}
                                
                 # Go through the array for the second character in each dimention 2
                 $k=0
@@ -132,13 +132,13 @@ function AddCreateSPjobs(){
 
                     # Check if the second array charater maches the second SiteId character
                     if ($arrScndChar[$j][$k] -like $SiteIdSecondtChar){
-                        if($debug="1"){Write-Host "Second Char match: $SiteIdSecondtChar"}                
+                        if($debug -eq 1){Write-Host "Second Char match: $SiteIdSecondtChar"}                
                                                 
                         $jobitem = New-VBOBackupItem -Site $VbUnprotectedSite
 
                         # Check if job exist and add site
 
-                        if ($VbJob=Get-VBOJob | ? {$_.Name -like $JobName}){
+                        if ($VbJob=Get-VBOJob | Where-Object {$_.Name -like $JobName}){
                             Write-Log -Info "$JobName exists, adding $VbUnprotectedSiteName" -Status Info
                             Add-VBOBackupItem -Job $VbJob -BackupItem $jobitem
 
@@ -150,9 +150,9 @@ function AddCreateSPjobs(){
                             Add-VBOJob -Organization $vbOrgObject -Name "$JobName" -Repository $vbRepoObject -SchedulePolicy $vbSchedule -SelectedItems $jobitem
 
                             # Increase the time for the next schedule
-                            if($debug="1"){Write-Host "Schedule before delay: $($vbSchedule.DailyTime)"}
+                            if($debug -eq 1){Write-Host "Schedule before delay: $($vbSchedule.DailyTime)"}
                             AddTimeDelay
-                            if($debug="1"){Write-Host "Schedule after delay: $($vbSchedule.DailyTime)"}
+                            if($debug -eq 1){Write-Host "Schedule after delay: $($vbSchedule.DailyTime)"}
                         }
 
                     }
@@ -169,19 +169,19 @@ function AddCreateSPjobs(){
 
 function AddTimeDelay(){
 
-    if($debug="1"){Write-Host "vbSchedTimeObj before delay: $vbSchedTimeObj"}
+    if($debug -eq 1){Write-Host "vbSchedTimeObj before delay: $vbSchedTimeObj"}
 
     # Add the delay minutes
     $global:vbSchedTimeObj = $vbSchedTimeObj.AddMinutes($vbSchedDelayMin)
-    if($debug="1"){Write-Host "vbSchedTimeObj after delay: $vbSchedTimeObj"}
+    if($debug -eq 1){Write-Host "vbSchedTimeObj after delay: $vbSchedTimeObj"}
 
     # Recreate the DailyTime value
     $global:vbDailyTime = $vbSchedTimeObj.ToString("HH:mm:ss")
-    if($debug="1"){Write-Host "vbDailyTime: $vbDailyTime"}
+    if($debug -eq 1){Write-Host "vbDailyTime: $vbDailyTime"}
 
     # Recreate the schedule object with the new start time
     $global:vbSchedule = New-VBOJobSchedulePolicy -Type $vbSchedType -DailyType $vbSchedDailyType -DailyTime $vbDailyTime
-    if($debug="1"){Write-Host "vbSchedule: $vbSchedule"}
+    if($debug -eq 1){Write-Host "vbSchedule: $vbSchedule"}
 }
 
 #### Main action ####
@@ -194,7 +194,7 @@ $vbRepoObject = Get-VBORepository -Name $RepoName
 
 # Create a time object for later modification
 $global:vbSchedTimeObj = New-Object DateTime 2022, 1, 1, $vbSchedStartHr, $vbSchedStartMin, 0, ([DateTimeKind]::Utc)
-if($debug="1"){Write-Host "Initial vbSchedTimeObj: $vbSchedTimeObj"}
+if($debug -eq 1){Write-Host "Initial vbSchedTimeObj: $vbSchedTimeObj"}
 
 # Build the backup job schedule
 $global:vbSchedule = New-VBOJobSchedulePolicy -Type $vbSchedType -DailyType $vbSchedDailyType -DailyTime $vbDailyTime
@@ -205,7 +205,7 @@ Write-Log -Info "Get all SP sites not in a job but exclude personal sites. This 
 
 # Run and measute the time of the Get-VBOOrganizationSite command to find SharePoint Sites not in jobs
 $executionTime = Measure-Command {
-    #$VbUnprotectedSites = Get-VBOOrganizationSite -Organization $vbOrgObject -NotInJob
+    $script:VbUnprotectedSites = Get-VBOOrganizationSite -Organization $vbOrgObject -NotInJob
 }
 
 # Read some execution values
