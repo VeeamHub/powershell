@@ -13,6 +13,21 @@ Write-Host "VM CPU Cores:" $VMcpu "Cores"
 $VMram = $RestorePoint.AuxData.MemSizeMb.InMegabytes
 Write-Host "VM RAM:" $VMram "MB"
 
+Write-Host "Set AWS Info"
+
+#Please Update the aws-info.csv for your settings
+$awsCSV = "C:\VDRO\Scripts\aws-info.csv" #CSV File to read from.
+$awsInfo =Import-Csv $awsCSV
+
+
+#Set Amazon account
+$Account = Get-VBRAmazonAccount -accesskey $awsInfo.accessKey
+Write-Host "Account:" $Account.Name
+
+#Set Amazon region
+$Region = Get-VBRAmazonEC2Region -Account $Account -RegionType Global -Name $awsInfo.region
+Write-Host "Region:" $Region.Name
+
 
 Write-Host "Matching equivelant T Class x86_64 EC2 instance type"
 
@@ -31,21 +46,6 @@ $Param6 = "--query InstanceTypes[].{InstnaceType:InstanceType,vCPUs:VCpuInfo.Def
 $Param6 = $Param6.Split(" ")
 $Ec2Instances = & "$AwsCmd" $Param1 $Param2 $Param3 $Param4 $Param5 $Param6 | ConvertFrom-Json
 
-
-Write-Host "Set AWS Info"
-
-#Please Update the aws-info.csv for your settings
-$awsCSV = "C:\VDRO\Scripts\aws-info.csv" #CSV File to read from.
-$awsInfo =Import-Csv $awsCSV
-
-
-#Set Amazon account
-$Account = Get-VBRAmazonAccount -accesskey $awsInfo.accessKey
-Write-Host "Account:" $Account.Name
-
-#Set Amazon region
-$Region = Get-VBRAmazonEC2Region -Account $Account -RegionType Global -Name $awsInfo.region
-Write-Host "Region:" $Region.Name
 
 #Set the disk type based on vm disk
 $VMdisk = Get-VBRFilesInRestorePoint -RestorePoint $RestorePoint | Where FileName -Like "*flat.vmdk*"
