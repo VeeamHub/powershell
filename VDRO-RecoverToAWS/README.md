@@ -58,3 +58,8 @@ In the Orchestration plan - Plan Steps
 * Add a Step Parameter
     Name has to be VMName
     Text type with Default value = %source_vm_name%
+
+
+A tag is added to the EC2 instance for auto backup by VB-AWS
+  Key=backup
+  Value=recover
