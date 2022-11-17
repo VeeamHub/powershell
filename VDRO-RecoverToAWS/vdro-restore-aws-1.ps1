@@ -54,7 +54,9 @@ $Ec2Instances = & "$AwsCmd" $Param1 $Param2 $Param3 $Param4 $Param5 $Param6 $Par
 
 #Set the disk type based on vm disk
 $VMdisk = Get-VBRFilesInRestorePoint -RestorePoint $RestorePoint | Where FileName -Like "*flat.vmdk*"
-$VolumeConfig = New-VBRAmazonEC2DiskConfiguration -DiskName $VMdisk.FileName -Include -DiskType GeneralPurposeSSD
+foreach ($disk in $VMdisk){
+    [array]$VolumeConfig += New-VBRAmazonEC2DiskConfiguration -DiskName $disk.FileName -Include -DiskType GeneralPurposeSSD
+}
 Write-Host "VolumeInfo:" $VolumeConfig.DiskName "is of type:" $VolumeConfig.DiskType
 
 #Set instant type/size
