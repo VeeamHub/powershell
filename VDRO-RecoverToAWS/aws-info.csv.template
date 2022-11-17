@@ -1,2 +1,2 @@
-accessKey,region,VPC,ec2SecGrp,ec2Subnet,prxGrp,prxSubnet,prxEc2
-AKIAQZSLXDNU57HHXXXX,us-east-1,vpc-079b4e8409600XXXX,private,10.10.110.0/24,vbr-proxy,10.10.100.0/24,c5.large
+accessKey,secretKey,region,VPC,ec2SecGrp,ec2Subnet,prxGrp,prxSubnet,prxEc2
+AKIAQZSLXDNU57HHXXXX,Z6rqKHHZZmNnVkAHlDdUSzz9DfKUCzoRrubqx3ji,us-east-1,vpc-079b4e8409600XXXX,private,10.10.110.0/24,vbr-proxy,10.10.100.0/24,c5.large
