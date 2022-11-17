@@ -18,11 +18,17 @@ This script is designed to help automate the recovery of VMs in a backup job and
 
 ## Known Issues
 
-* VMs with multiple harddisks need to have it set to inlude both disks
 * Linux GPT disks are not supported on AWS, neeed to convert to MPR
-* If using NFS location - please check AIX NFS capability
 * VM IP addresses are not adjusted for running in AWS
-* AWS CLI needs to be installed on Veeam BNR server
+
+
+## Requirements
+
+* Veeam Backup & Replication 11a or later
+* Install AWS CLI
+  * Configure AWS CLI
+
+  AWS CLI needs to be installed on Veeam BNR server
   * For AWS Recovery need AWS CLI:
     Documentation:
 	  https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
@@ -43,11 +49,6 @@ This script is designed to help automate the recovery of VMs in a backup job and
 	  Default Output format
       Run the aws configure as the Orchestrator service account
 
-## Requirements
-
-* Veeam Backup & Replication 11a or later
-* Install AWS CLI
-  * Configure AWS CLI
 
 ## Additional Information
 
