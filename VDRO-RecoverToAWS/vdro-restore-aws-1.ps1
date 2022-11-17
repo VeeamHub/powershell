@@ -30,6 +30,7 @@ Write-Host "Account:" $Account.Name
 #Set Amazon region
 $Region = Get-VBRAmazonEC2Region -Account $Account -RegionType Global -Name $awsInfo.region
 Write-Host "Region:" $Region.Name
+
 $RegionName = $Region.Name
 
 Write-Host "Matching equivelant T Class x86_64 EC2 instance type"
@@ -50,7 +51,6 @@ $Param6 = $Param6.Split(" ")
 $Param7 = "--query InstanceTypes[].{InstnaceType:InstanceType,vCPUs:VCpuInfo.DefaultVCpus,RAM:MemoryInfo.SizeInMiB}"
 $Param7 = $Param7.Split(" ")
 $Ec2Instances = & "$AwsCmd" $Param1 $Param2 $Param3 $Param4 $Param5 $Param6 $Param7 | ConvertFrom-Json
-
 
 #Set the disk type based on vm disk
 $VMdisk = Get-VBRFilesInRestorePoint -RestorePoint $RestorePoint | Where FileName -Like "*flat.vmdk*"
