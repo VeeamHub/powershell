@@ -20,8 +20,10 @@
 #   -backupWindowEnd = at which time of day ends the backup window? (string in 24h format, default can be changed in Param()-section)
 #   -displayGrid = switch to display results in PS-GridViews (default = $false)
 #   -outputDir = where to write the output files (folder must exist, otherwise defaulting to script folder)
-#   -excludeJobs = jobs including this string in their 'description' field will be ignored
 #   -excludeVMs = VMs or computers that have this string as part of their name will be ignored
+#   -excludeVMsFile = filename containing VMs to be excluded explicitly (textfile, one VM name per line, default = "exclude-VMs.txt")
+#   -excludeJobs = jobs including this string in their 'description' field will be ignored
+#   -excludeJobsFile = filename containing jobs to be excluded explicitly (textfile, one job name per line default = "exclude-Jobs.txt")
 #   -verbose = write details about script steps to screen while executing (only for debugging, default off)
 # 
 # Backup windows start will be calculated as follows:
@@ -38,6 +40,7 @@
 #      (appending to this file for each script run)
 #
 # 2022.06.16 by M. Mehrtens
+# 2022.11.24 added option to explicitly ignore a listing of VMs provided in a separate textfile
 # -----------------------------------------------
 
 # vbrServer passed as parameter (script will ask for credentials if there is no credentials file!)
@@ -55,10 +58,13 @@ Param(
     [Parameter(Mandatory = $false)]
     [string]$outputDir = "",
     [Parameter(Mandatory = $false)]
+    [string]$excludeVMs = "",
+    [Parameter(Mandatory = $false)]
+    [string]$excludeVMsFile = "exclude-VMs.txt",
+    [Parameter(Mandatory = $false)]
     [string]$excludeJobs = "",
     [Parameter(Mandatory = $false)]
-    [string]$excludeVMs = ""
-
+    [string]$excludeJobsFile = "exclude-Jobs.txt"
 )
 # -----------------------------------------------
 
@@ -112,6 +118,34 @@ Begin {
     if ("" -ne $excludeVMs) {
         $excludeVMs = "*$($excludeVMs.Trim('*'))*" 
         Write-Output "excluding VMs matching  ""$excludeVMs"""
+    }
+
+    # read exclusion list files
+    $excludeVMsList = @()
+    if ("" -ne $excludeVMsFile) {
+        try {
+            $excludeVMsFile = (Get-Item -Path $excludeVMsFile -ErrorAction Stop).FullName
+            Write-Verbose "reading VM exclusions file ""$excludeVMsFile"""
+            $excludeVMsList = Get-Content -LiteralPath $excludeVMsFile -ErrorAction Stop
+            Write-Output "excluding $($excludeVMsList.Count) VMs listed in ""$excludeVMsFile"""
+        }
+        catch {
+            Write-Output -Message "!!! could not read from ""$excludeVMsFile"" !!!"
+        }
+        
+    }
+    $excludeJobsList = @()
+    if ("" -ne $excludeJobsFile) {
+        try {
+            $excludeJobsFile = (Get-Item -Path $excludeJobsFile -ErrorAction Stop).FullName
+            Write-Verbose "reading job exclusions file ""$excludeJobsFile"""
+            $excludeJobsList = Get-Content -LiteralPath $excludeJobsFile -ErrorAction Stop
+            Write-Output "excluding $($excludeJobsList.Count) Jobs listed in  ""$excludeJobsFile"""
+        }
+        catch {
+            Write-Output -Message "!!! could not read from ""$excludeJobsFile"" !!!"
+        }
+        
     }
 
     # helper function to format numbers as MB/GB/TB/etc.
@@ -187,7 +221,7 @@ Process {
     $Error.Clear()
     $procStartTime = Get-Date
     $procDuration = ""
-    Write-Verbose "Backup Server: $vbrServer"
+    "Backup Server: $vbrServer"
     # output files path/name prefix
     $outfilePrefix = "$($now.ToString("yyyy-MM-ddTHH-mm-ss"))-$($vbrServer)"
     
@@ -273,11 +307,19 @@ Process {
 
         # check exclusion of this job
         $processThisJob = $true
-        if ("" -ne $excludeJobs) {
-            if ($thisJob.Description -like $excludeJobs) {
+        # ignore jobs explicitly excluded via $excludeJobsFile
+        if ($excludeJobsList.Count -gt 0) {
+            if ($excludeJobsList.Contains($objBackup.JobName)) {
                 $processThisJob = $false
             }
         }
+        # ignore jobs that have a match to $excludeJobs in their description
+        if ($processThisJob -and ("" -ne $excludeJobs) ) {
+            if ( $thisJob.Description -like $excludeJobs ) {
+                $processThisJob = $false
+            }
+        }
+
         if ($processThisJob) {
             try {
                 $objThisRepo = $null
@@ -301,94 +343,104 @@ Process {
             }
 
             $countRPs = 0
+            $excludeVMsCount = $excludeVMsList.Count
             # iterate through all discovered restore points
             foreach ($restorePoint in $objRPs) {            
                 Write-Progress -Activity "Getting restore points" -PercentComplete ($countRPs / $objRPs.Count * 100) -Id 3 -ParentId 2
                 $myBackupJob = $null
 
-                # check valid completion time, otherwise ignore this (corrupt) restore point 
-                $completionTime = $restorePoint.CompletionTimeUTC
-                if ($null -ne $completionTime) {
-                    $completionTime = $completionTime.ToLocalTime()
+                # ignore restore point if VM is listed in the exclusion list file
+                $processThisVM = $true
+                if($excludeVMsCount -gt 0) {
+                    if ($excludeVMsList.Contains($restorePoint.VmName)) {
+                        $processThisVM = $false
+                    }
+                }
+                if($processThisVM) {
+                    # check valid completion time, otherwise ignore this (corrupt) restore point 
+                    $completionTime = $restorePoint.CompletionTimeUTC
+                    if ($null -ne $completionTime) {
+                        $completionTime = $completionTime.ToLocalTime()
                     
-                    # ignore restore points which are newer than the backup window end time
-                    if ($completionTime -le $intervalEnd) {
+                        # ignore restore points which are newer than the backup window end time
+                        if ($completionTime -le $intervalEnd) {
 
-                        # only proceed if we do NOT already have a restore point for this VM from this job
-                        if ("$($restorePoint.VmName)-$($objBackup.Name)" -notin $VMJobList) {
+                            # only proceed if we do NOT already have a restore point for this VM from this job
+                            if ("$($restorePoint.VmName)-$($objBackup.Name)" -notin $VMJobList) {
                                 
-                            $rpDuration = New-TimeSpan -Start $restorePoint.CreationTimeUtc -End $restorePoint.CompletionTimeUTC
+                                $rpDuration = New-TimeSpan -Start $restorePoint.CreationTimeUtc -End $restorePoint.CompletionTimeUTC
                                 
-                            try {
-                                $myBackupJob = $objBackup.GetJob()
-                            }
-                            catch {
-                                # ignore error
-                            }
-                            if ($null -eq $myBackupJob ) {
-                                $myBlockSize = "[n/a]"
-                            }
-                            else {
-                                $myBlocksize = $jobBlockSizes."$($restorePoint.GetStorage().Blocksize)"
-                            }
-
-                            $myBackupType = $restorePoint.algorithm
-                            if ($myBackupType -eq "Increment") {
-                                $myDataRead = $restorePoint.GetStorage().stats.DataSize
-                            }
-                            else {
-                                $myDataRead = $restorePoint.ApproxSize
-                            }
-                            $myDedup = $restorePoint.GetStorage().stats.DedupRatio
-                            $myCompr = $restorePoint.GetStorage().stats.CompressRatio
-                            if ($myDedup -gt 1) { $myDedup = 100 / $myDedup } else { $myDedup = 1 }
-                            if ($myCompr -gt 1) { $myCompr = 100 / $myCompr } else { $myCompr = 1 }
-
-                            $myRepoName = $null
-                            $extentName = $null
-                            if ($null -ne $objThisRepo) {
-                                $myRepoName = $objThisRepo.Name
-                                if ($objThisRepo.TypeDisplay -eq "Scale-out") {
-                                    $extentName = $restorePoint.FindChainRepositories().Name
+                                try {
+                                    $myBackupJob = $objBackup.GetJob()
                                 }
-                            }
-                            # check if rp is within backup window
-                            $rpInBackupWindow = $false
-                            if (($completionTime -ge $intervalStart) -and ($completionTime -le $intervalEnd)) {
-                                $rpInBackupWindow = $true
-                                $totalRPsInBackupWindow++
-                            }
+                                catch {
+                                    # ignore error
+                                }
+                                if ($null -eq $myBackupJob ) {
+                                    $myBlockSize = "[n/a]"
+                                }
+                                else {
+                                    $myBlocksize = $jobBlockSizes."$($restorePoint.GetStorage().Blocksize)"
+                                }
 
-                            $countRPs++
-                            $tmpObject = [PSCustomobject]@{
-                                RpId           = ++$rpID # will be set later!
-                                VMName         = $restorePoint.VmName
-                                BackupJob      = $objBackup.Name
-                                JobDescription = $thisJob.Description
-                                Repository     = $myRepoName
-                                Extent         = $extentName
-                                RepoType       = $restorePoint.FindChainRepositories().Type
-                                CreationTime   = $restorePoint.CreationTimeUTC.ToLocalTime()
-                                CompletionTime = $completionTime
-                                InBackupWindow = $rpInBackupWindow
-                                Duration       = $rpDuration
-                                BackupType     = $restorePoint.algorithm
-                                ProcessedData  = $restorePoint.ApproxSize
-                                DataSize       = $restorePoint.GetStorage().stats.DataSize
-                                DataRead       = $myDataRead
-                                BackupSize     = $restorePoint.GetStorage().stats.BackupSize
-                                DedupRatio     = $myDedup
-                                ComprRatio     = $myCompr
-                                Reduction      = $myDedup * $myCompr
-                                Blocksize      = $myBlocksize
-                                Folder         = get_backupfile_path $restorePoint
-                                Filename       = $restorePoint.GetStorage().PartialPath.Internal.Elements[0]
-                            }
+                                $myBackupType = $restorePoint.algorithm
+                                if ($myBackupType -eq "Increment") {
+                                    $myDataRead = $restorePoint.GetStorage().stats.DataSize
+                                }
+                                else {
+                                    $myDataRead = $restorePoint.ApproxSize
+                                }
+                                $myDedup = $restorePoint.GetStorage().stats.DedupRatio
+                                $myCompr = $restorePoint.GetStorage().stats.CompressRatio
+                                if ($myDedup -gt 1) { $myDedup = 100 / $myDedup } else { $myDedup = 1 }
+                                if ($myCompr -gt 1) { $myCompr = 100 / $myCompr } else { $myCompr = 1 }
 
-                            $totalRPs++
-                            $allRPs.Add($tmpObject) | Out-Null
-                            $VMJobList.Add("$($restorePoint.VmName)-$($objBackup.Name)")
-                            $tmpObject = $null
+                                $myRepoName = $null
+                                $extentName = $null
+                                if ($null -ne $objThisRepo) {
+                                    $myRepoName = $objThisRepo.Name
+                                    if ($objThisRepo.TypeDisplay -eq "Scale-out") {
+                                        $extentName = $restorePoint.FindChainRepositories().Name
+                                    }
+                                }
+                                # check if rp is within backup window
+                                $rpInBackupWindow = $false
+                                if (($completionTime -ge $intervalStart) -and ($completionTime -le $intervalEnd)) {
+                                    $rpInBackupWindow = $true
+                                    $totalRPsInBackupWindow++
+                                }
+
+                                $countRPs++
+                                $tmpObject = [PSCustomobject]@{
+                                    RpId           = ++$rpID # will be set later!
+                                    VMName         = $restorePoint.VmName
+                                    BackupJob      = $objBackup.Name
+                                    JobDescription = $thisJob.Description
+                                    Repository     = $myRepoName
+                                    Extent         = $extentName
+                                    RepoType       = $restorePoint.FindChainRepositories().Type
+                                    CreationTime   = $restorePoint.CreationTimeUTC.ToLocalTime()
+                                    CompletionTime = $completionTime
+                                    InBackupWindow = $rpInBackupWindow
+                                    Duration       = $rpDuration
+                                    BackupType     = $restorePoint.algorithm
+                                    ProcessedData  = $restorePoint.ApproxSize
+                                    DataSize       = $restorePoint.GetStorage().stats.DataSize
+                                    DataRead       = $myDataRead
+                                    BackupSize     = $restorePoint.GetStorage().stats.BackupSize
+                                    DedupRatio     = $myDedup
+                                    ComprRatio     = $myCompr
+                                    Reduction      = $myDedup * $myCompr
+                                    Blocksize      = $myBlocksize
+                                    Folder         = get_backupfile_path $restorePoint
+                                    Filename       = $restorePoint.GetStorage().PartialPath.Internal.Elements[0]
+                                }
+
+                                $totalRPs++
+                                $allRPs.Add($tmpObject) | Out-Null
+                                $VMJobList.Add("$($restorePoint.VmName)-$($objBackup.Name)")
+                                $tmpObject = $null
+                            }
                         }
                     }
                 }
@@ -428,7 +480,6 @@ Process {
         RPsInBackupWindow    = $totalRPsInBackupWindow
         SLACompliancePercent = $SLACompliance
     }
-
 
     # output everything
     # -----------------
