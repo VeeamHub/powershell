@@ -40,7 +40,7 @@
 #      (appending to this file for each script run)
 #
 # 2022.06.16 by M. Mehrtens
-# 2022.11.24 added option to explicitly ignore a listing of VMs provided in a separate textfile
+# 2022.11.24 added option to explicitly ignore VMs or jobs provided in separate textfiles
 # -----------------------------------------------
 
 # vbrServer passed as parameter (script will ask for credentials if there is no credentials file!)
