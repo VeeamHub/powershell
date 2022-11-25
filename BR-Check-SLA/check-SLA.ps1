@@ -21,7 +21,8 @@
 #   -displayGrid = switch to display results in PS-GridViews (default = $false)
 #   -outputDir = where to write the output files (folder must exist, otherwise defaulting to script folder)
 #   -excludeVMs = VMs or computers that have this string as part of their name will be ignored
-#   -excludeVMsFile = filename containing VMs to be excluded explicitly (textfile, one VM name per line, default = "exclude-VMs.txt")
+#   -excludeVMsFile = filename containing VMs and optional VM-IDs to be excluded explicitly (textfile, one VM name or VM Name + ID per line, default = "exclude-VMs.txt")
+#   -separatorChar = character to separate VM Names from VM-IDs in exclusion file (default = "," (comma))
 #   -excludeJobs = jobs including this string in their 'description' field will be ignored
 #   -excludeJobsFile = filename containing jobs to be excluded explicitly (textfile, one job name per line default = "exclude-Jobs.txt")
 #   -verbose = write details about script steps to screen while executing (only for debugging, default off)
@@ -41,6 +42,7 @@
 #
 # 2022.06.16 by M. Mehrtens
 # 2022.11.24 added option to explicitly ignore VMs or jobs provided in separate textfiles
+# 2022.11.25 enhanced explicit VM exclusions to be based on combination of VM name and VM-ID (vSphere MoRefID)
 # -----------------------------------------------
 
 # vbrServer passed as parameter (script will ask for credentials if there is no credentials file!)
@@ -61,6 +63,7 @@ Param(
     [string]$excludeVMs = "",
     [Parameter(Mandatory = $false)]
     [string]$excludeVMsFile = "exclude-VMs.txt",
+    [string]$separatorChar = ',',
     [Parameter(Mandatory = $false)]
     [string]$excludeJobs = "",
     [Parameter(Mandatory = $false)]
@@ -70,6 +73,7 @@ Param(
 
 
 Begin {
+
     #Import-Module Veeam.Backup.PowerShell
     # calculate backup window start and stop times from parameters
     $now = Get-Date
@@ -121,19 +125,57 @@ Begin {
     }
 
     # read exclusion list files
-    $excludeVMsList = @()
+    
+    # exclusion of VM names
+    $excludeVMsList = New-Object -TypeName 'System.Collections.Generic.List[PSCustomObject]'
     if ("" -ne $excludeVMsFile) {
         try {
             $excludeVMsFile = (Get-Item -Path $excludeVMsFile -ErrorAction Stop).FullName
             Write-Verbose "reading VM exclusions file ""$excludeVMsFile"""
-            $excludeVMsList = Get-Content -LiteralPath $excludeVMsFile -ErrorAction Stop
-            Write-Output "excluding $($excludeVMsList.Count) VMs listed in ""$excludeVMsFile"""
+            $excludeVMsFileContent = Get-Content -LiteralPath $excludeVMsFile -ErrorAction Stop
         }
         catch {
-            Write-Output -Message "!!! could not read from ""$excludeVMsFile"" !!!"
+            Write-Output "!!! error reading from ""$excludeVMsFile"" !!!"
         }
-        
+        if ($excludeVMsFileContent.Count -gt 0) {
+            Write-Output "excluding $($excludeVMsFileContent.Count) VM entries listed in ""$excludeVMsFile"""
+            foreach ($line in $excludeVMsFileContent) {
+                if ($line.Length -gt 0) {
+                    $entry = $line.Split($separatorChar)
+                    if ($entry.Length -gt 1) {
+                        $tmpObject = [PSCustomobject]@{
+                            Name = $entry[0]
+                            ID   = $entry[1]
+                        }
+                    }
+                    else {
+                        $tmpObject = [PSCustomobject]@{
+                            Name = $entry[0]
+                            ID   = $null
+                        }
+                    }
+                    $excludeVMsList.Add($tmpObject) | Out-Null
+                    $tmpObject = $null
+                }
+            }
+        }
     }
+    #    # exclusion of VM (MoRef) IDs
+    #    $excludeVMIDsList = @()
+    #    if ("" -ne $excludeVMIDsFile) {
+    #        try {
+    #            $excludeVMIDsFile = (Get-Item -Path $excludeVMIDsFile -ErrorAction Stop).FullName
+    #            Write-Verbose "reading VM ID exclusions file ""$excludeVMIDsFile"""
+    #            $excludeVMIDsList = Get-Content -LiteralPath $excludeVMIDsFile -ErrorAction Stop
+    #            Write-Output "excluding $($excludeVMIDsList.Count) VM IDs listed in ""$excludeVMIDsFile"""
+    #        }
+    #        catch {
+    #            Write-Output "!!! could not read from ""$excludeVMIDsFile"" !!!"
+    #        }
+    #        
+    #    }
+
+    # exclusion of backup job names
     $excludeJobsList = @()
     if ("" -ne $excludeJobsFile) {
         try {
@@ -143,7 +185,7 @@ Begin {
             Write-Output "excluding $($excludeJobsList.Count) Jobs listed in  ""$excludeJobsFile"""
         }
         catch {
-            Write-Output -Message "!!! could not read from ""$excludeJobsFile"" !!!"
+            Write-Output "!!! error reading from ""$excludeJobsFile"" !!!"
         }
         
     }
@@ -349,14 +391,24 @@ Process {
                 Write-Progress -Activity "Getting restore points" -PercentComplete ($countRPs / $objRPs.Count * 100) -Id 3 -ParentId 2
                 $myBackupJob = $null
 
-                # ignore restore point if VM is listed in the exclusion list file
+                $myName = $restorePoint.VmName
+                $moRefID = $restorePoint.GetTargetVmInfo().VmRef
+
+                # ignore restore point if VM name or VM name + ID is listed in an exclusion file
                 $processThisVM = $true
-                if($excludeVMsCount -gt 0) {
-                    if ($excludeVMsList.Contains($restorePoint.VmName)) {
-                        $processThisVM = $false
+                if ($excludeVMsCount -gt 0) {
+                    # is this VM's name listed in the exclusions file?
+                    if ($excludeVMsList.Name.Contains($myName)) {
+                        # get the ID of the to-be-excluded VM from the exclusion list
+                        $excludeID = $excludeVMsList.ID[$excludeVMsList.FindIndex( { $args[0].Name -eq $myName } )]
+                        # ignore this VM if ID matches, too (or if no ID is given in exclusion file)
+                        if (($null -eq $excludeID) -or ($excludeID -eq $moRefID)) {
+                            $processThisVM = $false
+                        }
+                    
                     }
                 }
-                if($processThisVM) {
+                if ($processThisVM) {
                     # check valid completion time, otherwise ignore this (corrupt) restore point 
                     $completionTime = $restorePoint.CompletionTimeUTC
                     if ($null -ne $completionTime) {
@@ -414,6 +466,7 @@ Process {
                                 $tmpObject = [PSCustomobject]@{
                                     RpId           = ++$rpID # will be set later!
                                     VMName         = $restorePoint.VmName
+                                    VMID           = $moRefID
                                     BackupJob      = $objBackup.Name
                                     JobDescription = $thisJob.Description
                                     Repository     = $myRepoName
