@@ -19,7 +19,8 @@ Requires [Veeam Powershell module].
 - `displayGrid` = switch to display results in PS-GridViews (default = `$false`)
 - `outputDir` = where to write the output files (folder must exist, otherwise defaulting to script folder)
 - `excludeVMs` = VMs (or computers) that have this string as part of their name will be ignored (case-insensitive,default = empty string, i.e. no exclusions)
-- `excludeVMsFile` = filename containing list of either VM names or VM Name + VM-ID combination to be excluded explicitly (textfile, one VM name / VM name + VM-ID per line, default = "`exclude-VMs.txt`")
+- `excludeVMsFile` = filename containing list of either VM names or VM Name + VM-ID combination to be excluded explicitly (textfile, one VM name / VM name + VM-ID per line, default = "`exclude-VMs.txt`", see example below)
+- `separatorChar` = character for separation of VM name and VM-ID (optional) on each line of the VM exclusions file (default = "`,`" (comma), see example below)
 - `excludeJobs` = jobs including this string in their **description** field will be ignored (case-insensitive, default = empty string, i.e. no exclusions)
 - `excludeJobsFile` = filename containing list of backup jobs to be excluded explicitly (textfile, one job name per line, default = "`exclude-Jobs.txt`")
 
@@ -50,16 +51,13 @@ This example uses all parameters to check the backup window starting at 22:00 on
             -excludeJobs "#noSLA" `
             -displayGrid
 ```
-### Example exclusion file `excludeVMs.txt`
-- Syntax: One VM entry per line, VMID is optional
-- Separator default character is "`,`" (comma), and can be customized by parameter `separatorChar`.
+### Example VM exclusion file `excludeVMs.txt`
+- Syntax: One VM entry per line, VM-ID can be optionally added after separator character.
+- Default separator character is "`,`" (comma), it can be customized by parameter `separatorChar`.
 
 ```
-server1                 # VM with name 'server1' will be excluded
-server2
-vmachineA,vm-305        # only VM with name 'vmachineA' AND VM-ID 'vm-305' will be excluded
-vmachineB,vm-1764
-appserverC
+srv1           # VM 'srv1' will be excluded, regardless of its VM-ID
+vmA,vm-305     # VM 'vmA' will be excluded, but only if its VM-ID is 'vm-305'
 
 ```
 (Comments in the example above are for this readme only, __do not use comments__ in your real exception file!)
