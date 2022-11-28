@@ -52,7 +52,7 @@ This example uses all parameters to check the backup window starting at 22:00 on
             -displayGrid
 ```
 ### Example VM exclusion file `excludeVMs.txt`
-- Syntax: One VM entry per line, VM-ID can be optionally added after separator character.
+- Syntax: One VM entry per line, VM-ID can be optionally added after separator character (VM IDs can be retrieved from vCenter using the free [RVTools utility](https://www.robware.net/rvtools/), it shows on the "vInfo" page in column "VM ID").
 - Default separator character is "`,`" (comma), it can be customized by parameter `separatorChar`.
 
 ```
