@@ -27,10 +27,10 @@
 $debug = 0
 
 # Define the VB365 organisation
-$OrgName = "dabew.onmicrosoft.com"
+$OrgName = "<YOUR ORG NAME>"
 
-# Define the target repository
-$RepoName = "repo01"
+# Define the target repository, object storage is highly recommended!
+$RepoName = "<YOUR REPOSITORY NAME>"
 
 # Define the backup schedule for new jobs (Options Info: https://helpcenter.veeam.com/archive/vbo365/40/powershell/new-vbojobschedulepolicy.html)
 $vbSchedType = "daily"
