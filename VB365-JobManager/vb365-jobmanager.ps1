@@ -302,7 +302,7 @@ BEGIN {
             if (!$this.WeightTable) {
                 $this.LoadWeightTable()                
             }
-            return ($this.WeightTable.Values.Values | Measure-Object -Sum).Sum
+            return ($this.WeightTable.Values.weight | Measure-Object -Sum).Sum
         }
 
         WriteWeightTable () {
