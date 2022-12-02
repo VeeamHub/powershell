@@ -96,7 +96,7 @@ Param(
 
     # Count a Team as this many objects. 
     # Teams consist of Exchange, SharePoint and Teams objects, thus having higher object load than other services
-    [int] $countTeamsAs = 3,
+    [int] $countTeamAs = 3,
     
     # Read grouping patterns from JSON formatted file
     # Entries like:
@@ -144,6 +144,10 @@ DynamicParam {
 BEGIN {
     $global:version = '0.7.0'
     filter timelog { "$(Get-Date -Format "yyyy-mm-dd HH:mm:ss"): $_" }
+
+    # Save in global variables for easier use in classes
+    $global:countTeamAs = $countTeamAs
+    $global:recurseSP = $recurseSP
 
     # From https://4sysops.com/archives/convert-json-to-a-powershell-hash-table/
     function ConvertTo-Hashtable {
@@ -212,7 +216,7 @@ BEGIN {
 
         [int] GetWeight() {
             if ($this.VBOBackupItem.Type -eq "Team") {
-                return $global:countTeamsAs
+                return $global:countTeamAs
             } else {
                 if ($global:recurseSP) { 
                     return (Get-VBOOrganizationSite -Site ([Veeam.Archiver.PowerShell.Model.BackupItems.VBOBackupSite] $this.VBOBackupItem).Site -Recurse).Count
@@ -254,12 +258,16 @@ BEGIN {
 
         # Create a new managed Job
         ManagedJob([Veeam.Archiver.PowerShell.Model.VBOOrganization] $Organization, [string] $JobName, [ManagedObject[]] $addingObjects, [Veeam.Archiver.PowerShell.Model.VBORepository] $Repository, [Veeam.Archiver.PowerShell.Model.VBOJobSchedulePolicy] $SchedulePolicy) {            
-            $this.VBOJob = Add-VBOJob -Organization $Organization -Name $JobName -SelectedItems $addingObjects[0].VBOBackupItem -Repository $Repository -SchedulePolicy $SchedulePolicy -Description ("Created by VB365 JobManager v{0}`n{1}" -f $global:version,$this.DescriptionDelimiter)
+            $this.VBOJob = Add-VBOJob -Organization $Organization -Name $JobName -SelectedItems $addingObjects[0].VBOBackupItem -Repository $Repository -SchedulePolicy $SchedulePolicy -Description $this.GetNewJobDescription()
             # TODO: Not optimal - recalulating the weight which is already present
             
             # Add all objects to populate weighttable - redoing so for the initial added object doesn't hurt
             $this.AddObjects($addingObjects)
             
+        }
+
+        [string] GetNewJobDescription() {
+            return "Created by VB365 JobManager v{0} on {1}`n{2}" -f $global:version,(Get-Date),$this.DescriptionDelimiter
         }
 
         [ManagedObject[]] GetManagedObjects() {
@@ -280,11 +288,12 @@ BEGIN {
         # Read the description of the backup job and extract the weight table
         # WeightTable is JSON [ { 'id' : objectId, 'weight: weight }, ... ]
         LoadWeightTable () {
-            $description = $this.VBOJob.Description.Split($this.DescriptionDelimiter)
-            $table = $description[-1] | ConvertFrom-Json | ConvertTo-Hashtable
-            if ($table) {
-                $this.WeightTable = $table
+            # !!! -split splits on string, .Split() on CharArray
+            $description = $this.VBOJob.Description -split $this.DescriptionDelimiter
+            if ($description.Count -eq 2 -and $description[-1]) {
+                $this.WeightTable = $description[-1] | ConvertFrom-Json | ConvertTo-Hashtable                            
             } else {
+                # No table written yet, creating empty one
                 $this.WeightTable = @{ Team = New-Object System.Collections.ArrayList; Site = New-Object System.Collections.ArrayList }
             }
         }
@@ -300,8 +309,15 @@ BEGIN {
             if (!$this.WeightTable) {
                 $this.LoadWeightTable()
             }
-            $description = $this.VBOJob.Description.split($this.DescriptionDelimiter)
-            $description[-1] = $this.WeightTable | ConvertTo-Json -Compress
+            # !!! -split splits on string, .Split() on CharArray
+            $description = $this.VBOJob.Description -split $this.DescriptionDelimiter
+            $table = $this.WeightTable | ConvertTo-Json -Compress
+            if ($description.Count -eq 2) {
+                $description[-1] = $table 
+            } else {
+                throw "Job description is not in the right format, likely missing delimiter {0}" -f $this.DescriptionDelimiter
+                break
+            }
             Set-VBOJob -Job $this.VBOJob -Description ($description -join $this.DescriptionDelimiter)
         }
 
@@ -337,7 +353,6 @@ BEGIN {
         }
 
     }
-
 
     class JobManager {
         [Veeam.Archiver.PowerShell.Model.VBOOrganization] $org
@@ -445,8 +460,7 @@ BEGIN {
                     $freeJob = $this.FindFreeJob($repo, $sumWeight)
                     if (!$freeJob) {
                         if (!$repo) { $repo = $this.FindNextRepo() }
-                        $freeJob = $this.CreateNewJob($aol.Value, $repo)
-                        $this.Jobs += $freeJob
+                        $freeJob = $this.CreateNewJob($aol.Value, $repo)                        
                     } else {
                         $freeJob.AddObjects($aol.Value)
                     }                                        
