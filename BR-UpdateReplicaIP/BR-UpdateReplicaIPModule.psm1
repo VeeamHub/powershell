@@ -385,6 +385,17 @@ function Set-VMGuestNetworkInterface {
         else {
             $scripttext = "netplan apply"
         }
+
+
+        $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext -ObfuscateStringOutput $pwd
+        
+        if ($Elevate) {
+            $pwd = $([Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($guestcredential.password)))
+            $scripttext = "echo $($pwd) | sudo -S bash -c 'echo DNSStubListener=no >> /etc/systemd/resolved.conf' && echo $($pwd) | sudo -S systemctl restart systemd-resolved" #"echo DNSStubListener=no | sudo -s tee -a /etc/systemd/resolved.conf && echo $($pwd) | sudo -s systemctl restart systemd-resolved"
+        }else{
+            Write-Log "Warning: No sudo access please ensure DNS will function correctly!"
+        }
+
         $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext -ObfuscateStringOutput $pwd
     }
     elseif ($ostype -eq "CentOS") { 
