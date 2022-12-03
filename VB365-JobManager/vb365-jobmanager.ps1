@@ -219,7 +219,7 @@ BEGIN {
                 return $global:countTeamAs
             } else {
                 if ($global:recurseSP) { 
-                    return (Get-VBOOrganizationSite -Site ([Veeam.Archiver.PowerShell.Model.BackupItems.VBOBackupSite] $this.VBOBackupItem).Site -Recurse).Count
+                    return (Get-VBOOrganizationSite -Organization $global:org -URL ([Veeam.Archiver.PowerShell.Model.BackupItems.VBOBackupSite] $this.VBOBackupItem).Site.URL -Recurse).Count
                 } else {
                     return 1
                 }
@@ -533,6 +533,7 @@ BEGIN {
 
 PROCESS {
     $org = Get-VBOOrganization -Name $organization
+    $global:org = $org
     $repos = $repository | ForEach-Object { Get-VBORepository -Name $_ }    
 
     $sites = @()
@@ -575,8 +576,7 @@ PROCESS {
     
     $objCounter = 0
     $teamCounter = 0
-    $jobTouchedCounter = 0
-    $jobCreatedCounter = 0    
+    $jobTouchedCounter = 0    
     
     # Counts also not matching includes
     $excludeObjectCounter = 0
@@ -586,6 +586,7 @@ PROCESS {
     "Minimum free objects is set to {0}" -f $minFreeObjects | timelog 
 
     $jobManager = [JobManager]::new($org, $jobNamePattern, $objectsPerJob, $repos)
+    $jobCreatedStart = $jobManager.Jobs.Count
 
     foreach ($o in $objects) {
         
@@ -616,14 +617,24 @@ PROCESS {
         if ($checkBackups) {            
             if ($limitServiceTo -eq "Teams") {
                 $repos | ForEach-Object { 
-                    if (Get-VBOEntityData -Repository $_ -Team $o) {
-                        $assignedRepo = $_                        
+                    try {
+                        if (Get-VBOEntityData -Repository $_ -Team $o) {
+                            $assignedRepo = $_                        
+                        }
+                    } catch {
+                        # Ignore / just don't want an error message
+                        # -ErrorAction:SilentlyContinue or :Ignore still outputs errors
                     }
                 }
             } else {
                 $repos | ForEach-Object { 
-                    if (Get-VBOEntityData -Repository $_ -Site $o) {
-                        $assignedRepo = $_                        
+                    try {
+                        if (Get-VBOEntityData -Repository $_ -Site $o) {
+                            $assignedRepo = $_                        
+                        }
+                    } catch {
+                        # Ignore / just don't want an error message
+                        # -ErrorAction:SilentlyContinue or :Ignore still outputs errors
                     }
                 }
             }
@@ -635,12 +646,14 @@ PROCESS {
 
 
         if ($limitServiceTo -eq "Teams") {            
-            $jobManager.Add((New-VBOBackupItem -Team $o -TeamsChats:$withTeamsChats), $assignedRepo)            
+            $jobManager.Add((New-VBOBackupItem -Team $o -TeamsChats:$withTeamsChats), $assignedRepo)
+            $teamCounter++
             #$bObjects += New-VBOBackupItem -Team $o -TeamsChats:$withTeamsChats            
             #$bWeight = $countTeamsAs                                      
             #$bObjects += @{"object" = $bObject; "weight" = $bWeight}                        
         } else {            
             $jobManager.Add((New-VBOBackupItem -Site $o), $assignedRepo)
+            $objCounter++
             #$bObjects += New-VBOBackupItem -Site $o                        
             #$bWeight = if ($recurseSP -eq $true) { (Get-VBOOrganizationSite -Site $site -Recurse).Count } else { 1 }
             #$bObjects += @{"object" = $bObject; "weight" = $bWeight}
@@ -654,6 +667,7 @@ PROCESS {
                     $jobManager.Add((New-VBOBackupItem -Team $matchedTeam -TeamsChats:$withTeamsChats), $assignedRepo)
                     #$bObjects += New-VBOBackupItem -Team $matchedTeam -TeamsChats:$withTeamsChats                                
                     #$bObjects += @{"object" = $bTeam; "weight" = $countTeamsAs}
+                    $teamCounter++
                     "Found matching Team to SP site {0}: {1}" -f $o,$matchedTeam | timelog                    
                 }
             }
@@ -791,7 +805,9 @@ PROCESS {
     $primaryObject = if ($limitServiceTo -eq "Teams") { "Teams" } else { "Sharepoint Sites" }
     $teamCountText = if (!$limitServiceTo) { "and ${teamCounter} teams " } else { "" }
 
-    "Added ${objCounter} ${primaryObject} ${teamCountText}to ${jobTouchedCounter} touched and ${jobCreatedCounter} created backup jobs"  | timelog
+    $jobsCreatedDiff = $jobManager.Jobs.Count - $jobCreatedStart
+
+    "Added ${objCounter} ${primaryObject} ${teamCountText}to ${jobTouchedCounter} touched and ${jobsCreatedDiff} created backup jobs"  | timelog
     "Excluded {0} objects through include and exclude filters" -f $excludeObjectCounter | timelog    
 
 }
