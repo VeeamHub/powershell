@@ -3,6 +3,7 @@
 $LogFile = "BR-UpdateReplicaIp.log"
 $CurrentPid = ([System.Diagnostics.Process]::GetCurrentProcess()).Id
 $ViConnections = @{}
+
 Function Write-Log {
     param([string]$str)      
     Write-Host $str
@@ -391,7 +392,26 @@ function Set-VMGuestNetworkInterface {
         
         if ($Elevate) {
             $pwd = $([Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($guestcredential.password)))
-            $scripttext = "echo $($pwd) | sudo -S bash -c 'echo DNSStubListener=no >> /etc/systemd/resolved.conf' && echo $($pwd) | sudo -S systemctl restart systemd-resolved" #"echo DNSStubListener=no | sudo -s tee -a /etc/systemd/resolved.conf && echo $($pwd) | sudo -s systemctl restart systemd-resolved"
+
+            $scripttext = "more /etc/systemd/resolved.conf"
+            $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext
+            $lines = $output.Split("`n")
+            $scripttext = "echo -e '"
+            for($i = 3; $i -lt $lines.Count; $i++) {
+                $select = $true
+                $select = $select -and !($lines[$i] -like "*DNSStubListener*") 
+                if ($select) { $scripttext += $lines[$i].Trim() + "\n" }
+            }
+
+            $scripttext += "DNSStubListener=no"
+            $scripttext += "' > /etc/systemd/resolved.conf"
+            $scripttext = "echo $($pwd) | sudo -S bash -c ""$($scripttext)"""
+            $scripttext += " && echo $($pwd) | sudo -S systemctl restart systemd-resolved"
+
+            $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext -ObfuscateStringOutput $pwd
+
+
+
         }else{
             Write-Log "Warning: No sudo access please ensure DNS will function correctly!"
         }
