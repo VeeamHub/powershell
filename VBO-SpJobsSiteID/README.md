@@ -4,7 +4,19 @@ Veeamhub projects are community driven projects, and are not created by Veeam R&
 ## Project Notes
 Author: David Bewernick (Veeam Software)
 
-Function: Reading unprotected SharePoint Sites and add them to backup jobs based on the Site ID
+## Known Issues
+
+* *No known issues*
+
+## Requirements
+
+* Veeam Backup for Microsoft 365 v6a (build 6.1.0.423)
+  * *Other versions are untested*
+* Must be executed on Veeam Backup for Microsoft 365 server
+
+## Usage
+Modify the organisation name ($OrgName) in the script to your needs.
+Modify the repository name ($RepoName) in the script to the desired target repository name.
 
 ## 🤝🏾 License
 Copyright (c) 2021 VeeamHub
