@@ -13,31 +13,15 @@ Write-Host "VM CPU Cores:" $VMcpu "Cores"
 $VMram = $RestorePoint.AuxData.MemSizeMb.InMegabytes
 Write-Host "VM RAM:" $VMram "MB"
 
-
-Write-Host "Matching equivelant T Class x86_64 EC2 instance type"
-
-$AwsCmd = "C:\Program Files\Amazon\AWSCLIV2\aws.exe"
-$Param1 = "ec2 describe-instance-types"
-$Param1 = $Param1.Split(" ")
-$Param2 = "--filters Name=vcpu-info.default-vcpus,Values=$VMcpu"
-$Param2 = $Param2.Split(" ")
-$Param3 = "Name=memory-info.size-in-mib,Values=$VMram"
-$Param3 = $Param3.Split(" ")
-$Param4 = "Name=instance-type,Values=t*"
-$Param4 = $Param4.Split(" ")
-$Param5 = "Name=processor-info.supported-architecture,Values=x86_64"
-$Param5 = $Param5.Split(" ")
-$Param6 = "--query InstanceTypes[].{InstnaceType:InstanceType,vCPUs:VCpuInfo.DefaultVCpus,RAM:MemoryInfo.SizeInMiB}"
-$Param6 = $Param6.Split(" ")
-$Ec2Instances = & "$AwsCmd" $Param1 $Param2 $Param3 $Param4 $Param5 $Param6 | ConvertFrom-Json
-
-
 Write-Host "Set AWS Info"
 
 #Please Update the aws-info.csv for your settings
 $awsCSV = "C:\VDRO\Scripts\aws-info.csv" #CSV File to read from.
 $awsInfo =Import-Csv $awsCSV
 
+$Env:AWS_ACCESS_KEY_ID=$awsInfo.accessKey
+$Env:AWS_SECRET_ACCESS_KEY=$awsInfo.secretKey
+$Env:AWS_DEFAULT_REGION=$awsInfo.region
 
 #Set Amazon account
 $Account = Get-VBRAmazonAccount -accesskey $awsInfo.accessKey
@@ -47,9 +31,32 @@ Write-Host "Account:" $Account.Name
 $Region = Get-VBRAmazonEC2Region -Account $Account -RegionType Global -Name $awsInfo.region
 Write-Host "Region:" $Region.Name
 
+$RegionName = $Region.Name
+
+Write-Host "Matching equivelant T Class x86_64 EC2 instance type"
+
+$AwsCmd = "C:\Program Files\Amazon\AWSCLIV2\aws.exe"
+$Param1 = "ec2 describe-instance-types"
+$Param1 = $Param1.Split(" ")
+$Param2 = "--region $RegionName"
+$Param2 = $Param2.Split(" ")
+$Param3 = "--filters Name=vcpu-info.default-vcpus,Values=$VMcpu"
+$Param3 = $Param3.Split(" ")
+$Param4 = "Name=memory-info.size-in-mib,Values=$VMram"
+$Param4 = $Param4.Split(" ")
+$Param5 = "Name=instance-type,Values=t*"
+$Param5 = $Param5.Split(" ")
+$Param6 = "Name=processor-info.supported-architecture,Values=x86_64"
+$Param6 = $Param6.Split(" ")
+$Param7 = "--query InstanceTypes[].{InstnaceType:InstanceType,vCPUs:VCpuInfo.DefaultVCpus,RAM:MemoryInfo.SizeInMiB}"
+$Param7 = $Param7.Split(" ")
+$Ec2Instances = & "$AwsCmd" $Param1 $Param2 $Param3 $Param4 $Param5 $Param6 $Param7 | ConvertFrom-Json
+
 #Set the disk type based on vm disk
 $VMdisk = Get-VBRFilesInRestorePoint -RestorePoint $RestorePoint | Where FileName -Like "*flat.vmdk*"
-$VolumeConfig = New-VBRAmazonEC2DiskConfiguration -DiskName $VMdisk.FileName -Include -DiskType GeneralPurposeSSD
+foreach ($disk in $VMdisk){
+    [array]$VolumeConfig += New-VBRAmazonEC2DiskConfiguration -DiskName $disk.FileName -Include -DiskType GeneralPurposeSSD
+}
 Write-Host "VolumeInfo:" $VolumeConfig.DiskName "is of type:" $VolumeConfig.DiskType
 
 #Set instant type/size

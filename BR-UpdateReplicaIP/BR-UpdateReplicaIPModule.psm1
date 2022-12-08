@@ -330,28 +330,44 @@ function Backup-VMGuestNetworkConfig {
     return $null
 }
 
+function Convert-IpAddressToMaskLength([string] $dottedIpAddressString)
+{
+  $result = 0; 
+  # ensure we have a valid IP address
+  [IPAddress] $ip = $dottedIpAddressString;
+  $octets = $ip.IPAddressToString.Split('.');
+  foreach($octet in $octets)
+  {
+    while(0 -ne $octet) 
+    {
+      $octet = ($octet -shl 1) -band [byte]::MaxValue
+      $result++; 
+    }
+  }
+  return $result;
+}
+
 function Set-VMGuestNetworkInterface {
     param($vm, $iface, $ipaddress, $netmask, $gateway, $dns, [PSCredential] $guestcredential, $Elevate=$false)
-
     $scripttype = "Bash"
     $scripttext = ""
     $ostype = "Linux" 
     $vm_os = $vm.Guest.OSFullName
-
     if ($vm_os -like "*CentOS*") { $ostype = "CentOS" }
     if ($vm_os -like "*Red Hat*") { $ostype = "RedHat" }
     if ($vm_os -like "*Ubuntu*") { $ostype = "Ubuntu" }
     if ($vm_os -like "*Windows*") { $ostype = "Windows" }
     if (($ostype -eq "Ubuntu")) { 
-        $prefix = [System.Convert]::ToString( [ipaddress]::Parse($rule.TargetSubnet).Address,2).Length
+        
+        $prefix = Convert-IpAddressToMaskLength($rule.TargetSubnet)
 
         # does not include search domain for dns servers
         $netplan = "network:\n  ethernets:\n    $($iface):\n      addresses:\n        - $($ipaddress)/$($prefix)"
         if ($null -ne $dns) {
-            $scripttext += "\n      nameservers:\n          addresses: [$($dns)]"
+            $netplan += "\n      nameservers:\n          addresses: [$($dns)]"
         }
         if ($null -ne $gateway) {
-            $scripttext += "\n      routes:\n        - to: default\n          via: $($gateway)"
+            $netplan += "\n      routes:\n        - to: default\n          via: $($gateway)"
         }
         
         if ($Elevate) {
@@ -370,9 +386,39 @@ function Set-VMGuestNetworkInterface {
         else {
             $scripttext = "netplan apply"
         }
+
+
+        $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext -ObfuscateStringOutput $pwd
+        
+        if ($Elevate) {
+            $pwd = $([Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($guestcredential.password)))
+
+            $scripttext = "more /etc/systemd/resolved.conf"
+            $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext
+            $lines = $output.Split("`n")
+            $scripttext = "echo -e '"
+            for($i = 3; $i -lt $lines.Count; $i++) {
+                $select = $true
+                $select = $select -and !($lines[$i] -like "*DNSStubListener*") 
+                if ($select) { $scripttext += $lines[$i].Trim() + "\n" }
+            }
+
+            $scripttext += "DNSStubListener=no"
+            $scripttext += "' > /etc/systemd/resolved.conf"
+            $scripttext = "echo $($pwd) | sudo -S bash -c ""$($scripttext)"""
+            $scripttext += " && echo $($pwd) | sudo -S systemctl restart systemd-resolved"
+
+            $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext -ObfuscateStringOutput $pwd
+
+
+
+        }else{
+            Write-Log "Warning: No sudo access please ensure DNS will function correctly!"
+        }
+
         $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext -ObfuscateStringOutput $pwd
     }
-    elseif (($ostype -eq "CentOS") -or ($ostype = "RedHat")) { 
+    elseif ($ostype -eq "CentOS") { 
         $scripttext = "more /etc/sysconfig/network-scripts/ifcfg-" + $iface
         $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext
         $lines = $output.Split("`n")
@@ -390,6 +436,34 @@ function Set-VMGuestNetworkInterface {
         $scripttext += "\nNETMASK=""$netmask"""
         $scripttext += "\nGATEWAY=""$gateway"""
         $scripttext += "' > /etc/sysconfig/network-scripts/ifcfg-$iface && service network restart"
+        $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext
+        
+        if ($null -ne $dns) {
+            $scripttext = "echo -e '"
+            $scripttext += "nameserver $dns"
+            $scripttext += "' > /etc/resolv.conf" # network-scripts do not set the DNS server
+            $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext
+        }
+    }
+    elseif ($ostype = "RedHat") { 
+        $scripttext = "more /etc/sysconfig/network-scripts/ifcfg-" + $iface
+        $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext
+        $lines = $output.Split("`n")
+        $scripttext = "echo -e '"
+        for($i = 3; $i -lt $lines.Count; $i++) {
+            $select = $true
+            $select = $select -and !($lines[$i] -like "*BOOTPROTO*") 
+            $select = $select -and !($lines[$i] -like "*IPADDR*")
+            $select = $select -and !($lines[$i] -like "*NETMASK*") 
+            $select = $select -and !($lines[$i] -like "*GATEWAY*")
+            if ($select) { $scripttext += $lines[$i].Trim() + "\n" }
+        }
+        $scripttext += "BOOTPROTO=static"
+        $scripttext += "\nIPADDR="+$ipaddress
+        $scripttext += "\nNETMASK="+$netmask
+        $scripttext += "\nGATEWAY="+$gateway
+        $scripttext += "' > /etc/sysconfig/network-scripts/ifcfg-$iface && ifdown $iface && ifup $iface"
+        
         $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext
         
         if ($null -ne $dns) {
@@ -464,13 +538,18 @@ Function Get-VBRFailoverPlanVMs
     $platform = $FailoverPlan.BackupPlatform
     if ($platform = "EVMware") {    
         $foijs = $FailoverPlan.GetViOijs()
+        $replicationjobs = [Veeam.Backup.Core.CBackupJob]::GetByTypeAndPlatform([Veeam.Backup.Model.EDbJobType]::Replica, [Veeam.Backup.Common.EPlatform]::EVmware , $false)
+        $cdpreplicationjobs = [Veeam.Backup.Core.CBackupJob]::GetByTypeAndPlatform([Veeam.Backup.Model.EDbJobType]::CdpReplica, [Veeam.Backup.Common.EPlatform]::EVmware , $false)
     }
     else {
         # not supported
         $foijs = $FailoverPlan.GetHvOijs()
+        $replicationjobs = [Veeam.Backup.Core.CBackupJob]::GetByTypeAndPlatform([Veeam.Backup.Model.EDbJobType]::Replica, [Veeam.Backup.Common.EPlatform]::EHyperV , $false)
+        $cdpreplicationjobs = [Veeam.Backup.Core.CBackupJob]::GetByTypeAndPlatform([Veeam.Backup.Model.EDbJobType]::CdpReplica, [Veeam.Backup.Common.EPlatform]::EHyperV , $false)
     }
 
-    $replicationjobs = [Veeam.Backup.Core.CBackupJob]::GetByTypeAndPlatform([Veeam.Backup.Model.EDbJobType]::Replica, $platform, $false)
+    #$replicationjobs = [Veeam.Backup.Core.CBackupJob]::GetByTypeAndPlatform([Veeam.Backup.Model.EDbJobType]::Replica, $platform, $false)
+    $replicationjobs = $replicationjobs + $cdpreplicationjobs
 
     $result = @()
     foreach ($j in $replicationjobs) {
@@ -609,7 +688,7 @@ function Update-VMIPAddresses {
 
                             Write-Log "Processing: Virtual Machine $($_vm.Name) interface: $($iface.Name), source: $($iface.Ipv4), target: $($trgip)"
 
-                            Set-VMGuestNetworkInterface -VM $_vm -Iface $iface.Name -IpAddress $trgip -SubnetMask $rule.TargetSubnet -DefaultGateway $rule.TargetGateway -DNSServerAddresses $rule.TargetDNS -WINSAddresses $rule.TargetWINS -GuestCredential $GuestCredential -Elevate:$elevate
+                            Set-VMGuestNetworkInterface -VM $_vm -Iface $iface.Name -IpAddress $trgip -netmask $rule.TargetSubnet -Gateway $rule.TargetGateway -DNS $rule.TargetDNS -WINSAddresses $rule.TargetWINS -GuestCredential $GuestCredential -Elevate:$elevate
 
                             $cnics = Get-VMGuestNetworkInterface -VM $_vm -GuestCredential ($GuestCredential) | ?{ $_.Name -like $iface.Name }
                             
