@@ -1,15 +1,13 @@
 
 <#PSScriptInfo
 
-.VERSION 0.7.1
+.VERSION 1.0.0
 
 .GUID f3795945-b130-4740-84f4-e8248a847263
 
 .AUTHOR Stefan Zimmermann <stefan.zimmermann@veeam.com>
 
-.COMPANYNAME
-
-.COPYRIGHT
+.COPYRIGHT Stefan Zimmermann <stefan.zimmermann@veeam.com>
 
 .TAGS Veeam Backup for Microsoft 365
 
@@ -19,16 +17,14 @@
 
 .ICONURI
 
-.EXTERNALMODULEDEPENDENCIES 
+.EXTERNALMODULEDEPENDENCIES Veeam.Archiver.PowerShell
 
 .REQUIREDSCRIPTS
 
 .EXTERNALSCRIPTDEPENDENCIES
 
 .RELEASENOTES
-IN DEVELOPMENT
-
-.PRIVATEDATA
+See RELEASENOTES.MD
 
 #>
 
@@ -37,14 +33,17 @@ IN DEVELOPMENT
 <# 
 
 .DESCRIPTION 
- Script to automatically create and maintain Sharepoint and Teams backup jobs in Veeam Backup for Microsoft 365.
- The script delivers the following major features:
- - Creates backup jobs for all processed objects respecing a maximum number of objects per job
- - Round robins through a list of repositories for created jobs
- - Reuses jobs matching the naming scheme which can still hold objects
- - Puts Sharepoint sites and matching teams to the same job
- - Schedules created jobs with a delay to not start all at the same time
- - Can work with include and exclude patterns
+ Create and maintain SharePoint Online and Teams jobs in VB365. 
+The script offers the following major features:
+
+- Creates backup jobs for all processed objects respecing a maximum number of objects per job
+- Round robins through a list of repositories for created jobs
+- Reuses jobs matching the naming scheme which can still hold objects
+- Puts Sharepoint sites and matching teams to the same job
+- Schedules created jobs with a delay to not start all at the same time
+- Can work with include and exclude patterns from files (regex)
+- Object count can be configured for Teams
+- Sharepoint subsites can be counted as objects and are respected in the objectcount (`-recurseSP`)
  
 #> 
 [CmdletBinding()]
@@ -65,7 +64,7 @@ Param(
     [switch] $withTeamsChats = $false,
 
     # Base schedule for 1st job
-    # Must be a VBO Schedule Policy like created with `New-VBOSchedulePolicy`
+    # Must be a VBO Schedule Policy like created with `New-VBOJobSchedulePolicy`
     [Object] $baseSchedule = $null,
 
     # Delay between the starttime of two jobs in HH:MM:SS format
@@ -143,12 +142,12 @@ DynamicParam {
 }
 
 BEGIN {
-    $global:version = '0.7.1'
+    $global:version = '1.0.0'
     filter timelog { "$(Get-Date -Format "yyyy-mm-dd HH:mm:ss"): $_" }
 
     # Save in global variables for easier use in classes
     $global:countTeamAs = $countTeamAs
-    $global:recurseSP = $recurseSP
+    $global:recurseSP = $recurseSP    
 
     # From https://4sysops.com/archives/convert-json-to-a-powershell-hash-table/
     function ConvertTo-Hashtable {
@@ -259,8 +258,7 @@ BEGIN {
 
         # Create a new managed Job
         ManagedJob([Veeam.Archiver.PowerShell.Model.VBOOrganization] $Organization, [string] $JobName, [ManagedObject[]] $addingObjects, [Veeam.Archiver.PowerShell.Model.VBORepository] $Repository, [Veeam.Archiver.PowerShell.Model.VBOJobSchedulePolicy] $SchedulePolicy) {            
-            $this.VBOJob = Add-VBOJob -Organization $Organization -Name $JobName -SelectedItems $addingObjects[0].VBOBackupItem -Repository $Repository -SchedulePolicy $SchedulePolicy -Description $this.GetNewJobDescription()
-            # TODO: Not optimal - recalulating the weight which is already present
+            $this.VBOJob = Add-VBOJob -Organization $Organization -Name $JobName -SelectedItems $addingObjects[0].VBOBackupItem -Repository $Repository -SchedulePolicy $SchedulePolicy -Description $this.GetNewJobDescription()            
             
             # Add all objects to populate weighttable - redoing so for the initial added object doesn't hurt
             $this.AddObjects($addingObjects)
@@ -364,15 +362,24 @@ BEGIN {
         [Veeam.Archiver.PowerShell.Model.VBORepository[]] $Repositories
         [System.Collections.Queue] $RepoQueue = [System.Collections.Queue]::new()
         [hashtable] $AddObjectList = @{ "any" = [System.Collections.ArrayList]::new(); }
+        [hashtable] $currentSchedules = @{}
+        [Veeam.Archiver.PowerShell.Model.VBOJobSchedulePolicy] $baseSchedule = $null
+        [string] $scheduleDelay = '00:30:00'
 
-        JobManager([Veeam.Archiver.PowerShell.Model.VBOOrganization] $Organization, [string] $JobnamePattern, [int] $ObjectLimit, [Veeam.Archiver.PowerShell.Model.VBORepository[]] $Repositories) {
+        JobManager([Veeam.Archiver.PowerShell.Model.VBOOrganization] $Organization, [string] $JobnamePattern, [int] $ObjectLimit, [Veeam.Archiver.PowerShell.Model.VBORepository[]] $Repositories, [Veeam.Archiver.PowerShell.Model.VBOJobSchedulePolicy] $baseSchedule, [string] $scheduleDelay) {
             $this.org = $Organization
             $this.JobnamePattern = $JobnamePattern
             $this.ObjectLimit = $ObjectLimit
-            $this.Jobs = $this.GetJobs()            
+
             $this.Repositories = $Repositories
 
+            # Create schedules per repository (as should be linked to a proxy)
+            $this.Repositories | Foreach-Object { $this.currentSchedules.Add($_.Id, $baseSchedule) }
+
+            # Create "buckets" for the to be added objects per repository
             $this.Repositories | ForEach-Object { $this.AddObjectList.Add($_.Id, [System.Collections.ArrayList]::new()) }
+
+            $this.Jobs = $this.GetJobs()
         }
 
         [ManagedJob[]] GetJobs() {            
@@ -383,6 +390,9 @@ BEGIN {
                 if ($checkJob) { 
                     $this.NextJobNumber++
                     $myjobs.Add(([ManagedJob]::new($checkJob)))
+
+                    # Update the current schedule with the one from the latest job found
+                    $this.currentSchedules[$checkJob.Repository.Id] = $checkJob.SchedulePolicy
                 } else {                    
                     break
                 }
@@ -428,32 +438,21 @@ BEGIN {
 
         [ManagedJob] CreateNewJob([ManagedObject[]] $ManagedObjects, [Veeam.Archiver.PowerShell.Model.VBORepository] $Repository) {            
             $nextJobName = $this.JobnamePattern -f $this.NextJobNumber
-            # TODO: Get next schedule for this repo (this proxy) - from managedjob?
-            $nextSchedule = New-VBOJobSchedulePolicy -EnableSchedule -Type Daily -DailyType Everyday -DailyTime '22:00'
+            [Veeam.Archiver.PowerShell.Model.VBOJobSchedulePolicy] $currentSchedule = $this.currentSchedules[$Repository.Id]
+            if ($currentSchedule -eq $null) {
+                $currentSchedule = New-VBOJobSchedulePolicy -EnableSchedule -Type Daily -DailyTime '22:00' -DailyType Everyday
+            }                        
+            $nextSchedule = New-VBOJobSchedulePolicy -EnableSchedule -Type $currentSchedule.Type -DailyType $currentSchedule.DailyType -DailyTime ($currentSchedule.DailyTime+$this.scheduleDelay)            
             $newJob = [ManagedJob]::new($this.org, $nextJobName, $ManagedObjects, $Repository, $nextSchedule)            
             $this.Jobs += $newJob
             $this.NextJobNumber++
+            $this.currentSchedules[$Repository.Id] = $nextSchedule
             return $newJob
-            
-            #if ($lastSchedule) {
-            #             $lastSchedule = $currentSchedule                    
-            #             $currentSchedule = New-VBOJobSchedulePolicy -EnableSchedule -Type $lastSchedule.Type -DailyType $lastSchedule.DailyType -DailyTime ($lastSchedule.DailyTime+$scheduleDelay)
-            #         }                
-            #         $useRepo = if ($assignedRepo) { $assignedRepo } else { $repoQueue.Dequeue() }
-            #         $usedObject = $objectQueue.Dequeue()
-            #         $weightTable = @{ "Sites" = @{}; "Teams" = @{} }
-            #         if ($usedObject.object.Type -eq "Site") {
-            #             $weightTable.Sites.Add("$($usedObject.object.Site.SiteId)", $usedObject.weight)
-            #         } else {
-            #             $weightTable.Teams.Add("$($usedObject.object.OfficeId)", $usedObject.weight)
-            #         }
-            #         $weightTableJson = $weightTable | Convertto-Json -Compress
-            #         $currentJob = Add-VBOJob -Organization $org -Name $jobName -SchedulePolicy $currentSchedule -Repository $useRepo -SelectedItems $usedObject.object -Description $weightTableJson
-            #         "No usable job found - created new job {0} and added {1}" -f $currentJob,$usedObject.object | timelog
         }
 
         # Save all enqueued objects to jobs matching the given repositories
-        Save() {
+        [hashtable] Save() {
+            [hashtable] $returnData = @{}
             foreach ($aol in $this.AddObjectList.GetEnumerator()) {
                 if ($null -ne $aol.Value -and $aol.Value.Count -gt 0) {
                     $sumWeight = ($aol.value | Measure-Object -Property Weight -Sum).Sum
@@ -464,13 +463,16 @@ BEGIN {
                         $freeJob = $this.CreateNewJob($aol.Value, $repo)                        
                     } else {
                         $freeJob.AddObjects($aol.Value)
-                    }                                        
+                    }                   
+                    $returnData[$freeJob] += $aol.Value
                 }
             }
             # Clear the object list
             $this.AddObjectList = @{}
             $this.Repositories | ForEach-Object { $this.AddObjectList.Add($_.Id, [System.Collections.ArrayList]::new()) }
             $this.AddObjectList["any"] = [System.Collections.ArrayList]::new()
+
+            return $returnData
         }
 
         [String] ToString() {
@@ -577,7 +579,7 @@ PROCESS {
     
     $objCounter = 0
     $teamCounter = 0
-    $jobTouchedCounter = 0    
+    $touchedJobs = @()
     
     # Counts also not matching includes
     $excludeObjectCounter = 0
@@ -586,7 +588,7 @@ PROCESS {
     $minFreeObjects = if ($noTeams -or $noSharepoint) { 1 } else { 1+$countTeamsAs }
     "Minimum free objects is set to {0}" -f $minFreeObjects | timelog 
 
-    $jobManager = [JobManager]::new($org, $jobNamePattern, $objectsPerJob, $repos)
+    $jobManager = [JobManager]::new($org, $jobNamePattern, $objectsPerJob, $repos, $baseSchedule, $scheduleDelay)
     $jobCreatedStart = $jobManager.Jobs.Count
 
     foreach ($o in $objects) {
@@ -666,7 +668,12 @@ PROCESS {
             }
         }
 
-        $jobManager.Save()
+        $saveData = $jobManager.Save()
+        $saveData.GetEnumerator() | ForEach-Object { 
+            "Saving to job {0}: {1}" -f $_.Key,($_.Value -join ", ") 
+            $touchedJobs += $_.Key
+        }
+
 
         # Grouping is just done on the primary loop object. Subsites & matching Teams follow
         #if ($groups) {
@@ -677,12 +684,11 @@ PROCESS {
         #}
     }
 
-    $primaryObject = if ($limitServiceTo -eq "Teams") { "Teams" } else { "Sharepoint Sites" }
-    $teamCountText = if (!$limitServiceTo) { "and ${teamCounter} teams " } else { "" }
-
+    
     $jobsCreatedDiff = $jobManager.Jobs.Count - $jobCreatedStart
+    $jobTouchedCounter = ($touchedJobs | Select-Object -Unique).Count - $jobsCreatedDiff
 
-    "Added ${objCounter} ${primaryObject} ${teamCountText}to ${jobTouchedCounter} touched and ${jobsCreatedDiff} created backup jobs"  | timelog
+    "Added ${objCounter} SharePoint sites and ${teamCounter} teams to ${jobTouchedCounter} touched and ${jobsCreatedDiff} created backup jobs"  | timelog
     "Excluded {0} objects through include and exclude filters" -f $excludeObjectCounter | timelog    
 
 }
