@@ -1,4 +1,4 @@
-# Veeam Availability Console (VAC) License Usage Report
+# Veeam Service Provider Console (VSPC) License Usage Report
 
 ## Author
 
@@ -6,24 +6,28 @@ Chris Arceneaux (@chris_arceneaux)
 
 ## Function
 
-This script will report VAC license usage that will be nearly identical to the VAC monthly usage report generated at the beginning of the month.
-
-## Known Issues
-
-* While editions (Standard, Enterprise, Enterprise Plus) are captured, Veeam ONE is not.
-
-## Requirements
-
-* Veeam Availability Console 3.x
-  * Portal Administrator account used to access the REST API.
-* Network connectivity
-  * The server executing the script needs to be able to access REST API for VAC
+This script will return VSPC point in time license usage for
+the current calendar month.
 
 ***NOTE:***
 
-* In order to get usage numbers as accurate as possible, the script should be scheduled to run on the last day of the month sometime before midnight.
-* For usage report numbers to be accurate and holistic, **all** Veeam Backup & Replication (VBR) servers must be managed by VAC. More information on allowing VAC to manage VBR servers can be found in the [Veeam Availablility Console Documentation](https://helpcenter.veeam.com/docs/vac/provider_user/connect_backup_servers.html). If multiple VAC instances are used, then this script must be run against all VAC intances with the usage report numbers totalled.
+* This script was designed to pull usage numbers to be used for customer chargeback. For end of month license usage reporting to Veeam, please use this report:
+  * UI: [https://helpcenter.veeam.com/docs/vac/provider_admin/view_license_usage_report.html](https://helpcenter.veeam.com/docs/vac/provider_admin/view_license_usage_report.html)
+  * API: [https://helpcenter.veeam.com/docs/vac/rest/reference/vspc-rest.html#tag/Licensing/operation/GetLatestLicensingReports](https://helpcenter.veeam.com/docs/vac/rest/reference/vspc-rest.html#tag/Licensing/operation/GetLatestLicensingReports)
+* For usage report numbers to be accurate and holistic, **all** Veeam Backup & Replication (VBR) servers must be managed by VSPC. More information on allowing VSPC to manage VBR servers can be found in the [Veeam Service Provider Console Documentation](https://helpcenter.veeam.com/docs/vac/provider_user/connect_backup_servers.html). If multiple VSPC instances are used, then this script must be run against all of them.
+
+## Known Issues
+
+* *None*
+
+## Requirements
+
+* Veeam Service Provider Console v6
+  * Portal Administrator account used to access the REST API.
+* Network connectivity
+  * The server executing the script needs to be able to access the VSPC REST API
+* PowerShell Core
 
 ## Usage
 
-Get-Help .\VAC-UsageReport.ps1
+Get-Help .\Get-VspcUsageReport.ps1
