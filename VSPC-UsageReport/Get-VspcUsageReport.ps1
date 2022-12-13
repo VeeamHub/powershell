@@ -451,7 +451,7 @@ foreach ($company in $companies) {
 		VB365_UserNewCount              = Confirm-Value -Value $vb365User.newCount
 		VB365_UserUsedCount             = Confirm-Value -Value $vb365User.usedCount
 	}
-	$output.Add($object)
+	[ref] $null = $output.Add($object)
 	Clear-Variable -Name object
 }
 ### End - Calculating per-Company usage
