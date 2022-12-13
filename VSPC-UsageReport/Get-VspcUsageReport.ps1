@@ -5,14 +5,14 @@ Veeam Service Provider Console (VSPC) License Usage Report
 .DESCRIPTION
 This script will return VSPC point in time license usag for
 the current calendar month.
-	
+
 .PARAMETER Server
 VSPC Server IP or FQDN
 
-.PARAMETER UserName
+.PARAMETER User
 VSPC Portal Administrator account username
 
-.PARAMETER Password
+.PARAMETER Pass
 VSPC Portal Administrator account password
 
 .PARAMETER Credential
@@ -24,50 +24,40 @@ VSPC Rest API port
 .PARAMETER AllowSelfSignedCerts
 Flag allowing self-signed certificates (insecure)
 
-.PARAMETER Detailed
-Flag to include a list of all metrics gathered
-
 .OUTPUTS
 Get-VspcUsageReport returns a PowerShell Object containing all data
 
 .EXAMPLE
 Get-VspcUsageReport.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password"
 
-Description 
------------     
+Description
+-----------
 Connect to the specified VSPC server using the username/password specified
 
 .EXAMPLE
 Get-VspcUsageReport.ps1 -Server "vspc.contoso.local" -Credential (Get-Credential)
 
-Description 
------------     
+Description
+-----------
 PowerShell credentials object is supported
-
-.EXAMPLE
-Get-VspcUsageReport.ps1 -Server "vspc.contoso.local" -Credential $cred_vac -Detailed
-
-Description 
------------     
-Includes a detailed list of all metrics (and then some) used to generate the monthly usage report
 
 .EXAMPLE
 Get-VspcUsageReport.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password" -Port 9999
 
-Description 
------------     
+Description
+-----------
 Connecting to a VSPC server using a non-standard API port
 
 .EXAMPLE
 Get-VspcUsageReport.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password" -AllowSelfSignedCerts
 
-Description 
------------     
+Description
+-----------
 Connecting to a VSPC server that uses Self-Signed Certificates (insecure)
 
 .NOTES
 NAME:  Get-VspcUsageReport.ps1
-VERSION: 2.1
+VERSION: 2.2
 AUTHOR: Chris Arceneaux
 TWITTER: @chris_arceneaux
 GITHUB: https://github.com/carceneaux
@@ -85,364 +75,385 @@ https://helpcenter.veeam.com/docs/vac/rest/reference/vspc-rest.html?ver=60
 [CmdletBinding(DefaultParametersetName = "UsePass")]
 param(
 	[Parameter(Mandatory = $true)]
-	[String] $Server,
+	[string] $Server,
 	[Parameter(Mandatory = $true, ParameterSetName = "UsePass")]
-	[String] $Username,
+	[string] $User,
 	[Parameter(Mandatory = $false, ParameterSetName = "UsePass")]
-	[String] $Password = $true,
+	[string] $Pass = $true,
 	[Parameter(Mandatory = $true, ParameterSetName = "UseCred")]
 	[System.Management.Automation.PSCredential]$Credential,
 	[Parameter(Mandatory = $false)]
 	[Int] $Port = 1280,
 	[Parameter(Mandatory = $false)]
-	[Switch] $AllowSelfSignedCerts,
-	[Parameter(Mandatory = $false)]
-	[Switch] $Detailed
+	[Switch] $AllowSelfSignedCerts
 )
 
-Function Get-AsyncAction {
-	param([String] $asyncUrl)
 
-	$asyncUrl -match "([^\/]+$)"
-	$actionId = $Matches[0]
+Function Confirm-Value {
+	param($value)
+
+	# If value exists, return value.
+	if ($value) {
+		return $value
+	}
+ else {
+		# Otherwise, return zero.
+		return 0
+	}
+}
+
+Function Get-AsyncAction {
+	param(
+		[string] $ActionId,
+		[System.Collections.Generic.Dictionary[[string], [string]]] $Headers
+	)
+
+	# Removing x-request-id header as it's not needed
+	$Headers.Remove("x-request-id")
 
 	# GET - /api/v3/asyncActions/{actionId} - Retrieve Async Action
-	[String] $url = "https://" + $Server + ":" + $Port + "/api/v3/asyncActions/" + $actionId
+	[string] $url = $baseUrl + "/api/v3/asyncActions/" + $actionId
 	Write-Verbose "GET - $url"
-	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-	$headers.Add("Authorization", "Bearer $token")
-	try {
-		:loop while ($true)
-		{
-			$response = Invoke-RestMethod $url -Method 'GET' -Headers $headers -ErrorAction Stop -SkipCertificateCheck:$AllowSelfSignedCerts
-			switch ($response.data.status) {
-				"running"
-				{
-					Start-Sleep -Seconds 10
-					break
-				}
-				"succeed"
-				{
-					break loop
-				}
-				"canceled"
-				{
-					throw "Async Action ID (" + $actionId + ") was cancelled."
-				}
-				"failed"
-				{
-					throw "Async Action ID (" + $actionId + ") failed with the following error message(s): " + $response.errors.message
-				}
-				Default	{throw "An unknown response was detected."}
+
+	:loop while ($true) {
+		$response = Invoke-RestMethod $url -Method 'GET' -Headers $headers -ErrorAction Stop -SkipCertificateCheck:$AllowSelfSignedCerts
+		switch ($response.data.status) {
+			"running" {
+				Start-Sleep -Seconds 10
+				break
 			}
+			"succeed" {
+				break loop
+			}
+			"canceled" {
+				throw "Async Action ID (" + $actionId + ") was cancelled."
+			}
+			"failed" {
+				throw "Async Action ID (" + $actionId + ") failed with the following error message(s): " + $response.errors.message
+			}
+			Default	{ throw "An unknown Async Action response was detected." }
 		}
 	}
-	catch {
-		throw
-	}
+
+	# Action complete...obtaining result...
+	[string] $url = $baseUrl + "/api/v3/asyncActions/" + $actionId + "/result"
+	Write-Verbose "GET - $url"
+	$response = Invoke-RestMethod $url -Method 'GET' -Headers $headers -ErrorAction Stop -SkipCertificateCheck:$AllowSelfSignedCerts
+
+	return $response
 	# End Retrieve Async Action
 }
 
-# Function Get-VbrServerUsage {
-# 	param([String] $tenantId)
+Function Get-PaginatedResults {
+	param(
+		[string] $URL,
+		[System.Collections.Generic.Dictionary[[string], [string]]] $Headers,
+		[PSCustomObject] $Response
+	)
 
-# 	# GET - /v2/tenants/{id}/backupServers
-# 	[String] $url = "https://" + $Server + ":" + $Port + "/v2/tenants/$tenantId/backupServers"
-# 	Write-Verbose "VBR Server Usage Url: $url"
-# 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-# 	$headers.Add("Authorization", "Bearer $token")
-# 	try {
-# 		$response = Invoke-RestMethod $url -Method 'GET' -Headers $headers -ErrorAction Stop
-# 		return $response
-# 	}
-#  catch {
-# 		Write-Error "`nERROR: Retrieving VBR Server Usage for Tenant ID $tenantId Failed!"
-# 		Exit 1
-# 	}
-# 	# End VBR Server Usage
+	# Initializing API object
+	$results = [System.Collections.ArrayList]::new()
+	[ref] $null = $results.Add($Response.data)
 
-# }
+	# Determine page count
+	$pageTotal = [math]::ceiling($response.meta.pagingInfo.total / $response.meta.pagingInfo.count)
+	Write-Verbose "Total Pages: $pageTotal"
 
-# Function Get-VbrAgentUsage {
-# 	param([String] $tenantId)
+	# Retrieving remaining results
+	$page = 0
+	while ($page -ne $pageTotal) {
+		# Setting offset variable
+		$page++
+		$offset = $page * 500  # 500 is limit
+		Write-Verbose ("GET - {0}&offset={1}" -f $URL, $offset)
 
-# 	# GET - /v2/tenants/{tenantId}/licensing/backupServerUsage
-# 	[String] $url = "https://" + $Server + ":" + $Port + "/v2/tenants/$tenantId/licensing/backupServerUsage"
-# 	Write-Verbose "VBR Agent Usage Url: $url"
-# 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-# 	$headers.Add("Authorization", "Bearer $token")
-# 	try {
-# 		$response = Invoke-RestMethod $url -Method 'GET' -Headers $headers -ErrorAction Stop
-# 		return $response
-# 	}
-#  catch {
-# 		Write-Error "`nERROR: Retrieving VBR Agent Usage for Tenant ID $tenantId Failed!"
-# 		Exit 1
-# 	}
-# 	# End VBR Agent Usage
+		# Updating x-request-id
+		$guid = (New-Guid).Guid
+		$Headers."x-request-id" = $guid
+		Write-Verbose "x-request-id: $guid"
 
-# }
+		$response = Invoke-RestMethod ("{0}&offset={1}" -f $URL, $offset) -Method 'GET' -Headers $Headers -ErrorAction Stop -SkipCertificateCheck:$AllowSelfSignedCerts -StatusCodeVariable responseCode
+		if (202 -eq $responseCode) {
+			# retrieve async action response
+			$response = Get-AsyncAction -ActionId $guid -Headers $headers
+		}
+		[ref] $null = $results.Add($response.data)
+	}
 
-# Function Get-ServerAgentUsage {
-# 	param([String] $tenantId)
-
-# 	# GET - /v2/tenants/{tenantId}/licensing/availabilityConsoleUsage
-# 	[String] $url = "https://" + $Server + ":" + $Port + "/v2/tenants/$tenantId/licensing/availabilityConsoleUsage"
-# 	Write-Verbose "VSPC Agent Usage Url: $url"
-# 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-# 	$headers.Add("Authorization", "Bearer $token")
-# 	try {
-# 		$response = Invoke-RestMethod $url -Method 'GET' -Headers $headers -ErrorAction Stop
-# 		return $response
-# 	}
-#  catch {
-# 		Write-Error "`nERROR: Retrieving VSPC Agent Usage for Tenant ID $tenantId Failed!"
-# 		Exit 1
-# 	}
-# 	# End VSPC Agent Usage
-
-# }
-
-# Function Get-ServerAlarmEvents {
-# 	param([String] $alarmId)
-
-# 	# GET - /v2/notifications/alarmTemplates/{id}/events
-# 	[String] $url = "https://" + $Server + ":" + $Port + "/v2/notifications/alarmTemplates/$alarmId/events" +
-# 	'?$filter=' + "lastActivation%2Fstatus%20ne%20'Resolved'" # Filters out only active alarms
-# 	Write-Verbose "VSPC Alarm Events Url: $url"
-# 	$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-# 	$headers.Add("Authorization", "Bearer $token")
-# 	try {
-# 		$response = Invoke-RestMethod $url -Method 'GET' -Headers $headers -ErrorAction Stop
-# 		return $response
-# 	}
-#  catch {
-# 		Write-Error "`nERROR: Retrieving VSPC Alarm Events for Alarm ID $alarmId Failed!"
-# 		Exit 1
-# 	}
-# 	# End VSPC Alarm Check
-
-# }
-
-# Function Check-Value {
-# 	param($value)
-
-# 	# If value exists, return value.
-# 	if ($value) {
-# 		return $value
-# 	}
-#  else {
-# 		# Otherwise, return zero.
-# 		return 0
-# 	}
-# }
-
-# Processing Credentials
-if ($Credential) {
-	$Username = $Credential.GetNetworkCredential().Username
-	$Password = $Credential.GetNetworkCredential().Password
-} else {
-    if ($Password -eq $true) {
-        $secPass = Read-Host "Enter password for '$($Username)'" -AsSecureString
-        $Password = ConvertFrom-SecureString -SecureString $secPass -AsPlainText
-    }
+	return $results
 }
 
-# POST - /token - Authorization
-[String] $url = "https://" + $Server + ":" + $Port + "/api/v3/token"
-Write-Verbose "GET - $url"
-$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+Function Get-VspcApiResult {
+	param(
+		[string] $URL,
+		[string] $Token,
+		[string] $Type
+	)
+
+	try {
+		# Initializing API object
+		$result = [System.Collections.ArrayList]::new()
+
+		# Setting headers
+		$headers = New-Object "System.Collections.Generic.Dictionary[[string],[string]]"
+		$headers.Add("Authorization", "Bearer $Token")
+		$guid = (New-Guid).Guid
+		$headers.Add("x-request-id", $guid)
+
+		# Making API call
+		Write-Verbose "GET - $URL"
+		Write-Verbose "x-request-id: $guid"
+		$response = Invoke-RestMethod $URL -Method 'GET' -Headers $headers -ErrorAction Stop -SkipCertificateCheck:$AllowSelfSignedCerts -StatusCodeVariable responseCode
+		if ($null -eq $response) { return $null }  # return empty response
+		if (202 -eq $responseCode) {
+			# retrieve async action response
+			$response = Get-AsyncAction -ActionId $guid -Headers $headers
+		}
+
+		# Is there more than 1 page of results?
+		if ($response.meta.pagingInfo.count -lt $response.meta.pagingInfo.total) {
+			$result = Get-PaginatedResults -URL $URL -Response $response -Headers $headers
+		}
+		else {
+			[ref] $null = $result.Add($response.data)
+		}
+
+		return $result
+	}
+	catch {
+		Write-Error "ERROR: Retrieving $Type Failed!"
+		throw
+	}
+}
+
+# Processing credentials
+if ($Credential) {
+	$User = $Credential.GetNetworkCredential().Username
+	$Pass = $Credential.GetNetworkCredential().Password
+}
+else {
+	if ($Pass -eq $true) {
+		[securestring] $secPass = Read-Host "Enter password for '$($User)'" -AsSecureString
+		[string] $Pass = ConvertFrom-SecureString -SecureString $secPass -AsPlainText
+	}
+}
+
+# Initializing global variables
+[string] $baseUrl = "https://" + $Server + ":" + $Port
+$output = [System.Collections.ArrayList]::new()
+
+# Logging into VSPC API
+[string] $url = $baseUrl + "/api/v3/token"
+Write-Verbose "POST - $url"
+$headers = New-Object "System.Collections.Generic.Dictionary[[string],[string]]"
 $headers.Add("Content-Type", "application/x-www-form-urlencoded")
-$body = "grant_type=password&username=$Username&password=$Password"
+$body = "grant_type=password&username=$User&password=$Pass"
 try {
 	$response = Invoke-RestMethod $url -Method 'POST' -Headers $headers -Body $body -ErrorAction Stop -SkipCertificateCheck:$AllowSelfSignedCerts
-	$token = $response.access_token
+	[string] $token = $response.access_token
 }
 catch {
 	Write-Error "ERROR: Authorization Failed! Make sure the correct server and port were specified."
 	throw
 }
-# End Authorization
 
-# GET - /api/v3/organizations - Retrieve Organizations (Service Provider, Resellers, & Companies)
-[String] $url = "https://" + $Server + ":" + $Port + "/api/v3/organizations?limit=1"
-Write-Verbose "GET - $url"
-$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
-$headers.Add("Authorization", "Bearer $token")
-try {
-	while ($true)
-	{
-		$response = Invoke-RestMethod $url -Method 'GET' -Headers $headers -ErrorAction Stop -SkipCertificateCheck:$AllowSelfSignedCerts
-		$orgs = $response
-		Write-Verbose "Organizations found: $($orgs.meta.pagingInfo.total)"
+### Checking for active alarms that could cause incorrect numbers on the report
+[bool] $alarms = $false
+
+# Retrieving unique alarm IDs for the following built-in VSPC Alarms...
+# Alarm 17: Veeam Service Provider Console lost connection to the managed Veeam Backup & Replication server.
+# Alarm 41: Veeam Service Provider Console has lost connection to the Cloud Connect server.
+[string] $url = $baseUrl + "/api/v3/alarms/templates?filter=[{'operation':'or','items':[{'property':'internalId','operation':'equals','value':17},{'property':'internalId','operation':'equals','value':41}]}]"
+$alarmUids = Get-VspcApiResult -URL $url -Type "Alarm IDs" -Token $token
+
+# Retrieving active alarms for the specified ID
+[string] $url = $baseUrl + "/api/v3/alarms/active?filter=[{'property':'alarmTemplateUid','operation':'equals','value':'$($alarmUids[0].instanceUid)'}]"
+$alarm17 = Get-VspcApiResult -URL $url -Type "Active Alarms $($alarmUids[0].instanceUid)" -Token $token
+
+if ($alarm17) {
+	$alarms = $true
+	Write-Warning "`nActive alarms are present that will cause usage report numbers to be inaccurate.`nPlease resolve these alarms and re-run this script to ensure accurate numbers.`nVeeam Service Provider Console lost connection to the following managed Veeam Backup & Replication server(s):`n$(foreach ($event in $alarm17) {"`n$($event.object.computerName) ($($event.object.instanceUid))"})"
+}
+
+# Retrieving active alarms for the specified ID
+[string] $url = $baseUrl + "/api/v3/alarms/active?filter=[{'property':'alarmTemplateUid','operation':'equals','value':'$($alarmUids[1].instanceUid)'}]"
+$alarm42 = Get-VspcApiResult -URL $url -Type "Active Alarms $($alarmUids[1].instanceUid)" -Token $token
+
+if ($alarm42) {
+	$alarms = $true
+	Write-Warning "`nActive alarms are present that will cause usage report numbers to be inaccurate.`nPlease resolve these alarms and re-run this script to ensure accurate numbers.`nVeeam Service Provider Console has lost connection to the following Cloud Connect server(s):`n$(foreach ($event in $alarm42) {"`n$($event.object.computerName) ($($event.object.instanceUid))"})"
+}
+### End - Checking for active alarms
+
+### Retrieving usage numbers
+
+# Retrieve Companies
+[string] $url = $baseUrl + "/api/v3/organizations/companies?expand=Organization&limit=500"
+$companies = Get-VspcApiResult -URL $url -Type "Companies" -Token $token
+
+# Retrieve Resellers
+[string] $url = $baseUrl + "/api/v3/organizations/resellers?limit=500"
+$resellers = Get-VspcApiResult -URL $url -Type "Resellers" -Token $token
+
+# Retrieve Cloud Connect license usage
+[string] $url = $baseUrl + "/api/v3/licensing/sites/usage/companies?limit=500"
+$vcc = Get-VspcApiResult -URL $url -Type "Cloud Connect License Usage" -Token $token
+
+# Retrieve Veeam Backup & Replication license usage
+[string] $url = $baseUrl + "/api/v3/licensing/backupServers/usage/companies?limit=500"
+$vbr = Get-VspcApiResult -URL $url -Type "Veeam Backup & Replication License Usage" -Token $token
+
+# Retrieve Veeam Service Provider Console license usage
+[string] $url = $baseUrl + "/api/v3/licensing/console/usage/companies?limit=500"
+$vspc = Get-VspcApiResult -URL $url -Type "Veeam Service Provider Console License Usage" -Token $token
+
+# Retrieve Veeam ONE license usage
+[string] $url = $baseUrl + "/api/v3/licensing/voneServers/usage/companies?limit=500"
+$one = Get-VspcApiResult -URL $url -Type "Veeam ONE License Usage" -Token $token
+
+# Retrieve Veeam Backup for Microsoft 365 license usage
+[string] $url = $baseUrl + "/api/v3/licensing/vbm365Servers/usage/companies?limit=500"
+$vb365 = Get-VspcApiResult -URL $url -Type "Veeam Backup for Microsoft 365 License Usage" -Token $token
+
+### End - Retrieving usage numbers
+
+### Calculating per-Company usage
+
+# Get Company License Usage
+foreach ($company in $companies) {
+	Write-Verbose "Retrieving usage for $($company.Name) ($($company.instanceUid))"
+
+	# Filtering usage to the specified Company Id
+	$vccUsage = $vcc | Where-Object { $_.companyUid -eq $company.instanceUid }
+	$vbrUsage = $vbr | Where-Object { $_.companyUid -eq $company.instanceUid }
+	$vspcUsage = $vspc | Where-Object { $_.companyUid -eq $company.instanceUid }
+	$oneUsage = $one | Where-Object { $_.companyUid -eq $company.instanceUid }
+	$vb365Usage = $vb365 | Where-Object { $_.companyUid -eq $company.instanceUid }
+
+	# All usage, if it exists, is located in the "counters" property
+	if ($vccUsage.PSobject.Properties.name -match "counters") { $vccUsage = $vccUsage.counters }
+	if ($vbrUsage.PSobject.Properties.name -match "counters") { $vbrUsage = $vbrUsage.counters }
+	if ($vspcUsage.PSobject.Properties.name -match "counters") { $vspcUsage = $vspcUsage.counters }
+	if ($oneUsage.PSobject.Properties.name -match "counters") { $oneUsage = $oneUsage.counters }
+	if ($vb365Usage.PSobject.Properties.name -match "counters") { $vb365Usage = $vb365Usage.counters }
+
+	# Parsing VCC license usage numbers
+	$vccSrvBackup = $vccUsage | Where-Object { $_.type -eq "CC_Server_Backup" }
+	$vccWsBackup = $vccUsage | Where-Object { $_.type -eq "CC_Workstation_Backup" }
+	$vccVmBackup = $vccUsage | Where-Object { $_.type -eq "CC_VM_Backup" }
+	$vccVmReplica = $vccUsage | Where-Object { $_.type -eq "CC_VM_Replica" }
+
+	# Parsing VBR server rental license usage numbers
+	$vbrVsphereVm = $vbrUsage | Where-Object { $_.type -eq "VBR_vSphere_VM" }
+	$vbrHyperVVm = $vbrUsage | Where-Object { $_.type -eq "VBR_HyperV_VM" }
+	$vbrAhvVm = $vbrUsage | Where-Object { $_.type -eq "VBR_AHV_VM" }
+	$vbrNasBackup = $vbrUsage | Where-Object { $_.type -eq "VBR_NAS_Backup" }
+	$vbrCloudVm = $vbrUsage | Where-Object { $_.type -eq "VBR_Cloud_VM" }
+	$vbrApplicationPlugins = $vbrUsage | Where-Object { $_.type -eq "VBR_Application_Plugins" }
+	$vbrServerAgent = $vbrUsage | Where-Object { $_.type -eq "VBR_Server_Agent" }
+	$vbrWorkstationAgent = $vbrUsage | Where-Object { $_.type -eq "VBR_Workstation_Agent" }
+	$vbrRhvVm = $vbrUsage | Where-Object { $_.type -eq "VBR_RHV_VM" }
+
+	# Parsing VSPC managed agents license usage numbers
+	$vspcServerAgent = $vspcUsage | Where-Object { $_.type -eq "VAC_Server_Agent" }
+	$vspcWorkstationAgent = $vspcUsage | Where-Object { $_.type -eq "VAC_Workstation_Agent" }
+
+	# Parsing ONE license usage numbers
+	$oneFileShare = $oneUsage | Where-Object { $_.type -eq "FileShare" }
+	$oneVm = $oneUsage | Where-Object { $_.type -eq "VM" }
+	$oneCloudVm = $oneUsage | Where-Object { $_.type -eq "CloudVM" }
+	$oneServerAgent = $oneUsage | Where-Object { $_.type -eq "ServerAgent" }
+	$oneWorkstationAgent = $oneUsage | Where-Object { $_.type -eq "WorkstationAgent" }
+
+	# Parsing VB365 license usage numbers
+	$vb365User = $vb365Usage | Where-Object { $_.type -eq "User" }
+
+	# Is the Company managed by a Reseller?
+	[string] $resellerName = ''
+	[bool] $isResellerManaged = $false
+	if ($null -ne $company.resellerUid) {
+		$isResellerManaged = $true
+		[string] $resellerName = ($resellers | Where-Object { $_.instanceUid -eq $company.resellerUid }).name
 	}
+
+	$object = [PSCustomObject] @{
+		# Company Information
+		CompanyName                     = $company.name
+		CompanyId                       = $company.instanceUid
+		IsResellerManaged               = $isResellerManaged
+		ResellerName                    = $resellerName
+		ResellerId                      = $company.resellerUid
+		# Veeam Cloud Connect Backup - VM
+		CC_VmBackupRentalCount          = Confirm-Value -Value $vccVmBackup.rentalCount
+		CC_VmBackupNewCount             = Confirm-Value -Value $vccVmBackup.newCount
+		CC_VmBackupUsedCount            = Confirm-Value -Value $vccVmBackup.usedCount
+		# Veeam Cloud Connect Backup - Server
+		CC_SrvBackupRentalCount         = Confirm-Value -Value $vccSrvBackup.rentalCount
+		CC_SrvBackupNewCount            = Confirm-Value -Value $vccSrvBackup.newCount
+		CC_SrvBackupUsedCount           = Confirm-Value -Value $vccSrvBackup.usedCount
+		# Veeam Cloud Connect Backup - Workstation
+		CC_WsBackupRentalCount          = Confirm-Value -Value $vccWsBackup.rentalCount
+		CC_WsBackupNewCount             = Confirm-Value -Value $vccWsBackup.newCount
+		CC_WsBackupUsedCount            = Confirm-Value -Value $vccWsBackup.usedCount
+		# Veeam Cloud Connect Replication - VM
+		CC_VmReplicaRentalCount         = Confirm-Value -Value $vccVmReplica.rentalCount
+		CC_VmReplicaNewCount            = Confirm-Value -Value $vccVmReplica.newCount
+		CC_VmReplicaUsedCount           = Confirm-Value -Value $vccVmReplica.usedCount
+		# Veeam Backup & Replication - vSphere VM
+		VBR_VsphereVmNewCount           = Confirm-Value -Value $vbrVsphereVm.newCount
+		VBR_VsphereVmUsedCount          = Confirm-Value -Value $vbrVsphereVm.usedCount
+		# Veeam Backup & Replication - HyperV VM
+		VBR_HyperVVmNewCount            = Confirm-Value -Value $vbrHyperVVm.newCount
+		VBR_HyperVVmUsedCount           = Confirm-Value -Value $vbrHyperVVm.usedCount
+		# Veeam Backup & Replication - AHV VM
+		VBR_AhvVmNewCount               = Confirm-Value -Value $vbrAhvVm.newCount
+		VBR_AhvVmUsedCount              = Confirm-Value -Value $vbrAhvVm.usedCount
+		# Veeam Backup & Replication - NAS Backup
+		VBR_NasBackupNewCount           = Confirm-Value -Value $vbrNasBackup.newCount
+		VBR_NasBackupUsedCount          = Confirm-Value -Value $vbrNasBackup.usedCount
+		# Veeam Backup & Replication - Public Cloud VM
+		VBR_CloudVmNewCount             = Confirm-Value -Value $vbrCloudVm.newCount
+		VBR_CloudVmUsedCount            = Confirm-Value -Value $vbrCloudVm.usedCount
+		# Veeam Backup & Replication - Application Plugins
+		VBR_ApplicationPluginsNewCount  = Confirm-Value -Value $vbrApplicationPlugins.newCount
+		VBR_ApplicationPluginsUsedCount = Confirm-Value -Value $vbrApplicationPlugins.usedCount
+		# Veeam Backup & Replication - Veeam Agent - Server
+		VBR_SrvAgentNewCount            = Confirm-Value -Value $vbrServerAgent.newCount
+		VBR_SrvAgentUsedCount           = Confirm-Value -Value $vbrServerAgent.usedCount
+		# Veeam Backup & Replication - Veeam Agent - Workstation
+		VBR_WsAgentNewCount             = Confirm-Value -Value $vbrWorkstationAgent.newCount
+		VBR_WsAgentUsedCount            = Confirm-Value -Value $vbrWorkstationAgent.usedCount
+		# Veeam Backup & Replication - RHV VM
+		VBR_RhvVmNewCount               = Confirm-Value -Value $vbrRhvVm.newCount
+		VBR_RhvVmUsedCount              = Confirm-Value -Value $vbrRhvVm.usedCount
+		# Veeam Service Provider Console - Veeam Agent - Server
+		VSPC_SrvAgentNewCount           = Confirm-Value -Value $vspcServerAgent.newCount
+		VSPC_SrvAgentUsedCount          = Confirm-Value -Value $vspcServerAgent.usedCount
+		# Veeam Service Provider Console - Veeam Agent - Workstation
+		VSPC_WsAgentNewCount            = Confirm-Value -Value $vspcWorkstationAgent.newCount
+		VSPC_WsAgentUsedCount           = Confirm-Value -Value $vspcWorkstationAgent.usedCount
+		# Veeam ONE - File Share
+		ONE_FileShareNewCount           = Confirm-Value -Value $oneFileShare.newCount
+		ONE_FileShareUsedCount          = Confirm-Value -Value $oneFileShare.usedCount
+		# Veeam ONE - VM
+		ONE_VmNewCount                  = Confirm-Value -Value $oneVm.newCount
+		ONE_VmUsedCount                 = Confirm-Value -Value $oneVm.usedCount
+		# Veeam ONE - Public Cloud VM
+		ONE_CloudVmNewCount             = Confirm-Value -Value $oneCloudVm.newCount
+		ONE_CloudVmUsedCount            = Confirm-Value -Value $oneCloudVm.usedCount
+		# Veeam ONE - Veeam Agent - Server
+		ONE_SrvAgentNewCount            = Confirm-Value -Value $oneServerAgent.newCount
+		ONE_SrvAgentUsedCount           = Confirm-Value -Value $oneServerAgent.usedCount
+		# Veeam ONE - Veeam Agent - Workstation
+		ONE_WsAgentNewCount             = Confirm-Value -Value $oneWorkstationAgent.newCount
+		ONE_WsAgentUsedCount            = Confirm-Value -Value $oneWorkstationAgent.usedCount
+		# Veeam Backup for Microsoft 365 - User
+		VB365_UserNewCount              = Confirm-Value -Value $vb365User.newCount
+		VB365_UserUsedCount             = Confirm-Value -Value $vb365User.usedCount
+	}
+	$output.Add($object)
+	Clear-Variable -Name object
 }
-catch {
-	Write-Error "ERROR: Retrieving Tenants Failed!"
-	throw
-}
-# End Retrieve Organizations
+### End - Calculating per-Company usage
 
-return $orgs
-
-# # Checking for active alarms that could cause incorrect numbers on the report
-# $alarms = $false
-# $alarm15 = Get-ServerAlarmEvents -AlarmId 15 # Veeam Service Provider Console lost connection to the managed Veeam Backup & Replication server.
-# $alarm42 = Get-ServerAlarmEvents -AlarmId 42 # Veeam Service Provider Console has lost connection to the Cloud Connect server.
-# if ($alarm15) {
-# 	Write-Warning "`nActive alarms are present that will cause usage report numbers to be inaccurate.`nPlease resolve these alarms and re-run this script to ensure accurate numbers."
-# 	$alarms = $true
-# 	Write-Output "`nVeeam Availability Console lost connection to the following managed Veeam Backup & Replication server(s):`n"
-# 	foreach ($event in $alarm15) {
-# 		Write-Output $event.computerName
-# 	}
-# }
-# if ($alarm42) {
-# 	Write-Warning "`nActive alarms are present that will cause usage report numbers to be inaccurate.`nPlease resolve these alarms and re-run this script to ensure accurate numbers."
-# 	$alarms = $true
-# 	Write-Output "`nVeeam Availability Console has lost connection to the following Cloud Connect server(s):`n"
-# 	foreach ($event in $alarm42) {
-# 		Write-Output $event.computerName
-# 	}
-# }
-# # End - Checking for active alarms
-
-# # Get Tenant License Usage
-# $detailedUsage = @()
-# foreach ($tenant in $tenants) {
-# 	$ccUsage = Get-CloudConnectUsage -TenantId $tenant.id
-# 	$vbrServerUsage = Get-VbrServerUsage -TenantId $tenant.id
-# 	$vbrAgentUsage = Get-VbrAgentUsage -TenantId $tenant.id
-# 	$vacAgentUsage = Get-ServerAgentUsage -TenantId $tenant.id
-
-# 	# Parsing Cloud Connect Usage Numbers
-# 	$ccSrvBackup = $ccUsage | Where-Object { $_.type -eq "CC_Server_Backup" }
-# 	$ccWsBackup = $ccUsage | Where-Object { $_.type -eq "CC_Workstation_Backup" }
-# 	$ccVmBackup = $ccUsage | Where-Object { $_.type -eq "CC_VM_Backup" }
-# 	$ccVmReplica = $ccUsage | Where-Object { $_.type -eq "CC_VM_Replica" }
-
-# 	# Parsing VBR Server Usage Numbers
-# 	$licenseUsage = @()
-# 	if ($vbrServerUsage) {
-# 		# Pulling license(s) tied to tenant
-# 		$tenantVbrLicenses = (
-# 			$vbrServerUsage |
-# 			Where-Object { $_.serverUid -ne "00000000-0000-0000-0000-000000000000" } | # excluding perpetual licenses
-# 			Where-Object { $_.isCloudConnect -eq $false } | # excluding Cloud Connect server licenses
-# 			Select-Object "serverUid" -Unique # removing duplicates
-# 		).serverUid
-
-# 		# Pulling usage for the licenses identified
-# 		foreach ($license in $tenantVbrLicenses) {
-
-# 			# Finding corresponding VBR license
-# 			$vbr = $vbrLicenses | Where-Object { $_.id -eq $license }
-# 			$vbrLicensesObject = [PSCustomObject] @{
-# 				Id               = $vbr.id
-# 				BackupServerName = $vbr.backupServerName
-# 				Edition          = $vbr.edition
-# 				CompanyName      = $vbr.companyName
-# 				SupportId        = $vbr.supportID
-# 				UsedVMs          = $vbr.usedVMs
-# 				NewVMs           = $vbr.newVMs
-# 				TotalInstances   = $vbr.totalInstances
-# 				UsedInstances    = $vbr.usedInstances
-# 			}
-# 			$licenseUsage += $vbrLicensesObject
-# 		}
-# 	}
-
-# 	# Parsing VBR Agent Usage Numbers
-# 	$vbrWindowsSrvAgent = $vbrAgentUsage | Where-Object { $_.type -eq "VBR_Windows_Server_Agent" }
-# 	$vbrWindowsWsAgent = $vbrAgentUsage | Where-Object { $_.type -eq "VBR_Windows_Workstation_Agent" }
-
-# 	# Parsing VSPC Agent Usage Numbers
-# 	$vacWindowsSrvAgent = $vacAgentUsage | Where-Object { $_.type -eq "VAC_Windows_Server_Agent" }
-	
-# 	$tenantObject = [PSCustomObject] @{
-# 		# Basic Tenant Information
-# 		TenantName                     = $tenant.name
-# 		TenantId                       = $tenant.id
-# 		TenantType                     = $tenant.tenantType
-# 		IsEnabled                      = $tenant.isEnabled
-# 		SiteName                       = $tenant.siteName
-# 		# Veeam Backup & Replication for VMware/Hyper-V - VM
-# 		VBR_VmBackups                  = $licenseUsage
-# 		# Veeam Cloud Connect Backup - Workstation
-# 		CC_WsBackupRentalCount         = Check-Value -Value $ccWsBackup.rentalCount
-# 		CC_WsBackupNewCount            = Check-Value -Value $ccWsBackup.newCount
-# 		CC_WsBackupUsedCount           = Check-Value -Value $ccWsBackup.usedCount
-# 		# Veeam Cloud Connect Backup - VM
-# 		CC_VmBackupRentalCount         = Check-Value -Value $ccVmBackup.rentalCount
-# 		CC_VmBackupNewCount            = Check-Value -Value $ccVmBackup.newCount
-# 		CC_VmBackupUsedCount           = Check-Value -Value $ccVmBackup.usedCount
-# 		# Veeam Cloud Connect Backup - Server
-# 		CC_SrvBackupRentalCount        = Check-Value -Value $ccSrvBackup.rentalCount
-# 		CC_SrvBackupNewCount           = Check-Value -Value $ccSrvBackup.newCount
-# 		CC_SrvBackupUsedCount          = Check-Value -Value $ccSrvBackup.usedCount
-# 		# Veeam Cloud Connect Replication - VM
-# 		CC_VmReplicaRentalCount        = Check-Value -Value $ccVmReplica.rentalCount
-# 		CC_VmReplicaNewCount           = Check-Value -Value $ccVmReplica.newCount
-# 		CC_VmReplicaUsedCount          = Check-Value -Value $ccVmReplica.usedCount
-# 		# Veeam Agent for Windows/Linux - Workstation
-# 		VBR_WindowsWsAgentRentalCount  = Check-Value -Value $vbrWindowsWsAgent.rentalCount
-# 		VBR_WindowsWsAgentNewCount     = Check-Value -Value $vbrWindowsWsAgent.newCount
-# 		VBR_WindowsWsAgentUsedCount    = Check-Value -Value $vbrWindowsWsAgent.usedCount
-# 		# Veeam Agent for Windows/Linux - Server
-# 		VBR_WindowsSrvAgentRentalCount = Check-Value -Value $vbrWindowsSrvAgent.rentalCount
-# 		VBR_WindowsSrvAgentNewCount    = Check-Value -Value $vbrWindowsSrvAgent.newCount
-# 		VBR_WindowsSrvAgentUsedCount   = Check-Value -Value $vbrWindowsSrvAgent.usedCount
-# 		# VSPC Managed - Veeam Agent for Windows/Linux - Server
-# 		VAC_WindowsSrvAgentRentalCount = Check-Value -Value $vacWindowsSrvAgent.rentalCount
-# 		VAC_WindowsSrvAgentNewCount    = Check-Value -Value $vacWindowsSrvAgent.newCount
-# 		VAC_WindowsSrvAgentUsedCount   = Check-Value -Value $vacWindowsSrvAgent.usedCount
-# 	}
-# 	$detailedUsage += $tenantObject
-# }
-# # End - Get Tenant License Usage
-
-# # Adding up Veeam Backup & Replication for VMware/Hyper-V - VM
-# $editionEnterprisePlusVBR = ($detailedUsage | Where-Object { $_.VBR_VmBackups.Edition -eq "Enterprise Plus" }).VBR_VmBackups.UsedVms
-# $editionEnterpriseVBR = ($detailedUsage | Where-Object { $_.VBR_VmBackups.Edition -eq "Enterprise" }).VBR_VmBackups.UsedVms
-# $editionStandardVBR = ($detailedUsage | Where-Object { $_.VBR_VmBackups.Edition -eq "Standard" }).VBR_VmBackups.UsedVms
-
-# # Adding up Veeam Agent for Windows/Linux - Server
-# $vbrSrvAgent = ($detailedUsage.VBR_WindowsSrvAgentUsedCount | Measure-Object -Sum).Sum
-# $vacSrvAgent = ($detailedUsage.VAC_WindowsSrvAgentUsedCount | Measure-Object -Sum).Sum
-# $srvAgent = $vbrSrvAgent + $vacSrvAgent # Adding both VBR & VSPC managed agent-based backups for total count
-
-# # Creating combined usage object
-# if ($Detailed) {
-#  # Detailed metrics requested
-# 	$usageObject = [PSCustomObject] @{
-# 		Alarms             = $alarms
-# 		VBR_EntPlus_Total  = ($editionEnterprisePlusVBR | Measure-Object -Sum).Sum
-# 		VBR_Ent_Total      = ($editionEnterpriseVBR | Measure-Object -Sum).Sum
-# 		VBR_Standard_Total = ($editionStandardVBR | Measure-Object -Sum).Sum
-# 		CC_WsBackup_Total  = ($detailedUsage.CC_WsBackupUsedCount | Measure-Object -Sum).Sum
-# 		CC_VmBackup_Total  = ($detailedUsage.CC_VmBackupUsedCount | Measure-Object -Sum).Sum
-# 		CC_SrvBackup_Total = ($detailedUsage.CC_SrvBackupUsedCount | Measure-Object -Sum).Sum
-# 		CC_VmReplica_Total = ($detailedUsage.CC_VmReplicaUsedCount | Measure-Object -Sum).Sum
-# 		Agent_Ws_Total     = ($detailedUsage.VBR_WindowsWsAgentUsedCount | Measure-Object -Sum).Sum
-# 		Agent_Srv_Total    = $srvAgent
-# 		Detailed_Metrics   = $detailedUsage
-# 	}
-# }
-# else {
-#  # Detailed metrics not requested
-# 	$usageObject = [PSCustomObject] @{
-# 		Alarms             = $alarms
-# 		VBR_EntPlus_Total  = ($editionEnterprisePlusVBR | Measure-Object -Sum).Sum
-# 		VBR_Ent_Total      = ($editionEnterpriseVBR | Measure-Object -Sum).Sum
-# 		VBR_Standard_Total = ($editionStandardVBR | Measure-Object -Sum).Sum
-# 		CC_WsBackup_Total  = ($detailedUsage.CC_WsBackupUsedCount | Measure-Object -Sum).Sum
-# 		CC_VmBackup_Total  = ($detailedUsage.CC_VmBackupUsedCount | Measure-Object -Sum).Sum
-# 		CC_SrvBackup_Total = ($detailedUsage.CC_SrvBackupUsedCount | Measure-Object -Sum).Sum
-# 		CC_VmReplica_Total = ($detailedUsage.CC_VmReplicaUsedCount | Measure-Object -Sum).Sum
-# 		Agent_Ws_Total     = ($detailedUsage.VBR_WindowsWsAgentUsedCount | Measure-Object -Sum).Sum
-# 		Agent_Srv_Total    = $srvAgent
-# 	}
-# }
-
-# Outputting PowerShell object
-# return $usageObject
+return $output
