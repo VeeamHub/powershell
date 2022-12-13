@@ -3,7 +3,7 @@
 Veeam Service Provider Console (VSPC) License Usage Report
 
 .DESCRIPTION
-This script will return VSPC point in time license usag for
+This script will return VSPC point in time license usage for
 the current calendar month.
 
 .PARAMETER Server
