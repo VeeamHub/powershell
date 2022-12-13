@@ -29,3 +29,5 @@ the current calendar month.
 ## Usage
 
 Get-Help .\Get-VspcUsageReport.ps1
+
+![sample output](sample.png)
