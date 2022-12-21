@@ -113,7 +113,7 @@ That's why I came up with the **weight** of an object.
 
 Here are two examples:
 
-Let's assume we have to SP sites.
+Let's assume we have two SP sites.
 SiteA is a simple site with no subsites, while SiteB has 100 subsites.
 From a joblevel you just add SiteA and SiteB and they'll appear as two objects within  the job configuration in VB365.
 At runtime the sites will be resolved and SiteA resolves to a single object, while SiteB resolves to 101 objects.
