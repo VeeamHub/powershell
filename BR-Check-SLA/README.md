@@ -1,13 +1,18 @@
 # check-SLA.ps1
 
-This script will read all the most recent restore points from all backup jobs of a single or multiple VBR servers. SLA compliance ratio (in percent) is calculated based on which percentage of the restore points have been created within the given backup window in comparison to the total number of restore points.
-Per default, all backup jobs and VMs (or computers in cas of agent jobs) will be processed. To exclude particular jobs or VMs from the SLA calculation, parameters `excludeJobs` and `excludeVMs` can be used as described below.
+## Function
 
-Requires [Veeam Powershell module].
+This script will read all the most recent restore points from all backup jobs of a single or multiple VBR servers. SLA compliance ratio (in percent) is calculated based on which percentage of the restore points have been created within the given backup window in comparison to the total number of restore points.
+Per default, all backup jobs and VMs (or computers in case of agent jobs) will be processed. To exclude particular jobs or VMs from the SLA calculation, parameters `excludeJobs`, `excludeVMs` and `excludeVMFile` can be used as described below.
 
 > **Note:** If a VM within a particular job has NEVER been backed up successfully (i.e., no restore points exist for this VM at all), or if a job didn't run at least successfully once, this script will not be able report these as being 'outside of backup window' as it simply cannot process something that doesn't exist.
 
 > **2nd Note:** If a restore point is newer than the backup window end time, it will be ignored and the next (older) restore point will be checked for backup window compliance instead.
+
+## Requirements
+- [Veeam Backup & Replication] v11
+  - older versions haven't been tested
+- [Veeam Powershell module]
 
 ## Parameters:
 ### Mandatory
@@ -18,8 +23,11 @@ Requires [Veeam Powershell module].
 - `backupWindowEnd` = at which time of day ends the backup window? (string in 24h format, default `"07:00"` can be changed in `Param()`-section)
 - `displayGrid` = switch to display results in PS-GridViews (default = `$false`)
 - `outputDir` = where to write the output files (folder must exist, otherwise defaulting to script folder)
-- `excludeJobs` = jobs including this string in their **description** field will be ignored (case-insensitive, default = empty string, i.e. no exclusions)
 - `excludeVMs` = VMs (or computers) that have this string as part of their name will be ignored (case-insensitive,default = empty string, i.e. no exclusions)
+- `excludeVMsFile` = filename containing list of either VM names or VM Name + VM-ID combination to be excluded explicitly (textfile, one VM name / VM name + VM-ID per line, default = "`exclude-VMs.txt`", see example below)
+- `separatorChar` = character for separation of VM name and VM-ID (optional) on each line of the VM exclusions file (default = "`,`" (comma), see example below)
+- `excludeJobs` = jobs including this string in their **description** field will be ignored (case-insensitive, default = empty string, i.e. no exclusions)
+- `excludeJobsFile` = filename containing list of backup jobs to be excluded explicitly (textfile, one job name per line, default = "`exclude-Jobs.txt`")
 
 
 Backup window **start** will be calculated as follows:  
@@ -44,10 +52,22 @@ This example uses all parameters to check the backup window starting at 22:00 on
             -backupWindowStart "22:00" `
             -backupWindowEnd "05:00" `
             -outputDir "C:\temp" `
-            -excludeJobs "#noSLA" `
             -excludeVMs "_test" `
+            -excludeJobs "#noSLA" `
             -displayGrid
 ```
+### Example VM exclusion file `excludeVMs.txt`
+- Syntax: One VM entry per line, VM-ID can be optionally added after separator character (VM IDs can be retrieved from vCenter using the free [RVTools utility](https://www.robware.net/rvtools/), it shows on the "vInfo" page in column "VM ID").
+- Default separator character is "`,`" (comma), it can be customized by parameter `separatorChar`.
+
+```
+srv1           # VM 'srv1' will be excluded, regardless of its VM-ID
+vmA,vm-305     # VM 'vmA' will be excluded, but only if its VM-ID is 'vm-305'
+
+```
+(Comments in the example above are for this readme only, __do not use comments__ in your real exception file!)
+
 
 <!-- referenced links -->
+[Veeam Backup & Replication]: https://www.veeam.com/vm-backup-recovery-replication-software.html
 [Veeam PowerShell module]: https://helpcenter.veeam.com/docs/backup/powershell/getting_started.html
