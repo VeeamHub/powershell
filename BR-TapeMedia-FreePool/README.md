@@ -14,6 +14,7 @@ This script is designed to help automate the import of new tapes from the Unreco
 * Read [Veeam's Backup Documentation](https://helpcenter.veeam.com/docs/backup/vsphere/tape_device_support.html?ver=110)
 * Fully understand what the script is doing
 * Test the script in a lab environment
+* This script is designed to be executed on the VBR server
 
 ## Known Issues
 
@@ -28,3 +29,4 @@ This script is designed to help automate the import of new tapes from the Unreco
 ## Additional Information
 
 Would suggest setting this up as a Scheduled Task
+You can also adjust the media pool to a different one than Free based on your environment and specific needs
