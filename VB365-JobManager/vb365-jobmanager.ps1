@@ -143,7 +143,7 @@ DynamicParam {
 
 BEGIN {
     $global:version = '1.0.0'
-    filter timelog { "$(Get-Date -Format "yyyy-mm-dd HH:mm:ss"): $_" }
+    filter timelog { "$(Get-Date -Format "yyyy-MM-dd HH:mm:ss"): $_" }
 
     # Save in global variables for easier use in classes
     $global:countTeamAs = $countTeamAs
