@@ -1,0 +1,4 @@
+"VM Name","Cluster Name","Protection Domain","Job Name","Backup Target","Available Restore Points","Last Backup/Snapshot Date"
+"OSE PROXY CENTRAL","172.19.136.51","VeeamBackupProtection",,,,"9/25/2020 3:52:20 PM"
+"Snapshot Test Job","172.19.136.51","Windows 2016",,,,"4/1/2020 9:16:19 AM"
+"Windows 2016","172.19.136.51",,"Nutanix Backup Job - Windows 2016","EXAGRID - Accelerated Data Mover","2","9/25/2020 12:47:44 PM"

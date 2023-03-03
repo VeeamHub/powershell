@@ -1,4 +1,4 @@
-# Johan Huttenga, 20180425
+# Johan Huttenga, 20221107
 
 $LogFile = "BR-UpdateReplicaIp.log"
 $CurrentPid = ([System.Diagnostics.Process]::GetCurrentProcess()).Id
@@ -74,46 +74,63 @@ class InterfaceConfig {
 }
 
 function Parse-InterfaceConfig {
-    param($config, $ostype)
+    param($config, $ostype, $method = "default")
     $result = @()
     
     $lines = $config.Split("`n")
     
-    if ($ostype -eq "Linux") {
-            $gw = $lines[0].Split(" ",[System.StringSplitOptions]::RemoveEmptyEntries)[2]
-            for($i=1; $i -lt $lines.Count; $i++) {
-                $l = $lines[$i]
-                if ($l -like "*mtu*") {
-                        if ($ifcfg -ne $null) { $result += $ifcfg }
-                        $ifcfg = New-Object InterfaceConfig
-                        $ifcfg.Ipv4 = @()
-                        $ifcfg.Ipv6 = @()
-                        $ifcfg.Name = $l.Split(":")[0]
-                }
-                elseif ($l -like "*inet6*") {
-                        $cnf = $l.Split(" ",[System.StringSplitOptions]::RemoveEmptyEntries)
-                        $ifcfg.Ipv6 += $cnf[1]
-                }
-                elseif ($l -like "*inet*") {
-                        $cnf = $l.Split(" ",[System.StringSplitOptions]::RemoveEmptyEntries)
-                        $ifcfg.Ipv4 += $cnf[1]
-                        $ifcfg.Subnet = $cnf[3]
-                        $ifcfg.Gateway = $gw
-                        $ifcfg.Broadcast = $cnf[5]
-                }
-                elseif ($l -like "*ether*") {
-                        $cnf = $l.Split(" ",[System.StringSplitOptions]::RemoveEmptyEntries)
-                        $ifcfg.Mac = $cnf[1]
-                }
+    if (($ostype -eq "Linux") -and ($method -eq "default")) {
+        $gw = $(ConvertFrom-Json $lines[0]) | Where-Object {$_.dst -eq "default"}
+        $ifs = ConvertFrom-Json $lines[1]
+
+        foreach ($ifcfg in $ifs) {
+            $if = New-Object InterfaceConfig
+            $if.Name = $ifcfg.ifname
+            $if.Type = $ifcfg.link_type
+            $if.Mac = $ifcfg.address
+            $if.Ipv4 = $ifcfg.addr_info | Where-Object {$_.family -eq "inet"} | ForEach-Object {$_.local}
+            $if.Ipv6 = $ifcfg.addr_info | Where-Object {$_.family -eq "inet6"} | ForEach-Object {$_.local}
+            $if.Subnet = $ifcfg.addr_info | Where-Object {$_.family -eq "inet"} | ForEach-Object { "255."*$([math]::floor($_.prefixlen/8))+[System.Convert]::ToByte($("1"*($_.prefixlen%8)).PadRight(8,"0"),2)+".0"*$(4-$($_.prefixlen/8)) }
+            $if.Gateway = $gw | Where-Object {$_.dev -eq $if.Name} | ForEach-Object {$gw.gateway}
+            $if.Broadcast = $ifcfg.addresses | Where-Object {$_.family -eq "inet"} | ForEach-Object {$_.broadcast}
+            $result += $if
+        }
+    }
+    elseif (($ostype -eq "Linux") -and ($method -eq "ifconfig")) {
+        $gw = $lines[0].Split(" ",[System.StringSplitOptions]::RemoveEmptyEntries)[2]
+        for($i=1; $i -lt $lines.Count; $i++) {
+            $l = $lines[$i]
+            if ($l -like "*mtu*") {
+                    if ($null -ne $ifcfg) { $result += $ifcfg }
+                    $ifcfg = New-Object InterfaceConfig
+                    $ifcfg.Ipv4 = @()
+                    $ifcfg.Ipv6 = @()
+                    $ifcfg.Name = $l.Split(":")[0]
             }
-            if ($ifcfg -ne $null) { $result += $ifcfg }
+            elseif ($l -like "*inet6*") {
+                    $cnf = $l.Split(" ",[System.StringSplitOptions]::RemoveEmptyEntries)
+                    $ifcfg.Ipv6 += $cnf[1]
+            }
+            elseif ($l -like "*inet*") {
+                    $cnf = $l.Split(" ",[System.StringSplitOptions]::RemoveEmptyEntries)
+                    $ifcfg.Ipv4 += $cnf[1]
+                    $ifcfg.Subnet = $cnf[3]
+                    $ifcfg.Gateway = $gw
+                    $ifcfg.Broadcast = $cnf[5]
+            }
+            elseif ($l -like "*ether*") {
+                    $cnf = $l.Split(" ",[System.StringSplitOptions]::RemoveEmptyEntries)
+                    $ifcfg.Mac = $cnf[1]
+            }
+        }
+        if ($null -ne $ifcfg) { $result += $ifcfg } #>
     }
     else {
             $ifcfg = $null
             for($i=0; $i -lt $lines.Count; $i++) {
                 $l = $lines[$i]
                 if (($l -like "*adapter*") -and !($l -like "*description*")) {
-                        if ($ifcfg -ne $null) { $result += $ifcfg }
+                        if ($null -ne $ifcfg) { $result += $ifcfg }
                         $ifcfg = New-Object InterfaceConfig
                         $ifcfg.Ipv4 = @()
                         $ifcfg.Ipv6 = @()
@@ -137,15 +154,18 @@ function Parse-InterfaceConfig {
             }
             if ($ifcfg -ne $null) { $result += $ifcfg }
     }
-    
     return $result
 }
 
 function Get-VBRCredential {
     param ($id)
+
+    # hack to force dependencies to load
+    Get-VBRServer -? > $null
+
     $cred = ([Veeam.Backup.Core.CDbCredentials]::Get([System.Guid]::new($id))).Credentials
-    if ($cred -eq $null) { 
-        Write-Log "Error: Unable to query credential ($($cred)). Ensure it exists and this process is run with administrator permissions."
+    if ($null -eq $cred) { 
+        Write-Log "Error: Unable to query credential ($($cred)) associated with id ($($id)). Ensure it exists and this process is run with administrator permissions."
     }
     $decoded = [Veeam.Backup.Common.CStringCoder]::Decode($cred.EncryptedPassword, $true)
     $secpwd = ConvertTo-SecureString $decoded -AsPlainText $true
@@ -153,20 +173,24 @@ function Get-VBRCredential {
 }
 
 function Add-VIConnection {
-    param($Server, $Credential)
+    param($Server, [PSCredential] $Credential, $CredentialId)
 
     $result = $null
 
-    if ($Credential -eq $null) {
+    if ($null -eq $Credential) {
         Write-Log "Error: Cannot connect to $server as no credentials were specified."
         return
     }
 
     if (!($VIConnections.ContainsKey($Server)))
     {
-            Write-Log "Connecting to $Server using credentials ($($Credential.UserName))."
-            $VIConnections[$Server] = Connect-VIServer $Server -Credential $Credential
-            if ($VIConnections[$Server] -eq $null) {
+            Write-Log "Connecting to $Server using credentials ($($Credential.UserName)) ($($CredentialId))."
+            try { $VIConnections[$Server] = Connect-VIServer $Server -Credential $Credential -Force }
+            catch {
+                if ($null -ne $_.Exception.InnerException.Message) { Write-Log "Error: An error occurred when connecting to $($Server). $($_.Exception.InnerException.Message) " }
+                else { Write-Log "Error: An error occurred when connecting to $($vm). $($_.Exception.Message)" }
+            }
+            if ($null -eq $VIConnections[$Server]) {
                 Write-Log "Error: A connectivity issue has occurred when connecting to $Server."
             }
     }
@@ -183,13 +207,40 @@ function Apply-VMReIpRule {
     for($i=1;$i -le 3; $i++) 
     {
             [regex]$pattern  = "\*"
-            if ($rule.TargetIp.Split(".")[$i] -eq "*") { $TargetIp = $pattern.Replace($TargetIp,$SourceIpAddress.Split(".")[$i],1) }
+            if ($ReIpRule.TargetIp.Split(".")[$i] -eq "*") { $TargetIp = $pattern.Replace($TargetIp,$SourceIpAddress.Split(".")[$i],1) }
     }
     return $TargetIp
 }
 
-function Get-VMGuestNetworkInterface {
-    param($vm, $GuestCredential)
+function Call-VMScript {
+    param($VM,[PSCredential] $GuestCredential, $ScriptText, $ScriptType, $ObfuscateStringOutput = $null)
+
+    $output = "Invoking script: $($scripttext)"
+
+    if($null -ne $ObfuscateStringOutput) { $output = $output.Replace($ObfuscateStringOutput,"***") } 
+    
+    Write-Log $output
+
+    $output = $null
+
+    try { $output = Invoke-VMScript -VM $vm -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext -ErrorAction Stop }
+    catch {  
+        if ($null -ne $_.Exception.InnerException.Message) { 
+            Write-Log "Error: An error occurred when invoking the script on $($vm). $($_.Exception.InnerException.Message) " 
+        }
+        else { Write-Log "Error: An error occurred when invoking the script on $($vm). $($_.Exception.Message)" }
+    }
+
+    if (($null -ne $output) -and ($output.Length -gt 0)) { 
+        if($null -ne $ObfuscateStringOutput) { $output = $output.Replace($ObfuscateStringOutput,"***") }
+        Write-Log $output
+    }
+
+    return $output
+}
+
+function Get-VMGuestOperatingSystem {
+    param($vm, [PSCredential] $GuestCredential)
     
     $scripttype = ""
     $scripttext = ""
@@ -200,67 +251,227 @@ function Get-VMGuestNetworkInterface {
     
     if ($ostype -eq "Linux") { 
             $scripttype = "Bash"
-            $scripttext = "ip route | grep default && /sbin/ifconfig -a"
+            $scripttext = "cat /etc/os-release" 
     }
     else { 
             $scripttype = "Bat" 
-            $scripttext = "ipconfig /all"
+            $scripttext = "reg query `"HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\`" /v ProductName"
     }
     
-    Write-Log "Invoking script: $($scripttext)"
-    $output = Invoke-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext
-    Write-Log $output
-    $result = Parse-InterfaceConfig -Config $output.ScriptOutput -OSType $ostype
+    $result = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext
     
     return $result
 }
 
+function Get-VMGuestNetworkInterface {
+    param($vm, [PSCredential] $GuestCredential)
+    
+    $scripttype = ""
+    $scripttext = ""
+    
+    $ostype = "Linux"
+    
+    if ($ostype -eq "Linux") { 
+            $scripttype = "Bash"
+            $scripttext = "ip -json route && ip -json addr" # only works on newer systems
+            $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext
+    }
+    else { 
+            $scripttype = "Bat" 
+            $scripttext = "ipconfig /all"
+            $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext
+    }
+    $result = Parse-InterfaceConfig -Config $output -OSType $ostype
+    
+    return $result
+}
 
+function Test-SudoAccess {
+    
+    param($vm, [PSCredential] $GuestCredential)
+
+    $vm_os = $vm.Guest.OSFullName
+    $result = $false
+
+    if ($vm_os -like "*Ubuntu*") { $ostype = "Ubuntu" }
+    if ($ostype -eq "Ubuntu") {
+        $scripttype = "Bash"
+        
+        $pwd = $([Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($guestcredential.password)))
+        $scripttext = "set +H && echo $($pwd) | sudo -l -S -U $($guestcredential.username) && set -H"
+        $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext -ObfuscateStringOutput $pwd
+
+        if ($output -like "*ALL : ALL*") { $result = $true }
+
+    }
+
+    return $result
+
+}
+
+function Backup-VMGuestNetworkConfig {
+    param($vm, [PSCredential] $GuestCredential, $Elevate=$false)
+
+    $vm_os = $vm.Guest.OSFullName
+
+    if ($vm_os -like "*Ubuntu*") { $ostype = "Ubuntu" }
+    if ($ostype -eq "Ubuntu") {
+        $scripttype = "Bash"
+        if ($Elevate) {
+            $pwd = $([Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($guestcredential.password)))
+            $scripttext = "echo $($pwd) | sudo -S sh -c 'ls /etc/netplan/*.yaml | xargs -I {} mv {} {}.bak'"
+        }
+        else {
+            $scripttext = "ls /etc/netplan/*.yaml | xargs -I {} mv {} {}.bak"
+        }
+        $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext -ObfuscateStringOutput $pwd
+    }
+
+    return $null
+}
+
+function Convert-IpAddressToMaskLength([string] $dottedIpAddressString)
+{
+  $result = 0; 
+  # ensure we have a valid IP address
+  [IPAddress] $ip = $dottedIpAddressString;
+  $octets = $ip.IPAddressToString.Split('.');
+  foreach($octet in $octets)
+  {
+    while(0 -ne $octet) 
+    {
+      $octet = ($octet -shl 1) -band [byte]::MaxValue
+      $result++; 
+    }
+  }
+  return $result;
+}
 
 function Set-VMGuestNetworkInterface {
-    param($vm, $interface, $ipaddress, $netmask, $gateway, $dns, $guestcredential)
-
-    $scripttype = ""
+    param($vm, $iface, $ipaddress, $netmask, $gateway, $dns, [PSCredential] $guestcredential, $Elevate=$false)
+    $scripttype = "Bash"
     $scripttext = ""
     $ostype = "Linux" 
     $vm_os = $vm.Guest.OSFullName
-
     if ($vm_os -like "*CentOS*") { $ostype = "CentOS" }
     if ($vm_os -like "*Red Hat*") { $ostype = "RedHat" }
+    if ($vm_os -like "*Ubuntu*") { $ostype = "Ubuntu" }
     if ($vm_os -like "*Windows*") { $ostype = "Windows" }
-    if (($ostype -eq "CentOS") -or ($ostype = "RedHat")) { 
-    $scripttype = "Bash"
-    $scripttext = "more /etc/sysconfig/network-scripts/ifcfg-" + $interface
-    Write-Log "Invoking script: $($scripttext)"
-    $output = Invoke-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext
-    Write-Log $output
-    $lines = $output.Split("`n")
-    $scripttext = "echo -e '"
-    for($i = 3; $i -lt $lines.Count; $i++) {
-        $select = $true
-        $select = $select -and !($lines[$i] -like "*BOOTPROTO*") 
-        $select = $select -and !($lines[$i] -like "*IPADDR*")
-        $select = $select -and !($lines[$i] -like "*NETMASK*") 
-        $select = $select -and !($lines[$i] -like "*GATEWAY*")
-        if ($select) { $scripttext += $lines[$i].Trim() + "\n" }
-    }
-    $scripttext += "BOOTPROTO=""static"""
-    $scripttext += "\nIPADDR=""$ipaddress"""
-    $scripttext += "\nNETMASK=""$netmask"""
-    $scripttext += "\nGATEWAY=""$gateway"""
-    $scripttext += "' > /etc/sysconfig/network-scripts/ifcfg-$interface && service network restart"
-    Write-Log "Invoking script: $($scripttext)"
-    $output = Invoke-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext
-    Write-Log $output
+    if (($ostype -eq "Ubuntu")) { 
+        
+        $prefix = Convert-IpAddressToMaskLength($rule.TargetSubnet)
 
-    if ($dns -ne $null) {
-    $scripttext = "echo -e '"
-    $scripttext += "nameserver $dns"
-    $scripttext += "' > /etc/resolv.conf"
-    Write-Log "Invoking script: $($scripttext)"
-    $output = Invoke-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext
-    Write-Log $output
+        # does not include search domain for dns servers
+        $netplan = "network:\n  ethernets:\n    $($iface):\n      addresses:\n        - $($ipaddress)/$($prefix)"
+        if ($null -ne $dns) {
+            $netplan += "\n      nameservers:\n          addresses: [$($dns)]"
+        }
+        if ($null -ne $gateway) {
+            $netplan += "\n      routes:\n        - to: default\n          via: $($gateway)"
+        }
+        
+        if ($Elevate) {
+            $pwd = $([Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($guestcredential.password)))
+            $scripttext = "echo $($pwd) | sudo -S sh -c 'echo `"$($netplan)`" > /etc/netplan/01-netcfg.yaml'"
+        }
+        else {
+            $scripttext = "echo `"$($netplan)`" > /etc/netplan/01-netcfg.yaml"
+        }
+        $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext -ObfuscateStringOutput $pwd
+
+        if ($Elevate) {
+            $pwd = $([Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($guestcredential.password)))
+            $scripttext = "echo $($pwd) | sudo -S netplan apply"
+        }
+        else {
+            $scripttext = "netplan apply"
+        }
+
+
+        $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext -ObfuscateStringOutput $pwd
+        
+        if ($Elevate) {
+            $pwd = $([Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($guestcredential.password)))
+
+            $scripttext = "more /etc/systemd/resolved.conf"
+            $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext
+            $lines = $output.Split("`n")
+            $scripttext = "echo -e '"
+            for($i = 3; $i -lt $lines.Count; $i++) {
+                $select = $true
+                $select = $select -and !($lines[$i] -like "*DNSStubListener*") 
+                if ($select) { $scripttext += $lines[$i].Trim() + "\n" }
+            }
+
+            $scripttext += "DNSStubListener=no"
+            $scripttext += "' > /etc/systemd/resolved.conf"
+            $scripttext = "echo $($pwd) | sudo -S bash -c ""$($scripttext)"""
+            $scripttext += " && echo $($pwd) | sudo -S systemctl restart systemd-resolved"
+
+            $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext -ObfuscateStringOutput $pwd
+
+
+
+        }else{
+            Write-Log "Warning: No sudo access please ensure DNS will function correctly!"
+        }
+
+        $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext -ObfuscateStringOutput $pwd
     }
+    elseif ($ostype -eq "CentOS") { 
+        $scripttext = "more /etc/sysconfig/network-scripts/ifcfg-" + $iface
+        $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext
+        $lines = $output.Split("`n")
+        $scripttext = "echo -e '"
+        for($i = 3; $i -lt $lines.Count; $i++) {
+            $select = $true
+            $select = $select -and !($lines[$i] -like "*BOOTPROTO*") 
+            $select = $select -and !($lines[$i] -like "*IPADDR*")
+            $select = $select -and !($lines[$i] -like "*NETMASK*") 
+            $select = $select -and !($lines[$i] -like "*GATEWAY*")
+            if ($select) { $scripttext += $lines[$i].Trim() + "\n" }
+        }
+        $scripttext += "BOOTPROTO=""static"""
+        $scripttext += "\nIPADDR=""$ipaddress"""
+        $scripttext += "\nNETMASK=""$netmask"""
+        $scripttext += "\nGATEWAY=""$gateway"""
+        $scripttext += "' > /etc/sysconfig/network-scripts/ifcfg-$iface && service network restart"
+        $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext
+        
+        if ($null -ne $dns) {
+            $scripttext = "echo -e '"
+            $scripttext += "nameserver $dns"
+            $scripttext += "' > /etc/resolv.conf" # network-scripts do not set the DNS server
+            $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext
+        }
+    }
+    elseif ($ostype = "RedHat") { 
+        $scripttext = "more /etc/sysconfig/network-scripts/ifcfg-" + $iface
+        $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext
+        $lines = $output.Split("`n")
+        $scripttext = "echo -e '"
+        for($i = 3; $i -lt $lines.Count; $i++) {
+            $select = $true
+            $select = $select -and !($lines[$i] -like "*BOOTPROTO*") 
+            $select = $select -and !($lines[$i] -like "*IPADDR*")
+            $select = $select -and !($lines[$i] -like "*NETMASK*") 
+            $select = $select -and !($lines[$i] -like "*GATEWAY*")
+            if ($select) { $scripttext += $lines[$i].Trim() + "\n" }
+        }
+        $scripttext += "BOOTPROTO=static"
+        $scripttext += "\nIPADDR="+$ipaddress
+        $scripttext += "\nNETMASK="+$netmask
+        $scripttext += "\nGATEWAY="+$gateway
+        $scripttext += "' > /etc/sysconfig/network-scripts/ifcfg-$iface && ifdown $iface && ifup $iface"
+        
+        $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext
+        
+        if ($null -ne $dns) {
+            $scripttext = "echo -e '"
+            $scripttext += "nameserver $dns"
+            $scripttext += "' > /etc/resolv.conf" # network-scripts do not set the DNS server
+            $output = Call-VMScript -VM $vm.Name -GuestCredential $guestcredential -ScriptType $scripttype -ScriptText $scripttext
+        }
     }
     elseif ($ostype -eq "Linux") { 
     #do nothing 
@@ -273,40 +484,44 @@ function Set-VMGuestNetworkInterface {
 }
 
 function Wait-VMBoot {
-    param ($Name, $SkipWaitForTools = $false, $SkipWaitForGuestDetails = $false)
+    param ($Name, $sesionId, $SkipWaitForTools = $false, $SkipWaitForGuestDetails = $false)
 
     $vm = Get-VM -Name $Name
     
-    if ($vm -eq $null) {
+    if ($null -eq $vm) {
         Write-Log "Error: $($Name) does not exist or cannot be accessed."
         return
     }
 
     if (!($SkipWaitForTools)) {
-            Write-Log "Waiting for $($Name) integration tools status (180 seconds max)..."
+            Write-Log "Waiting for $($Name) integration tools status (240 seconds max)..."
             $wait = 0
             $toolsstatus = $null
             try { $toolsstatus = ($vm = Get-VM -Name $Name | Get-View).Guest.ToolsStatus } catch { }
-            while ((($toolsstatus -eq $null) -or ($toolsstatus -ne "toolsOk")) -and ($wait -lt 180)) {
+            $state = $null
+            while ((($null -eq $toolsstatus) -or ($toolsstatus -ne "toolsOk")) -and ($wait -lt 240) -and ($state -ne "Failed")) {
                 $wait = $wait +5;
                 Sleep 5
                 try { $vm = Get-VM -Name $Name } catch { }
                 try { $toolsstatus = ($vm | Get-View).Guest.ToolsStatus } catch { }
+                $state = $([Veeam.Backup.Core.CBackupSession]::Get([System.Guid]::new($sessionid))).State
                 Write-Log "$($wait) : guest tools available : $($toolsstatus -eq "toolsOk")"
             }
     }
     if (!($SkipWaitForGuestDetails)) {
-            Write-Log "Waiting for $($Name) integration tools data (180 seconds max)..."
+            Write-Log "Waiting for $($Name) integration tools data (240 seconds max)..."
             $wait = 0
             $os = $vm.Guest.OSFullName
-            while ((($os -eq $null) -or ($os.Length -eq 0)) -and ($wait -lt 180)) {
+            $state = $null
+            while ((($null -eq $os) -or ($os.Length -eq 0)) -and ($wait -lt 240) -and ($state -ne "Failed")) {
                 $wait = $wait +5;
                 Sleep 5
                 $vm = $vm = Get-VM -Name $Name
                 $os = $vm.Guest.OSFullName
                 Write-Log "$($wait) : guest data available : $($os -ne $null)"
+                $state = $([Veeam.Backup.Core.CBackupSession]::Get([System.Guid]::new($sessionid))).State
             }
-            if ($wait -eq 180) {
+            if ($wait -eq 240) {
                 Write-Log "Error: $($Name) ($($vm.PowerState)) integration tools not available or timeout occurred."
             }
             else {
@@ -319,125 +534,118 @@ function Wait-VMBoot {
 
 Function Get-VBRFailoverPlanVMs
 {
-    Param($FailoverPlan)
-    $foijs = $FailoverPlan.FailoverPlanObject
-    $platform = $foijs[0].item.platform
-    $replicationjobs = [Veeam.Backup.Core.CBackupJob]::GetByTypeAndPlatform([Veeam.Backup.Model.EDbJobType]::Replica, $platform, $false)
-    $taggedvms = $null
-	$hclvms = $null
+    Param($FailoverPlan, $Session)
+    $platform = $FailoverPlan.BackupPlatform
+    if ($platform = "EVMware") {    
+        $foijs = $FailoverPlan.GetViOijs()
+        $replicationjobs = [Veeam.Backup.Core.CBackupJob]::GetByTypeAndPlatform([Veeam.Backup.Model.EDbJobType]::Replica, [Veeam.Backup.Common.EPlatform]::EVmware , $false)
+        $cdpreplicationjobs = [Veeam.Backup.Core.CBackupJob]::GetByTypeAndPlatform([Veeam.Backup.Model.EDbJobType]::CdpReplica, [Veeam.Backup.Common.EPlatform]::EVmware , $false)
+    }
+    else {
+        # not supported
+        $foijs = $FailoverPlan.GetHvOijs()
+        $replicationjobs = [Veeam.Backup.Core.CBackupJob]::GetByTypeAndPlatform([Veeam.Backup.Model.EDbJobType]::Replica, [Veeam.Backup.Common.EPlatform]::EHyperV , $false)
+        $cdpreplicationjobs = [Veeam.Backup.Core.CBackupJob]::GetByTypeAndPlatform([Veeam.Backup.Model.EDbJobType]::CdpReplica, [Veeam.Backup.Common.EPlatform]::EHyperV , $false)
+    }
+
+    #$replicationjobs = [Veeam.Backup.Core.CBackupJob]::GetByTypeAndPlatform([Veeam.Backup.Model.EDbJobType]::Replica, $platform, $false)
+    $replicationjobs = $replicationjobs + $cdpreplicationjobs
 
     $result = @()
     foreach ($j in $replicationjobs) {
             $roijs = $j.GetObjectsInJob()
             foreach($ro in $roijs) {
-                $roij = $ro.GetObject()
-                if ($roij.ViType -eq "Tag") {
-                    if ($taggedvms -eq $null) { $taggedvms = Find-VBRViEntity -Tag }
-                    $roivms = $taggedvms | Where-Object Path -like "$($ro.Location)\*"
-                }
-                else {
-                    if ($hclvms -eq $null) { $hclvms = Find-VBRViEntity -HostsAndClusters }
-                    $roivms = $hclvms | Where-Object Path -like "$($ro.Location)"
-                }
-                foreach ($roivm in $roivms) {
-                    foreach ($fo in $foijs)
-                    {
-                        $result += Find-MatchingReplicationFailoverOijs -FailoverPlan $FailoverPlan -ReplicaJob $j -Platform $platform -ReplicationOij $roivm -FailoverOij $fo
-                    }
+                foreach ($fo in $foijs)
+                {
+                        if ($ro.Location -like $fo.Location)
+                        {
+                            if ($platform -eq [Veeam.Backup.Common.EPlatform]::EHyperV) {
+                                    $rprefix = $j.Options.HvReplicaTargetOptions.ReplicaNamePrefix
+                                    $rsuffix = $j.Options.HvReplicaTargetOptions.ReplicaNameSuffix
+                                    $replicatoptions = $j.Options.HvReplicaTargetOptions
+                            }
+                            elseif ($platform -eq [Veeam.Backup.Common.EPlatform]::EVMware)
+                            {
+                                    $rprefix = $j.Options.ViReplicaTargetOptions.ReplicaNamePrefix
+                                    $rsuffix = $j.Options.ViReplicaTargetOptions.ReplicaNameSuffix
+                                    $replicatoptions = $j.Options.ViReplicaTargetOptions
+                            }
+                            $reiprules = @()
+                            foreach($rule in $j.Options.ReIPRulesOptions.Rules) {
+                                $r = @{
+                                    'SourceIp'=$rule.Source.Ipaddress
+                                    'SourceSubnet'=$rule.Source.SubnetMask
+                                    'TargetIp'=$rule.Target.Ipaddress
+                                    'TargetSubnet'=$rule.Target.SubnetMask
+                                    'TargetGateway'=$rule.Target.DefaultGateway
+                                    'TargetDNS'=[string]::Join(",",$rule.Target.DNSAddresses)
+                                    'TargetWINS'=[string]::Join(",",$rule.Target.WINSAddresses)
+                                }
+                                $reiprules += New-Object -TypeName PSObject -Prop $r
+                            }
+                            if ($j.VssOptions) {
+                                    $rcreds = $null
+                                    $rcredid = $null
+                                    if ($j.VssOptions.LinCredsId -ne [System.Guid]::Empty) { $rcredid = $j.VssOptions.LinCredsId }
+                                    if ($j.VssOptions.WinCredsId -ne [System.Guid]::Empty) { $rcredid = $j.VssOptions.WinCredsId }
+                                    if ($null -ne $rcredid) { $rcreds = Get-VBRCredential -Id $rcredid }
+                            }
+                            if ($j.TargetHostId) {
+                                    $replicatarget = [Veeam.Backup.Core.Common.CHost]::Get([System.Guid]::new($j.TargetHostId))
+                                    $rtparentci = $replicatarget.GetSoapConnHostInfo()
+                                    $rtparentcredid = (([Veeam.Backup.Core.Common.CHost]::Get([System.Guid]::new($rtparentci.Id))).GetSoapCreds()).CredsId
+                                    $rtparentcreds = Get-VBRCredential -Id $rtparentcredid
+                            }
+                            $p = @{
+                                    'SessionId' = $session.Id
+                                    'SourceName'=$ro.Name
+                                    'Platform'=$platform
+                                    'Path'=$ro.Location
+                                    'PlanName'=$fo.Name
+                                    'PlanId'=$fo.Id
+                                    'PlanOijId'=$fo.Id
+                                    'JobName'=$j.Name
+                                    'JobId'=$j.Id
+                                    'JobOijId'=$ro.Id
+                                    'ReplicaName'=$rprefix + $ro.Name + $rsuffix
+                                    'TargetHostId'=$j.TargetHostId
+                                    'TargetParentConnectionInfo'=$rtparentci
+                                    'TargetParentCredential'=$rtparentcreds
+                                    'TargetParentCredentialId'=$rtparentcredid
+                                    'TargetOptions'= $replicatoptions
+                                    'ReipRules'=$reiprules
+                                    'GuestCredential'=$rcreds
+                                    'GuestCredentialId'=$rcredid
+                            }
+                            Write-Log ("$($fo.Name) ($($fo.Location)) is associated with " + $j.Name + ".")
+                            $result += New-Object -TypeName PSObject -Prop $p
+                        }
                 }
             }
-    }
-    return $result
-}
-
-Function Find-MatchingReplicationFailoverOijs
-{
-    Param($FailoverPlan, $ReplicaJob, $Platform, $ReplicationOij, $FailoverOij)
-
-    $j = $ReplicaJob
-    $ro = $ReplicationOij
-    $fo = $FailoverOij.Item
-
-    $result = @()
-
-    if (($ro.Reference -like $fo.Reference))
-    {
-        if ($platform -eq [Veeam.Backup.Common.EPlatform]::EHyperV) {
-                $rprefix = $j.Options.HvReplicaTargetOptions.ReplicaNamePrefix
-                $rsuffix = $j.Options.HvReplicaTargetOptions.ReplicaNameSuffix
-                $replicatoptions = $j.Options.HvReplicaTargetOptions
-        }
-        elseif ($platform -eq [Veeam.Backup.Common.EPlatform]::EVMware)
-        {
-                $rprefix = $j.Options.ViReplicaTargetOptions.ReplicaNamePrefix
-                $rsuffix = $j.Options.ViReplicaTargetOptions.ReplicaNameSuffix
-                $replicatoptions = $j.Options.ViReplicaTargetOptions
-        }
-        $reiprules = @()
-        foreach($rule in $j.Options.ReIPRulesOptions.Rules) {
-            $r = @{
-                'SourceIp'=$rule.Source.Ipaddress
-                'SourceSubnet'=$rule.Source.SubnetMask
-                'TargetIp'=$rule.Target.Ipaddress
-                'TargetSubnet'=$rule.Target.SubnetMask
-                'TargetGateway'=$rule.Target.DefaultGateway
-                'TargetDNS'=[string]::Join(",",$rule.Target.DNSAddresses)
-                'TargetWINS'=[string]::Join(",",$rule.Target.WINSAddresses)
-            }
-            $reiprules += New-Object -TypeName PSObject -Prop $r
-        }
-        if ($j.VssOptions) {
-                if ($j.VssOptions.LinCredsId -ne [System.Guid]::Empty) { $rcreds = $j.VssOptions.LinCredsId }
-                if ($j.VssOptions.WinCredsId -ne [System.Guid]::Empty) { $rcreds = $j.VssOptions.WinCredsId }
-                $rcreds = Get-VBRCredential -Id $rcreds
-        }
-        if ($j.TargetHostId) {
-                $replicatarget = [Veeam.Backup.Core.Common.CHost]::Get([System.Guid]::new($j.TargetHostId))
-                $rtparentci = $replicatarget.GetSoapConnHostInfo()
-                $rtparentcreds = (([Veeam.Backup.Core.Common.CHost]::Get([System.Guid]::new($rtparentci.Id))).GetSoapCreds()).CredsId
-                $rtparentcreds = Get-VBRCredential -Id $rtparentcreds
-        }
-        $p = @{
-                'SourceName'=$ro.Name
-                'Platform'=$platform
-                'Path'=$fo.Path
-                'PlanName'=$FailoverPlan.Name
-                'PlanId'=$FailoverPlan.Id
-                'PlanOijId'=$fo.Id
-                'JobName'=$j.Name
-                'JobId'=$j.Id
-                'JobOijId'=$ro.Id
-                'ReplicaName'=$rprefix + $ro.Name + $rsuffix
-                'TargetHostId'=$j.TargetHostId
-                'TargetParentConnectionInfo'=$rtparentci
-                'TargetParentCredential'=$rtparentcreds
-                'TargetOptions'= $replicatoptions
-                'ReipRules'=$reiprules
-                'GuestCredential'=$rcreds
-        }
-        Write-Log ("$($fo.Name) ($($fo.Path)) is associated with " + $j.Name + ".")
-        $result += New-Object -TypeName PSObject -Prop $p
     }
     return $result
 }
 
 function Update-VMIPAddresses {
-    param ($VM, $ReIpRules, $GuestCredential)
+    param ($VM, $ReIpRules, [PSCredential] $GuestCredential)
 
     $_vm = Get-VM -Name $VM
 
     $nics = $null
-    if ($_vm -ne $null) {
+    if ($null -ne $_vm) {
         $nics = Get-VMGuestNetworkInterface -VM $_vm -GuestCredential $GuestCredential
     }
     else {
         Write-Log "Error: Virtual Machine $($VM) is unavailable. Check parent server connections and permissions."
         return
     }
-
-    if ($nics -ne $null) {
+    if ($null -eq $ReIpRules) {
+        Write-Log "Error: No ReIP rules specified. Check source replication job."
+    }
+    if ($null -ne $nics) {
 
             if ($_vm.Guest.OSFullName -like "*Windows*") {
+                # windows vms are reip'd by veeam backup and replication but can be part of the same failover plan
                 Write-Log "Skipped: $($VM) has the following network configuration:`n$($nics)"
                 foreach($iface in $nics) { Write-Log "  $($iface.Name) ($($iface.Mac)), $($iface.Ipv4), Subnet: $($iface.Subnet)" }
             }
@@ -445,34 +653,68 @@ function Update-VMIPAddresses {
 
                 Write-Log "$($VM) has the following network configuration:"
                 foreach($iface in $nics) { Write-Log "  $($iface.Name) ($($iface.Mac)), $($iface.Ipv4), Subnet: $($iface.Subnet)" }
-                Write-Log "`r$($VM) will have the following re-ip rules applied:"
+                Write-Log "$($VM) will have the following re-ip rules applied:"
                 foreach($rule in $ReIpRules) { Write-Log "  Source: $($rule.SourceIp), Target: $($rule.TargetIP), Subnet: $($rule.TargetSubnet), Gateway: $($rule.TargetGateway)" }
     
+                $elevate = $false
+                if ($GuestCredential.UserName -ne "root") {
+                    Write-Log "$($VM) checking if $($GuestCredential.UserName) has sudo access."
+                    $sudo = Test-SudoAccess -VM $_vm -GuestCredential $GuestCredential
+
+                    if ($sudo) {
+                        $elevate = $true
+                    }
+                    else {
+                        Write-Log "Error: $($GuestCredential.UserName) does not have sudo access. Check source replication job guest credentials."
+                        return
+                    }
+                }
+
+                Write-Log "$($VM) backing up existing network configuration."
+                Backup-VMGuestNetworkConfig -VM $_vm -GuestCredential ($GuestCredential) -Elevate:$elevate
+
                 foreach($rule in $ReIpRules)
                 {
-                        $matched = $false
-                        foreach($iface in ($nics | ?{ $_.Ipv4 -like $rule.SourceIp })) {
-                            
-                            $matched = $true
-                            $srcip = $iface.Ipv4; 
-                            $trgip = Apply-VMReIpRule -SourceIpAddress $srcip -ReIpRule $rule
+                    $matchednics = $nics | Where-Object { $_.Ipv4 -like $rule.SourceIp }
+                    if ($null -ne $matchednics) {
 
-                            Write-Log "Processing: Virtual Machine $($_vm.Name) interface: $($iface.Name), source: $srcip, target: $trgip"
-                            Set-VMGuestNetworkInterface -VM $_vm -Interface $iface.Name -IPAddress $trgip -Netmask $rule.TargetSubnet -Gateway $rule.TargetGateway -DNS $rule.TargetDns -GuestCredential ($GuestCredential)
+                        foreach($iface in $matchednics) {
+
+                            # setting ip address for interfaces which match source ip
                             
+                            $trgip = Apply-VMReIpRule -SourceIpAddress $iface.Ipv4 -ReIpRule $rule
+
+                            # convert subnet to prefix
+
+                            Write-Log "Processing: Virtual Machine $($_vm.Name) interface: $($iface.Name), source: $($iface.Ipv4), target: $($trgip)"
+
+                            Set-VMGuestNetworkInterface -VM $_vm -Iface $iface.Name -IpAddress $trgip -netmask $rule.TargetSubnet -Gateway $rule.TargetGateway -DNS $rule.TargetDNS -WINSAddresses $rule.TargetWINS -GuestCredential $GuestCredential -Elevate:$elevate
+
                             $cnics = Get-VMGuestNetworkInterface -VM $_vm -GuestCredential ($GuestCredential) | ?{ $_.Name -like $iface.Name }
                             
-                            if (($cnics -ne $null) -and ($cnics.Ipv4 -eq $trgip)) { Write-Log "Success: Virtual Machine $($_vm.Name) interface $($cnics.Name) ($($cnics.Mac)) updated to $($cnics.Ipv4)" }
-                            elseif ($cnics -ne $null) { 
+                            if (($null -ne $cnics) -and ($cnics.Ipv4 -eq $trgip)) { Write-Log "Success: Virtual Machine $($_vm.Name) interface $($cnics.Name) ($($cnics.Mac)) updated to $($cnics.Ipv4)" }
+                            elseif ($null -ne $cnics) { 
                                 Write-Log "Failed: $($VM) has the following network configuration:"
                                 foreach($iface in $nics) { Write-Log "  $($iface.Name) ($($iface.Mac)), $($iface.Ipv4), Subnet: $($iface.Subnet)" }
                             }
                             else { Write-Log "Error: Virtual Machine $($_vm.Name) network configuration does not contain interface $($cnics.Name)." }
-                            
+
                         }
-                        if (!$matched) {
-                            Write-Log "Warning: Virtual Machine $($_vm.Name) does not contain network interfaces matching $($rule.SourceIp)"
+                        
+                    }
+                    else {
+                        Write-Log "Warning: Virtual Machine $($_vm.Name) does not contain network interfaces matching $($rule.SourceIp)"
+
+                        $unaddressednics = $nics | Where-Object { $_.Ipv4.Length -eq 0 -and $_.Type -eq "ether" } 
+
+                        Write-Log "Re-IP is designed for static IP addresses. DHCP could have been used for one or more interfaces. Found $($unaddressednics.Count()) unassigned network interfaces for $($VM)."
+
+                        else {
+                            Write-Log "Error: Virtual Machine $($_vm.Name) does not contain any unassigned network interfaces."
                         }
+                        
+                    }
+
                 }
                 
             }

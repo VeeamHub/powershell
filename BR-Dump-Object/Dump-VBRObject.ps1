@@ -113,11 +113,9 @@ The code inside is executed and expected to return an array. For analysis, we on
 This does mean that you need to have actually one Job defined and have one Backup etc..
 
 # Actual Dump
-Updated on {0}
+Using VeeamPSSnapIn {0}
 
-
-
-"@ -f (get-date -UFormat "+%y/%m/%d - %H:%M:%S")))
+"@ -f ((Get-PSSnapin -Name VeeamPSSnapin).PSVersion.ToString())))
 
 
 
@@ -129,53 +127,58 @@ $blacklisttype = @("System.String","System.String[]","System.TimeSpan","System.D
 
 
 $dumps = @()
-$dumps += New-Object -TypeName psobject -ArgumentList @{
+$dumps += New-Object -TypeName psobject -Property @{
+    Prefix="VBRJob";
+    ObjectCode=@('$VBRJob = @(Get-VBRJob)[0]');
+}
+$dumps += New-Object -TypeName psobject -Property @{
+    Prefix="VBRJobObject";
+    ObjectCode=@('$job = @(Get-VBRJob | where { $_.JobType -eq "Backup" })[0]','$VBRJobObject  = Get-VBRJobObject -job $job');
+}
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRJobOptions";
     ObjectCode=@('$job = @(Get-VBRJob | where { $_.JobType -eq "Backup" })[0]','$VBRJobOptions  = Get-VBRJobOptions -job $job');
 }
-$dumps += New-Object -TypeName psobject -ArgumentList @{
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRJobScheduleOptions";
     ObjectCode=@('$job = @(Get-VBRJob | where { $_.JobType -eq "Backup" })[0]','$VBRJobScheduleOptions = Get-VBRJobScheduleOptions -job $job');
 }
-$dumps += New-Object -TypeName psobject -ArgumentList @{
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRJobVSSOptions";
     ObjectCode=@('$job = @(Get-VBRJob | where { $_.JobType -eq "Backup" })[0]','$VBRJobVSSOptions = Get-VBRJobVSSOptions -job $job');
 }
-$dumps += New-Object -TypeName psobject -ArgumentList @{
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRJobObjectVssOptions";
     ObjectCode=@('$job = @(Get-VBRJob | where { $_.JobType -eq "Backup" })[0]','$JobObject = @(Get-VBRJobObject -job $Job)[0]','$VBRJobObjectVssOptions = Get-VBRJobObjectVssOptions -ObjectInJob $JobObject');
 }
-
-$dumps += New-Object -TypeName psobject -ArgumentList @{
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRBackup";
     ObjectCode=@('$VBRBackup = @(Get-VBRBackup)[0]');
 }
-
-$dumps += New-Object -TypeName psobject -ArgumentList @{
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRBackupStorage";
     ObjectCode=@('$VBRBackup = @(Get-VBRBackup)[0]','$VBRBackupStorage = @($VBRBackup.GetAllStorages())[0]');
 }
-
-$dumps += New-Object -TypeName psobject -ArgumentList @{
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRBackupPoint";
     ObjectCode=@('$VBRBackup = @(Get-VBRBackup)[0]','$VBRBackupPoint = @($VBRBackup.GetPoints())[0]');
 }
-$dumps += New-Object -TypeName psobject -ArgumentList @{
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRRestorePoint";
     ObjectCode=@('$VBRBackup = @(Get-VBRBackup)[0]','$VBRRestorePoint = @($VBRBackup | Get-VBRRestorePoint )[0]');
 }
-$dumps += New-Object -TypeName psobject -ArgumentList @{
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRBackupSession";
     ObjectCode=@('$VBRBackupSession = @(Get-VBRBackupSession | ? {$_.JobType -eq "Backup"})[0]');
 }
-$dumps += New-Object -TypeName psobject -ArgumentList @{
+$dumps += New-Object -TypeName psobject -Property @{
     Prefix="VBRBackupSessionTaskSession";
     ObjectCode=@('$VBRBackupSession = @(Get-VBRBackupSession | ? {$_.JobType -eq "Backup"})[0]','$VBRBackupSessionTaskSession = @($VBRBackupSession.GetTaskSessions())[0]');
 }
 
 
 
-foreach ($dump in $dumps) {
+foreach ($dump in $dumps | Sort Prefix) {
     $sbfile = New-Object -TypeName "System.Text.StringBuilder";
     $dump.ObjectCode | % {
      invoke-expression $_
@@ -186,7 +189,7 @@ foreach ($dump in $dumps) {
         Dump-VBRObject -object $o -header ("{0} [{1}]" -f $dump.Prefix,$o.GetType().Fullname) -objectcode $dump.ObjectCode -prefix ("`${0}" -f $dump.Prefix) -sb $sbfile -issue $issue -blacklist $blacklist -func $true -blacklisttype $blacklisttype
 
         $fname =  (mdfile -name $dump.Prefix)
-        $sbfile.ToString() | Out-File -FilePath $fname
+        $sbfile.ToString() | Out-File -FilePath $fname -Encoding utf8
 
         [void]$sb.AppendLine(("* [{0}](./{1}.md)" -f $dump.Prefix,$dump.Prefix))
     } else {
@@ -195,4 +198,4 @@ foreach ($dump in $dumps) {
 }
 
 
-$sb.ToString() | Out-File -FilePath $dumpfile
+$sb.ToString() | Out-File -FilePath $dumpfile -Encoding utf8
