@@ -199,6 +199,7 @@ Function Get-VspcApiResult {
 		$headers.Add("Authorization", "Bearer $Token")
 		$guid = (New-Guid).Guid
 		$headers.Add("x-request-id", $guid)
+		$headers.Add("x-client-version", 3.2)  # API versioning using for backwards compatibility
 
 		# Making API call
 		Write-Verbose "GET - $URL"
@@ -247,6 +248,7 @@ $output = [System.Collections.ArrayList]::new()
 Write-Verbose "POST - $url"
 $headers = New-Object "System.Collections.Generic.Dictionary[[string],[string]]"
 $headers.Add("Content-Type", "application/x-www-form-urlencoded")
+$headers.Add("x-client-version", 3.2)  # API versioning using for backwards compatibility
 $body = "grant_type=password&username=$User&password=$Pass"
 try {
 	$response = Invoke-RestMethod $url -Method 'POST' -Headers $headers -Body $body -ErrorAction Stop -SkipCertificateCheck:$AllowSelfSignedCerts
