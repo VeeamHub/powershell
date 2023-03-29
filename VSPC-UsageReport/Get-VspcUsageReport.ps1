@@ -234,8 +234,8 @@ if ($Credential) {
 }
 else {
 	if ($Pass -eq $true) {
-		[securestring] $secPass = Read-Host "Enter password for '$($User)'" -AsSecureString
-		[string] $Pass = ConvertFrom-SecureString -SecureString $secPass -AsPlainText
+		[securestring] $secureString = Read-Host "Enter password for '$($User)'" -AsSecureString
+		[string] $Pass = [System.Net.NetworkCredential]::new("", $secureString).Password
 	}
 }
 
