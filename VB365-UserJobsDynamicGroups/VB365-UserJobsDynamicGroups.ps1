@@ -14,13 +14,14 @@
    VB365 backup jobs will be created for every dynamic group and separatly for Exchange Online and OneDrive.
     
    .NOTES 
-   Version:        1.0
+   Version:        1.1
    Author:         David Bewernick (david.bewernick@veeam.com)
-   Creation Date:  31.03.2023
+   Creation Date:  03.04.2023
    Purpose/Change: Extension for dynamic filters
 
    .CHANGELOG
    1.0   31.03.2023   Script created
+   1.1   03.04.2023   Description and dynamic membership rules extention
 
  #> 
 
@@ -34,8 +35,8 @@ $timestampFileName = get-date -Format "yyyy-mm-dd_HH-mm-ss"
 [string[]]$Script:arrScndChar = @('0-3','4-7','8-9a-b','c-f')
 
 # Variables to fit your needs
-$OrgName = "dabew.onmicrosoft.com" # The name of your M365 organization
-$RepoName = "repo04-minio" # Define the target repository
+$OrgName = "XYZ.onmicrosoft.com" # The name of your M365 organization
+$RepoName = "XYZ-Repo" # Define the target repository
 $LogFile = "VBO-CreateDynamicGroups.log" #logfile name
 $GroupNameFile = "DynamicGroupsList_$timestampFileName.log" #file to export group names
 $strGroupNameStart = "VB365-UserBackup_" #start of the Azure AD dynamic group names
