@@ -17,7 +17,6 @@
    Version:        1.1
    Author:         David Bewernick (david.bewernick@veeam.com)
    Creation Date:  03.04.2023
-   Purpose/Change: Extension for dynamic filters
 
    .CHANGELOG
    1.0   31.03.2023   Script created
