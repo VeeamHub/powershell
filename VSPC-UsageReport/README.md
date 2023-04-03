@@ -22,6 +22,7 @@ the current calendar month.
 
 * Veeam Service Provider Console v6
   * Portal Administrator account used to access the REST API.
+  * Script *works* with v7 but needs to be updated to fully support the v7 API.
 * Network connectivity
   * The server executing the script needs to be able to access the VSPC REST API
 * PowerShell Core

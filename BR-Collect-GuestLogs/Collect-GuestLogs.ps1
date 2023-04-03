@@ -11,7 +11,7 @@
     NAME: Collect_Veeam_Guest_Logs.ps1
     AUTHOR: Chris Evans, Veeam Software
     CONTACT: chris.evans@veeam.com
-    LASTEDIT: 07-19-2022
+    LASTEDIT: 03-31-2023
     KEYWORDS: Log collection, AAiP, Guest Processing
 #> 
 #Requires -Version 4.0
@@ -274,11 +274,20 @@ function Add-FileToZip (
 #Check to make sure we are not running this on the VBR server
 $isVBR = Get-Service -Name "VeeamBackupSv*"
 if ($isVBR) {
-    Write-Console "This script is meant to be executed on the server which has Guest Processing errors, NOT the Veeam Backup Server." "Red" 3
-    Write-Console "Please re-run this script on the GUEST server." "Red" 3
-    Exit
+    Add-Type -AssemblyName PresentationCore, PresentationFramework
+    $msgBody = "This script is almost always intended to be executed on the server which has Guest Processing errors, not the Veeam Backup Server. Were you specifically asked to run this script on the Backup Server?"
+    $msgTitle = "Are you running this on the correct server?"
+    $msgButton = 'YesNo'
+    $msgImage = 'Question'
+    $Result = [System.Windows.MessageBox]::Show($msgBody,$msgTitle,$msgButton,$msgImage)
+    switch ($Result)
+    {
+        0 { Exit }
+        6 { Break }
+        7 { Exit }
+    }
 }
- 
+
 #Initialize variables
 if ((Get-Item -Path 'HKLM:\SOFTWARE\Veeam\Veeam Backup and Replication').Property -Contains "LogDirectory") {
     $veeamDir = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Veeam\Veeam Backup and Replication').LogDirectory
@@ -294,6 +303,7 @@ $logvolume = Split-Path -Path $veeamDir -Parent
 $logDir = Join-Path -Path $logVolume -ChildPath "Case_Logs" 
 $directory = Join-Path -Path $logDir -ChildPath $date$hostname
 $VBR = "$directory\Backup"
+$tempEvents = "$temp\Events"
 $Events = "$directory\Events"
 $VSS = "$directory\VSS"
 $PSVersion = $PSVersionTable.PSVersion.Major
@@ -324,7 +334,7 @@ Start-Transcript -Path $temp\Execution.log > $null
 
 #Create directories
 Write-Console "Creating temporary directories..." "White" 1
-New-Dir $directory, $VBR, $Events, $VSS, $temp
+New-Dir $directory, $VBR, $tempEvents, $Events, $VSS, $temp
 Write-Console
 
 #Copy Backup Folder
@@ -471,24 +481,31 @@ if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System')
 Write-Console
 
 #Export event viewer logs
-Write-Console "Exporting relevant Windows Event Viewer logs..." "White" 1
-wevtutil epl Application "$Events\Application_$hostname.evtx" 
-wevtutil al "$Events\Application_$hostname.evtx" 
-wevtutil epl System "$Events\System_$hostname.evtx"
-wevtutil al "$Events\System_$hostname.evtx"
-#Check if this is a Server Edition of Windows.
-if ((Get-CimInstance -ClassName Win32_OperatingSystem).ProductType -ne 1) {
-    #Check if Hyper-V role enabled. If so, collect VMMS event logs.
-    if ((Get-WindowsFeature -Name Hyper-V).Installed) {
-        wevtutil epl Microsoft-Windows-Hyper-V-VMMS-Admin "$Events\VMMS_$hostname.evtx"
-        wevtutil al "$Events\VMMS_$hostname.evtx"
-        Write-Console
-    }
-    else {
-        Write-Console
-    }
+Write-Console "Exporting Windows Event Viewer logs..." "White" 1
+Get-WinEvent -ListLog * | Select-Object Logname, LogFilePath | % {
+	$name = $_.Logname
+	$validName = $name.Replace("/","-")
+	wevtutil epl $name $tempEvents\$validName.evtx
+}
 
-    #Get status of all Windows Features. This block included here because Workstation Edition servers would throw an error.
+#Generate LocaleMetadata for each event log
+Get-ChildItem -File -Path $tempEvents | % {
+	wevtutil al ($tempEvents + "\" + $_.Name)
+}
+
+#Check to see if PowerShell version is 5.x or newer. Compress-Archive cmdlet did not exist prior to version 5.
+if ($PSVersionTable.PSVersion.Major -ge '5') {
+    Compress-Archive -Path $tempEvents\* -DestinationPath ((Split-Path $Events) + "\Event_Logs.zip")
+    Remove-Item $tempEvents -Recurse -Force
+} else {
+    #Manually zipping up event logs would be necessary if PowerShell version is less than 5.x. Display this to the user.
+    [System.Windows.MessageBox]::Show("Unable to automatically add logs to .zip archive. `n`nPlease archive manually before uploading. `n`nPress 'OK' to open log directory.")
+    (Split-Path $tempEvents) | Invoke-Item
+}
+
+#Check if this is a Server Edition of Windows because Workstation Edition servers would throw an error.
+if ((Get-CimInstance -ClassName Win32_OperatingSystem).ProductType -ne 1) {
+    #Get status of all Windows Features.
     Write-Console "Retrieving list of installed features..." "White" 1
     Get-WindowsFeature | Format-Table -AutoSize > "$directory\installed_features.log"
 }
