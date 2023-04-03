@@ -8,6 +8,7 @@ Copyright (c) 2021 VeeamHub
 
 ## Project Notes
 **Author:** David Bewernick (@d-works42)
+
 **Version:** 1.1
 
 **Function:** This script creates Azure AD dynamic groups to split up the users of a whole tenant based on the first two characters of their ObjectID. 
