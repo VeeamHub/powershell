@@ -539,7 +539,7 @@ BEGIN {
         "objectsPerJob" = $objectsPerJob;
         "limitServiceTo" = $limitServiceTo;
         "jobNamePattern" = $jobNamePattern;
-        "withTeamsChats =" $withTeamsChats;
+        "withTeamsChats" = $withTeamsChats;
         "baseSchedule" = $baseSchedule;
         "scheduleDelay" = $scheduleDelay;
         "includeFile" = $includeFile;
@@ -555,15 +555,9 @@ BEGIN {
 PROCESS {
     "Starting VB365-JobManager - v{0}" -f $global:version| timelog
     "Commandline: {0}" -f $MyInvocation.Line | timelog   
-    $myParameters | ForEach-Object {
-        "{0}: {1}" -f $_.
+    $myParameters.Keys | ForEach-Object {
+        "{0}: {1}" -f $_,$myParameters[$_]
     }
-    foreach ($param in ($objectsPerJob, 
-    $limitServiceTo, $jobNamePattern, $withTeamsChats, $baseSchedule, $scheduleDelay)) {
-        "{0}: {1}" -f (Get-Variable $param | Select-Property -Name), $param | timelog
-    }
-
-    
 
     $org = Get-VBOOrganization -Name $organization
     $global:org = $org
