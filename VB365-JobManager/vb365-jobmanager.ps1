@@ -1,7 +1,7 @@
 
 <#PSScriptInfo
 
-.VERSION 1.0.0
+.VERSION 1.0.1
 
 .GUID f3795945-b130-4740-84f4-e8248a847263
 
@@ -142,8 +142,8 @@ DynamicParam {
 }
 
 BEGIN {
-    $global:version = '1.0.0'
-    filter timelog { "$(Get-Date -Format "yyyy-mm-dd HH:mm:ss"): $_" }
+    $global:version = '1.0.1'
+    filter timelog { "$(Get-Date -Format "yyyy-MM-dd HH:mm:ss"): $_" }
 
     # Save in global variables for easier use in classes
     $global:countTeamAs = $countTeamAs
@@ -531,10 +531,40 @@ BEGIN {
     #        $groups += $myGroup            
     #    }
     #}
+
+    # Build a dict of all options/variables/parameters to easily log them
+    # This might be easier achievable, but I didn't find anything yet.
+    # As defaults can also be changed in the script all variables need to be logged, not just arguments passed to the script
+    $myParameters = @{
+        "objectsPerJob" = $objectsPerJob;
+        "limitServiceTo" = $limitServiceTo;
+        "jobNamePattern" = $jobNamePattern;
+        "withTeamsChats =" $withTeamsChats;
+        "baseSchedule" = $baseSchedule;
+        "scheduleDelay" = $scheduleDelay;
+        "includeFile" = $includeFile;
+        "excludeFile" = $excludeFile;
+        "recurseSP" = $recurseSP;
+        "checkBackups" = $checkBackups;
+        "countTeamAs" = $countTeamAs;
+    }
+
     Start-Transcript -IncludeInvocationHeader -Path "${PSScriptRoot}\logs\vb365-spo-teams-jobs-$(get-Date -Format FileDateTime).log" -NoClobber
 }
 
 PROCESS {
+    "Starting VB365-JobManager - v{0}" -f $global:version| timelog
+    "Commandline: {0}" -f $MyInvocation.Line | timelog   
+    $myParameters | ForEach-Object {
+        "{0}: {1}" -f $_.
+    }
+    foreach ($param in ($objectsPerJob, 
+    $limitServiceTo, $jobNamePattern, $withTeamsChats, $baseSchedule, $scheduleDelay)) {
+        "{0}: {1}" -f (Get-Variable $param | Select-Property -Name), $param | timelog
+    }
+
+    
+
     $org = Get-VBOOrganization -Name $organization
     $global:org = $org
     $repos = $repository | ForEach-Object { Get-VBORepository -Name $_ }    
@@ -592,6 +622,8 @@ PROCESS {
     $jobCreatedStart = $jobManager.Jobs.Count
 
     foreach ($o in $objects) {
+
+        "Processing object: {0}" -f $o.toString() | timelog
         
         #$assignedGroup = $null
         $assignedRepo = $null
