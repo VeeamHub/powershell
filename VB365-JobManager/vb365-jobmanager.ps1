@@ -142,6 +142,7 @@ DynamicParam {
 }
 
 BEGIN {
+
     $global:version = '1.0.1'
     filter timelog { "$(Get-Date -Format "yyyy-MM-dd HH:mm:ss"): $_" }
 

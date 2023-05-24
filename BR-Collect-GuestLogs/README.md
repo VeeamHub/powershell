@@ -1,21 +1,21 @@
 # Collect-GuestLogs
 
 # 📗 Documentation
-
+## **Versions supported**
+This script has been tested to work on Windows Server/Workstation operating systems that use PowerShell version 4.0 or higher.
 
 ## **Purpose**
 This script helps automate and simplify the Guest OS log collection process documented in [Veeam KB1789](https://www.veeam.com/kb1789).
 
 ## **Description:**
-Automated collection of Windows **guest OS** logs for troubleshooting of Veeam Backup jobs with _Application Aware Processing_ enabled (ie. SQL/Exchange/Active Directory/SharePoint/Oracle).
+Automated collection of Windows-based logs for troubleshooting of Veeam Backup jobs with _Application Aware Processing_ enabled (ie. SQL/Exchange/Active Directory/SharePoint/Oracle).
 
 ## **Requirements** <br>
-Local Administrator permissions to be able to execute the script as Administrator.
-
+Local Administrator permissions and permission to execute scripts in an elevated PowerShell console.
 
 ## **Usage:** <br>
 
-1. Download the script **[Collect-GuestLogs.ps1](https://raw.githubusercontent.com/VeeamHub/powershell/master/BR-Collect-GuestLogs/Collect-GuestLogs.ps1)** (Right-click link > '_Save link as_') and save it to the Windows machine where logs need to be collected.
+1. **[Download the script](https://raw.githubusercontent.com/VeeamHub/powershell/master/BR-Collect-GuestLogs/Collect-GuestLogs.ps1)** (Right-click link > '_Save link as_') and save it to the Windows machine where logs need to be collected.
 2. Open an Administrative PowerShell Console, and navigate to the directory where the script was saved. 
      - (**NOTE**: Running the script in PowerSell ISE is **NOT** supported due to the additional modules that PowerShell ISE loads that can conflict with the script's execution.)
 4. Run the following to execute the script:
@@ -41,8 +41,7 @@ This script will collect the following information from the machine:
 * Collects list of accounts with Local Administrator permissions
 * Collects status of Windows Services
 * Checks if '_File and Printer Sharing_' is enabled/disabled
-* Collects _Application_ and _System_ Event Viewer logs
-* Collects _VMMS_ Event Viewer logs if Hyper-V role is detected
+* Collects Event Viewer logs
 * Collects status of Windows Firewall profiles
 * Collects settings of attached NICs
 * Collects list of installed features/roles
