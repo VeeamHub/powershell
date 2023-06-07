@@ -19,8 +19,8 @@ This script was written to work with standard Veeam Backup & Replication environ
 ## Known Issues
 
 * If Veeam software other than Veeam Backup Enterprise Manager or Veeam Backup & Replication Server is installed on the same server, this software will be taken offline during the upgrade.
-* After the upgrade, any Agent-based backups (VAW/VAL/VAM/VAU) that Veeam administers will need to be upgraded.
-* This script does NOT backup the Enterprise Manager database prior to upgrade. It's recommended to perform a DB backup prior to upgrade.
+* After the upgrade, any Veeam Agents (VAW/VAL/VAM/VAU) managed by Veeam Backup & Replication will need to be upgraded.
+* This script does NOT backup the Enterprise Manager database. Prior to upgrade, it's recommended to perform a DB backup.
 
 ## Requirements
 
