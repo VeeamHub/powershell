@@ -113,7 +113,7 @@ That's why I came up with the **weight** of an object.
 
 Here are two examples:
 
-Let's assume we have to SP sites.
+Let's assume we have two SP sites.
 SiteA is a simple site with no subsites, while SiteB has 100 subsites.
 From a joblevel you just add SiteA and SiteB and they'll appear as two objects within  the job configuration in VB365.
 At runtime the sites will be resolved and SiteA resolves to a single object, while SiteB resolves to 101 objects.
@@ -136,12 +136,12 @@ Adds all SharePoint sites which are currently not in backup to jobs and search f
 Limit the counted objects to 200 per job while each SP site will be counted as 1 and each team as 3.
 
 ```powershell
-./vb365-JobManager.ps1 -Organization "my-org.onmicrosoft.com" -Repositories Proxy1-Repo1,Proxy1-Repo2,Proxy2-Repo1,Proxy2-Repo2 -objectsPerJob 200
+./vb365-JobManager.ps1 -Organization "my-org.onmicrosoft.com" -Repository Proxy1-Repo1,Proxy1-Repo2,Proxy2-Repo1,Proxy2-Repo2 -objectsPerJob 200
 ```
 
 Adds all SPO and teams to backup jobs but recurses every single SP site for subsites to calculate the real object weight which will be respected for `-objectsPerJob`
 
 ```powershell
-./vb365-JobManager.ps1 -Organization "my-org.onmicrosoft.com" -Repositories Proxy1-Repo1,Proxy1-Repo2 -recurseSP -objectsPerJob 200
+./vb365-JobManager.ps1 -Organization "my-org.onmicrosoft.com" -Repository Proxy1-Repo1,Proxy1-Repo2 -recurseSP -objectsPerJob 200
 ```
 
