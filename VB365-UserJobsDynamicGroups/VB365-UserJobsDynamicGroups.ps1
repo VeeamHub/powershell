@@ -142,7 +142,7 @@ function create-groups(){
 function create-jobs ($strGroupName){
 
     # get the organization group in an object
-    $orggroup = Get-VBOOrganizationGroup -Organization $org -DisplayName $strGroupName
+    $orggroup = Get-VBOOrganizationGroup -Organization $OrgName -DisplayName $strGroupName
     # create backup job item objects for Exchange and OneDrive
     $ExchJobItem = New-VBOBackupItem -Group $orggroup -Mailbox -ArchiveMailbox
     $ODJobItem = New-VBOBackupItem -Group $orggroup -OneDrive
