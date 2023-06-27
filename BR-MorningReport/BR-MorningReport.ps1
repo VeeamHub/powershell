@@ -118,7 +118,9 @@ function get-lastbackupjobs {
         }
 
         $lastBackupJobs += [PSCustomObject]@{'BackupJob' = $session.JobName.split(' ')[0]
-                                             'Server'    = $session.Name.split(' ')[0].split('.')[0]                                             'StartTime' = $session.Progress.StartTimeLocal.ToString('dd/MM/yyyy HH\hmm')                                             'EndTime'   = $endTime
+                                             'Server'    = $session.Name.split(' ')[0].split('.')[0]
+                                             'StartTime' = $session.Progress.StartTimeLocal.ToString('dd/MM/yyyy HH\hmm')
+                                             'EndTime'   = $endTime
                                              'Duration'  = $duration
                                              'Status'    = $session.Status.ToString()
                                              'Progress'  = $progress
@@ -148,7 +150,7 @@ function get-lastbackupjobs {
 try {
     log -level HIGH -entry "Script started"
 
-    Add-PSSnapin VeeamPSSnapin
+    Add-PSSnapin VeeamPSSnapin -ea SilentlyContinue
 
     # Get jobs infos
     $jobinfos = @(get-lastbackupjobs -lastHours $LastPeriodInHours)
@@ -220,7 +222,15 @@ try {
     # email sending
     log -level INFO  -entry "Sending email"
 
-    Send-MailMessage -From $mail_From `                     -To $mail_To `                     -Subject $mail_Subject `                     -SmtpServer $mail_SmtpServer `                     -Body $mail_string `                     -BodyAsHtml `                     -Attachments $veeamLogo_path `                     -Encoding 'UTF8' `                     -ea Stop
+    Send-MailMessage -From $mail_From `
+                     -To $mail_To `
+                     -Subject $mail_Subject `
+                     -SmtpServer $mail_SmtpServer `
+                     -Body $mail_string `
+                     -BodyAsHtml `
+                     -Attachments $veeamLogo_path `
+                     -Encoding 'UTF8' `
+                     -ea Stop
 
 }catch{
     log -level ERROR -entry ($_ | Out-String)
