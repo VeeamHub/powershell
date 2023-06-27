@@ -2,7 +2,7 @@
 This script get the last backups results (the last 15 hours by default) and send it by email.
 
 Here is a preview :
-![](https://github.com/Weylin-fr/Veeam/blob/57257497eaa3b6ddab1c2ee12604a94b519b34cb/BR-MorningReport/sample.png)
+![](BR-MorningReport/sample.png)
 
 ## Features
 * Get results of VM backup jobs, agent backup jobs, backup copy jobs and tape jobs.
