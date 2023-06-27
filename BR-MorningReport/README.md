@@ -2,7 +2,7 @@
 This script get the last backups results (the last 15 hours by default) and send it by email.
 
 Here is a preview :
-![](BR-MorningReport/sample.png)
+![sample.png](./sample.png)
 
 ## Features
 * Get results of VM backup jobs, agent backup jobs, backup copy jobs and tape jobs.
