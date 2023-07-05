@@ -2,16 +2,33 @@
 
 Veeamhub projects are community driven projects, and are not created by Veeam R&D nor validated by Veeam Q&A. They are maintained by community members which might be or not be Veeam employees.
 
-## Project Notes
-Author: Wouter Oltlammers, Marc Molleman & Rico Wezenberg (Veeam Software)
+## Author
 
-Function: Script to use for automatically and dynamically adding specific Mailbox Recipient types like SharedMailbox, EquipmentMailbox, RoomMailboxes to a VBO backup job. 
+Wouter Oltlammers, Marc Molleman & Rico Wezenberg (Veeam Software)
 
-Description: With this script, these RecipientType details are pulled from M365, stored in a temp file, and then compared to your VB365 job:
+## Function
+
+Script to use for automatically and dynamically adding specific Mailbox Recipient types like SharedMailbox, EquipmentMailbox, RoomMailboxes to a VBO backup job. 
+
+## Description
+
+ With this script, these RecipientType details are pulled from M365, stored in a temp file, and then compared to your VB365 job:
 If not added yet to the job, this script will automatically add the UPN to the job.
 If already added to the job, this script will filter out those accounts already added.
 If a specific Mailbox may not be added to the job, write this UPN in the Filter file created by this script. With each run, the script will compare the newly found mailboxes against the filter list and exclude all that matches the filter.
 
+## Known Issues
+
+* *No known issues*
+
+## Requirements
+
+* Veeam Backup for Microsoft 365 v7
+  * *Other versions are untested*
+* ExchangeOnlineManagement 3.1.0 PowerShell module
+  * *Other versions are untested*
+
+## Usage
 During the first run of this script, the script will automatically create a folder structure in which the temp-output file, log files, filter files, and credential files are stored. Please feel free to adjust those folders and file names to your own needs.
 
 Second, during the first interactive run of the script, the script will ask for the M365 credentials to be used for pulling the information from M365. It's recommended that you use an MFA-Enabled service account with a preconfigured App password to securely login to M365. See the following link to create an App password for an MFA-Enabled service account: http://vee.am/App-Password.
@@ -26,8 +43,6 @@ Full list of tested RecipientType values:
 EquipmentMailbox,GroupMailbox,RoomMailbox,SharedMailbox,TeamMailbox,UserMailbox
 
 You can specify multiple values separated by commas in the script.
-
-Requires: Veeam Backup for Microsoft 365 and ExchangeOnlineManagement 3.1.0 PowerShell modules.
 
 ##Changelog:
 
