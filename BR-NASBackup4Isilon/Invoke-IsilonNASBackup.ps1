@@ -12,6 +12,9 @@
 
    .PARAMETER IsilonCluster
    With this parameter you specify the clustername of the Isilon system
+   
+   .PARAMETER IsilonAccessZone
+   With this parameter you specify the Access Zone for the share. If no value is provided the defaule "System" zone will be used.
 
    .PARAMETER IsilonShare
    With this parameter you secify the source SMB share
@@ -32,13 +35,18 @@
    None. You cannot pipe objects to this script
 
    .Example
-   .\Invoke-IsilonNASBackup.ps1 -IsilonName "192.168.60.220" -IsilonCluster "isilon01" -IsilonShare "VeeamShare" -IsilonCredentialFile 'C:\Scripts\isilon-system-credentials.xml' -IsilonSnapExpireDays "2"
+   You can add this file and parameter to a Veeam NAS Backup Job
+   .\Invoke-IsilonNASBackup_v1.4.ps1 -IsilonName "192.168.60.218" -IsilonCluster "isiloncl01" -IsilonAccessZone "demo01" -IsilonShare "az01share01" -IsilonCredentialFile 'C:\Scripts\isilon-system-credentials.xml' -IsilonSnapExpireDays "2"
+
 
    .Notes 
-   Version:        1.3
+   Version:        1.4
    Author:         David Bewernick (david.bewernick@veeam.com)
    Creation Date:  05.09.2019
-   Purpose/Change: Initial script development
+   Purpose/Change: 05.09.2019 - 1.3 - Initial script development
+                   11.04.2022 - 1.4 - Added support for Access Zones
+                                    - Added enforcement TLS1.2
+
    Based on:       https://github.com/marcohorstmann/psscripts/tree/master/NASBackup by Marco Horstmann (marco.horstmann@veeam.com)
  #> 
 
@@ -51,6 +59,9 @@ Param(
    [Parameter(Mandatory=$True)]
    [string]$IsilonCluster,
    
+   [Parameter(Mandatory=$False)]
+   [string]$IsilonAccessZone="System",
+
    [Parameter(Mandatory=$True)]
    [string]$IsilonShare,
    
@@ -96,8 +107,8 @@ PROCESS {
     }
 
     function Set-IsilonSnapExpireDate($IsilonSnapExpireDays) {
-        #$IsilonSnapExpireDate = ((get-date -date (get-date).AddDays($IsilonSnapExpireDays) -UFormat %s)).split(',')[0]
-        $IsilonSnapExpireDate = ((get-date -date ((get-date).ToUniversalTime()).AddDays(2) -UFormat %s)).split(',')[0]
+        $IsilonSnapExpireDate = ((get-date -date (get-date).AddDays($IsilonSnapExpireDays) -UFormat %s)).split(',')[0]
+        #$IsilonSnapExpireDate = ((get-date -date ((get-date).ToUniversalTime()).AddDays(2) -UFormat %s)).split(',')[0]
         
         Write-Log -Info "Calculated the snapshot expiry date to $IsilonSnapExpireDate" -Status Info
         return($IsilonSnapExpireDate)
@@ -107,6 +118,9 @@ PROCESS {
         # Disable SSl validation
         # $IsilonCredentialFile
         Disable-SSLValidation
+        # Set TLS to 1.2
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
         Write-Log -Info "Trying to connect to Isilon $IsilonName on cluster $IsilonCluster " -Status Info
         try {
             $Credential = Import-CliXml -Path $IsilonCredentialFile -ErrorAction Stop  
@@ -120,14 +134,23 @@ PROCESS {
         }
     }
 
-    function Get-IsilonSharePath($IsilonShare){
-        Write-Log -Info "Getting the path value from $IsilonShare" -Status Info
+    function Get-IsilonSharePath($IsilonShare, $IsilonAccessZone){
+        Write-Log -Info "Getting the path value from $IsilonShare in $IsilonAccessZone" -Status Info
+        #Write-Host $IsilonAccessZone
         try {
-            $objIsilonShare = Get-isiSmbShares | where {$_.Name -eq $IsilonShare}
+            $objIsilonShare = Get-isiSmbShares -access_zone $IsilonAccessZone | where {$_.Name -eq $IsilonShare}
+            #Write-Host $objIsilonShare
             $IsilonSharePath = $objIsilonShare.path
-            Write-Log -Info "Path for $IsilonShare is $IsilonSharePath" -Status Info
-            return($IsilonSharePath)
+            #Write-Host $IsilonSharePath
+            if ($IsilonSharePath -ne $null) {
+                Write-Log -Info "Path for $IsilonShare is $IsilonSharePath" -Status Info
+                return($IsilonSharePath)
             }
+            else {
+                Write-Log -Info "Path for $IsilonShare not found" -Status Warning
+                exit 1
+            }
+        }
         catch {
             Write-Log -Info "$_" -Status Error
             Write-Log -Info "Getting path for $IsilonShare failed" -Status Error
@@ -200,6 +223,7 @@ PROCESS {
 
     #Load the required PS modules
     Load-IsilonModule
+    #write-host $IsilonAccessZone
 
     #Get the desired snapshot expiration date
     $IsilonSnapExpireDate = Set-IsilonSnapExpireDate($IsilonSnapExpireDays)
@@ -208,7 +232,7 @@ PROCESS {
     Connect-IsilonSystem -IsilonName $IsilonName -IsilonCluster $IsilonCluster -IsilonCredentialFile $IsilonCredentialFile
 
     #retrieve the path of the SMB share
-    $IsilonSharePath = Get-IsilonSharePath($IsilonShare)
+    $IsilonSharePath = Get-IsilonSharePath -IsilonShare $IsilonShare -IsilonAccessZone $IsilonAccessZone
 
     #Create the new snapshot
     Create-IsilonSnapShot -SnapshotName $SnapshotName -IsilonSharePath $IsilonSharePath -IsilonSnapExpireDate $IsilonSnapExpireDate

@@ -91,8 +91,7 @@ Function Get-VBRInstanceLicenseUsageDetails {
 
     if ($ObjectType -like "*VM") {
       $Name = $AllVMs | Where-Object { $_.InstanceUid -eq $LicensedObject.ObjectId } | Select-Object -ExpandProperty Name
-    }
-    elseif ($ObjectType -like "*Agent") {
+    } elseif ($ObjectType -like "*Agent") {
       $Name = $AllDiscoveredComputers | Where-Object { $_.ObjectId -eq $LicensedObject.ObjectId } | Select-Object -ExpandProperty Name
     }
 
@@ -130,6 +129,7 @@ function Get-VBRLicenseDetails {
     'ExpirationDate'        = $License.ExpirationDate
     'Status'                = $License.Status
     'IsSupportExpired'      = $License.IsSupportExpired
+    'SupportID'             = $License.SupportID
     'SupportExpirationDate' = $SupportExpirationDate
   }
 
