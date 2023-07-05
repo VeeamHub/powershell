@@ -8,7 +8,7 @@ Wouter Oltlammers, Marc Molleman & Rico Wezenberg (Veeam Software)
 
 ## Function
 
-Script to use for automatically and dynamically adding specific Mailbox Recipient types like SharedMailbox, EquipmentMailbox, RoomMailboxes to a VBO backup job. 
+Script to use for automatically and dynamically adding specific Mailbox Recipient types like SharedMailbox, EquipmentMailbox, RoomMailboxes to a VB365 backup job. 
 
 ## Description
 
