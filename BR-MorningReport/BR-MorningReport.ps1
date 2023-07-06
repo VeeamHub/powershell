@@ -80,7 +80,7 @@ function get-lastbackupjobs {
         } elseif($session.Progress.Duration -lt (New-TimeSpan -Days 2)) {
             $duration = "$([math]::Round($session.Progress.Duration.TotalHours,0))h"
         } else {
-            $duration = "$([math]::Round($session.Progress.Duration.TotalDays,0)) jours"
+            $duration = "$([math]::Round($session.Progress.Duration.TotalDays,0)) days"
         }
             
         # endtime shapping
@@ -174,7 +174,7 @@ try {
 
         $mail_Body += "<tr>"
         if($jobinfo.Encrypted){
-            $mail_Body += "  <td class='crypted'>$($jobinfo.BackupJob)</th>"
+            $mail_Body += "  <td class='crypted'>$($jobinfo.BackupJob)</td>"
         }else{
 	        $mail_Body += "  <td>$($jobinfo.BackupJob)</td>"
         }
