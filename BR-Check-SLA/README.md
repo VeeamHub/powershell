@@ -67,6 +67,12 @@ vmA,vm-305     # VM 'vmA' will be excluded, but only if its VM-ID is 'vm-305'
 ```
 (Comments in the example above are for this readme only, __do not use comments__ in your real exception file!)
 
+## Version History
+Date | Comments
+---  | ---
+2022.12.09 | initial release 
+2023.08.07 | added support for VBR v12 job type "PerVMParentBackup" (new backup chain format of v12)
+
 
 <!-- referenced links -->
 [Veeam Backup & Replication]: https://www.veeam.com/vm-backup-recovery-replication-software.html

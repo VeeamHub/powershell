@@ -43,6 +43,7 @@
 # 2022.06.16 by M. Mehrtens
 # 2022.11.24 added option to explicitly ignore VMs or jobs provided in separate textfiles
 # 2022.11.25 enhanced explicit VM exclusions to be based on combination of VM name and VM-ID (vSphere MoRefID)
+# 2023-08-07 added support for VBR v12 job type "PerVMParentBackup" (new backup chain format of v12)
 # -----------------------------------------------
 
 # vbrServer passed as parameter (script will ask for credentials if there is no credentials file!)
@@ -101,12 +102,21 @@ Begin {
 
 
     $jobTypesScope = @("Backup",
+        "PerVMParentBackup",
         "EndpointBackup",
         "EpAgentBackup",
         "EpAgentManagement",
         "EPAgentPolicy")
 
-    $jobBlockSizes = [PSCustomobject]@{ kbBlockSize256 = 256 * 1024
+    $vmJobTypesScope = @("Backup",
+        "PerVMParentBackup")
+
+    $agentJobTypesScope = @("EndpointBackup",
+        "EpAgentBackup",
+        "EpAgentManagement",
+        "EPAgentPolicy")
+
+        $jobBlockSizes = [PSCustomobject]@{ kbBlockSize256 = 256 * 1024
         kbBlockSize512                                 = 512 * 1024
         kbBlockSize1024                                = 1024 * 1024
         kbBlockSize4096                                = 4096 * 1024
@@ -340,11 +350,12 @@ Process {
         Write-Progress -Activity "Iterating through backup jobs" -CurrentOperation "$($objBackup.JobName)" -PercentComplete ($countJobs / $allBackups.Count * 100) -Id 2 -ParentId 1
 
         # get backup job object for this backup object
-        if ($objBackup.JobType -eq "Backup") {
+        if ($vmJobTypesScope -icontains $objBackup.JobType) {
             $thisJob = Get-VBRJob -Name $objBackup.JobName
         }
-        else {
-            $thisJob = Get-VBRComputerBackupJob -Name $objBackup.JobName
+        elseif ($agentJobTypesScope -icontains $objBackup.JobType) {
+            
+            $thisJob = Get-VBRComputerBackupJob -Name $objBackup.JobName -ErrorAction SilentlyContinue
         }
 
         # check exclusion of this job
@@ -468,6 +479,7 @@ Process {
                                     VMName         = $restorePoint.VmName
                                     VMID           = $moRefID
                                     BackupJob      = $objBackup.Name
+                                    JobType        = $objBackup.JobType
                                     JobDescription = $thisJob.Description
                                     Repository     = $myRepoName
                                     Extent         = $extentName
