@@ -10,7 +10,7 @@ Per default, all backup jobs and VMs (or computers in case of agent jobs) will b
 > **2nd Note:** If a restore point is newer than the backup window end time, it will be ignored and the next (older) restore point will be checked for backup window compliance instead.
 
 ## Requirements
-- [Veeam Backup & Replication] v11
+- [Veeam Backup & Replication] v11 or newer
   - older versions haven't been tested
 - [Veeam Powershell module]
 
