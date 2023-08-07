@@ -38,10 +38,13 @@ $veeamRestPort = "4443" #Default Port
 
 # Variables to login and Auth in GoogleMail, or Microsoft 365
 $ServerType = "Microsoft365"
-$clientId = "YOURCLIENTID"
-$clientSecret = "YOURSECRET"
-$tenantId = "YOURTENANTID"
 $redirectUrl = "http://localhost"
+
+# Not needed if you want to use the Official Veeam App to send emails (recommended)
+#$clientId = "YOURCLIENTID" 
+#$clientSecret = "YOURSECRET"
+#$tenantId = "YOURTENANTID"
+
 
 # Variables to login and Auth in GoogleMail, or Microsoft 365
 $mailFrom = "YOURMAILFROM"
@@ -85,10 +88,13 @@ $headers = @{
 }
 $body = @{
     "authenticationServiceKind" = $ServerType
-    "clientId" = $clientId
-    "clientSecret" = $clientSecret
-    "tenantId" = $tenantId
     "redirectUrl" = $redirectUrl
+    
+    # Not needed if you want to use the Official Veeam App to send emails (recommended)
+    # "clientId" = $clientId
+    #"clientSecret" = $clientSecret
+    #"tenantId" = $tenantId
+    
 }
 $response = Invoke-RestMethod -Method Post -Uri $veeamRestEndPoint -Body ($body | ConvertTo-Json) -Headers $headers 
 $signInUrl = $response.signInUrl
