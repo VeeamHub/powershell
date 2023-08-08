@@ -116,7 +116,7 @@ Begin {
         "EpAgentManagement",
         "EPAgentPolicy")
 
-        $jobBlockSizes = [PSCustomobject]@{ kbBlockSize256 = 256 * 1024
+    $jobBlockSizes = [PSCustomobject]@{ kbBlockSize256 = 256 * 1024
         kbBlockSize512                                 = 512 * 1024
         kbBlockSize1024                                = 1024 * 1024
         kbBlockSize4096                                = 4096 * 1024

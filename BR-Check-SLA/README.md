@@ -11,7 +11,7 @@ Per default, all backup jobs and VMs (or computers in case of agent jobs) will b
 
 ## Requirements
 - [Veeam Backup & Replication] v11 or newer
-  - older versions haven't been tested
+  - script has been tested against v11, v11a and v12 only
 - [Veeam Powershell module]
 
 ## Parameters:
