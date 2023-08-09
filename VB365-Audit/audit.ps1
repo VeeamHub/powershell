@@ -794,7 +794,7 @@ $DCVB365EncryptionKey             = Get-DCVB365EncryptionKey | ConvertTo-Html -F
 $DCVB365TeamsGraphAPIState        = Get-DCVB365TeamsGraphAPIState | ConvertTo-Html -Fragment
 
 
-#Create HTML Report
+#Create HTML Report.
 Get-HTMLReport -Path $HTMLReportPath
 
 Disconnect-VBOServer
