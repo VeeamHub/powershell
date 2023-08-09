@@ -3,7 +3,7 @@
 # AUTHOR: Commenge Damien, Axians Cloud Builder
 # DATE: 11/07/2022
 #
-# VERSION 1.03
+# VERSION 1.04
 # COMMENTS: This script is created to Audit Veeam backup for microsoft 365
 # <N/A> is used for not available
 # =======================================================
