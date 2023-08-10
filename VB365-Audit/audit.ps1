@@ -501,35 +501,55 @@ function Get-DCVB365InternetProxy
  .SYNOPSIS
     Get configuration about SMTP
  .DESCRIPTION
-    Get state, server, port, ssl, account
+    Get state, server, port, ssl, account, type
  .EXAMPLE 
     Get-DCVB365SMTP
  #>
-function Get-DCVB365SMTP
-{
-    Write-Host "$(Get-Date -Format "yyyy-MM-dd HH:mm") - VBM365 SMTP configuration"
-
-    $SMTPSetting = Get-VBOEmailSettings
-
-    $SMTP = [PScustomObject]@{
-        Enabled = $SMTPSetting.EnableNotification
-        Server  = "<N/A>"
-        Port    = "<N/A>"
-        SSL     = "<N/A>"
-        Account = "<N/A>"
-    }
-    if ($SMTPSetting.EnableNotification)
-    {
-        $SMTP.Server = $SMTPSetting.SMTPServer
-        $SMTP.Port   = $SMTPSetting.Port
-        $SMTP.SSL    = $SMTPSetting.UseSSL
-        if ($SMTPSetting.UseAuthentication)
-        {
-            $SMTP.Account = $SMTPSetting.Username
-        }
-    }
-    $SMTP
-}
+ function Get-DCVB365SMTP
+ {
+     Write-Host "$(Get-Date -Format "yyyy-MM-dd HH:mm") - VBM365 SMTP configuration"
+ 
+     $SMTPSetting = Get-VBOEmailSettings
+     $Type = if ($SMTPSetting.AuthenticationType -eq "CustomSmtp")
+             {
+                 "SMTP authentication"
+             }
+             else
+             {
+                 $SMTPSetting.AuthenticationType
+             }
+     $SMTP = [PScustomObject]@{
+         Enabled = $SMTPSetting.EnableNotification
+         Type    = "<N/A>"
+         Server  = "<N/A>"
+         Port    = "<N/A>"
+         SSL     = "<N/A>"
+         Account = "<N/A>"
+     }
+     if ($SMTPSetting.EnableNotification)
+     {
+         $SMTP.Type   = $Type
+ 
+ 
+         if ($Type -eq "SMTP authentication") 
+         {
+             $SMTP.Port   = $SMTPSetting.Port
+             $SMTP.Server = $SMTPSetting.SMTPServer
+             $SMTP.SSL    = $SMTPSetting.UseSSL
+ 
+             if ($SMTPSetting.UseAuthentication)
+             {
+                 $SMTP.Account = $SMTPSetting.Username
+             }
+         }
+         else
+         {
+             $SMTP.Server = $SMTPSetting.MailApiUrl
+             $SMTP.Account = $SMTPSetting.UserId
+         }
+     }
+     $SMTP
+ }
 
 
  <#
