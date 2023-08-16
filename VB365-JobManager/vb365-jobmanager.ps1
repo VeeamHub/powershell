@@ -371,7 +371,7 @@ BEGIN {
             $this.org = $Organization
             $this.JobnamePattern = $JobnamePattern
             $this.ObjectLimit = $ObjectLimit
-
+            $this.scheduleDelay = $scheduleDelay
             $this.Repositories = $Repositories
 
             # Create schedules per repository (as should be linked to a proxy)
