@@ -3,7 +3,7 @@
 # AUTHOR: Commenge Damien, Axians Cloud Builder
 # DATE: 11/07/2022
 #
-# VERSION 1.04
+# VERSION 1.05
 # COMMENTS: This script is created to Audit Veeam backup for microsoft 365
 # <N/A> is used for not available
 # =======================================================
@@ -667,24 +667,27 @@ function Get-DCVB365EncryptionKey
  .EXAMPLE 
     Get-DCVB365StorageAccount
  #>
-function Get-DCVB365TeamsGraphAPIState
-{
-    Write-host "$(Get-Date -Format "yyyy-MM-dd HH:mm") - VBM365 Teams graph api state"
-
-    #VBM365 server
-    [PSCustomObject]@{
-        Server        = $env:COMPUTERNAME 
-        TeamsGraphApi = (Get-VBOServer).IsTeamsGraphAPIBackupEnabled
-    }
-    $Proxy = Get-VBOProxy 
-    foreach ($obj in $Proxy)
-    {
-        [PSCustomObject]@{
-            Server = $obj.Hostname
-            TeamsGraphApi = $obj.IsTeamsGraphAPIBackupEnabled
-        }
-    }
-}
+ function Get-DCVB365TeamsGraphAPIState
+ {
+     Write-host "$(Get-Date -Format "yyyy-MM-dd HH:mm") - VBM365 Teams graph api state"
+ 
+     #VBM365 server
+     [PSCustomObject]@{
+         Server        = $env:COMPUTERNAME 
+         TeamsGraphApi = (Get-VBOServer).IsTeamsGraphAPIBackupEnabled
+     }
+     $Proxy = Get-VBOProxy 
+     foreach ($obj in $Proxy)
+     {
+         If ($obj.Hostname -ne $env:COMPUTERNAME)
+         {
+             [PSCustomObject]@{
+                 Server = $obj.Hostname
+                 TeamsGraphApi = $obj.IsTeamsGraphAPIBackupEnabled
+             }
+         }
+     }
+ }
 
 
 
