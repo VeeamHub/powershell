@@ -20,7 +20,8 @@
     Add backup copy
     Add encryption key
     Add Teams graph API
-    
+# 21/08/2023
+    Fix issue on storage repository function with B instead of GB
 #>
 
 # =======================================================
@@ -312,15 +313,16 @@ function Get-DCVB365Proxy
          $SizeLimit = "<N/A>"
          if ($ObjectStorage.EnableSizeLimit)
          {
-             $SizeLimit = [String]$ObjectStorage.UsedSpace + "/" + $ObjectStorage.SizeLimit
+             $SizeLimit = $ObjectStorage.SizeLimit
          }
+         $UsedSpace = $ObjectStorage.UsedSpace / 1GB -as [INT]
          [PScustomObject]@{
-             Name        = $ObjectStorage.name
-             Folder      = $ObjectStorage.Folder
-             Type        = $ObjectStorage.Type
-             'UsedSpace(GB)'   = [int]($ObjectStorage.UsedSpace / 1GB)
-             SizeLimit   = $SizeLimit
-             LongTerm    = $ObjectStorage.IsLongTerm
+             Name            = $ObjectStorage.name
+             Folder          = $ObjectStorage.Folder
+             Type            = $ObjectStorage.Type
+             'UsedSpace(GB)' = $UsedSpace
+             SizeLimit       = $SizeLimit
+             LongTerm        = $ObjectStorage.IsLongTerm
          }
      }
  }
