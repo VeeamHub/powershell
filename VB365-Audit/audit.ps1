@@ -22,6 +22,8 @@
     Add Teams graph API
 # 21/08/2023
     Fix issue on storage repository function with B instead of GB
+# 22/08/2023
+    Can get several organizations
 #>
 
 # =======================================================
@@ -103,39 +105,42 @@ function Get-DCVB365Summary
  .EXAMPLE 
     Get-DCVB365Organization
  #>
-function Get-DCVB365Organization
-{
-    Write-host "$(Get-Date -Format "yyyy-MM-dd HH:mm") - VBM365 Organization"
-
-    $Organization = Get-VBOOrganization
-
-    if ($Organization.Office365ExchangeConnectionSettings)
-    {
-        $OrgAuth = (Get-VBOOrganization).Office365ExchangeConnectionSettings.AuthenticationType
-    }
-    else
-    {
-        $OrgAuth = (Get-VBOOrganization).Office365SharePointConnectionSettings.AuthenticationType
-    }
-    if ($OrgAuth -eq "Basic")
-    {
-        $AuxAccount = (Get-VBOOrganization).backupaccounts.count
-    }
-    else
-    {
-        $AuxAccount = (Get-VBOOrganization).backupapplications.count
-    }
-
-    [PScustomObject]@{
-        Name            = $Organization.OfficeName
-        Account         = $Organization.username
-        Type            = $Organization.type
-        Service         = $Organization.BackupParts
-        Region          = $Organization.region
-        Authentication  = $OrgAuth
-        AuxAccount      = $AuxAccount
-    }
-}
+ function Get-DCVB365Organization
+ {
+     Write-host "$(Get-Date -Format "yyyy-MM-dd HH:mm") - VBM365 Organization"
+ 
+     $Organization = Get-VBOOrganization
+     foreach ($org in $Organization)
+     {
+ 
+         if ($Org.Office365ExchangeConnectionSettings)
+         {
+             $OrgAuth = $org.Office365ExchangeConnectionSettings.AuthenticationType
+         }
+         else
+         {
+             $OrgAuth = $org.Office365SharePointConnectionSettings.AuthenticationType
+         }
+         if ($OrgAuth -eq "Basic")
+         {
+             $AuxAccount = $org.backupaccounts.count
+         }
+         else
+         {
+             $AuxAccount = $org.backupapplications.count
+         }
+ 
+         [PScustomObject]@{
+             Name            = $org.OfficeName
+             Account         = $org.username
+             Type            = $org.type
+             Service         = $org.BackupParts
+             Region          = $org.region
+             Authentication  = $OrgAuth
+             AuxAccount      = $AuxAccount
+         }
+     }
+ }
 
  <#
  .SYNOPSIS
