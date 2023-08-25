@@ -3,7 +3,7 @@
 # AUTHOR: Commenge Damien, Axians Cloud Builder
 # DATE: 11/07/2022
 #
-# VERSION 1.07
+# VERSION 1.08
 # COMMENTS: This script is created to Audit Veeam backup for microsoft 365
 # <N/A> is used for not available
 # =======================================================
@@ -20,10 +20,13 @@
     Add backup copy
     Add encryption key
     Add Teams graph API
+    Add modern authentication notifications
 # 21/08/2023
     Fix issue on storage repository function with B instead of GB
 # 22/08/2023
     Can get several organizations
+# 25/08/2023
+    Fix issue on Get-DCVB365Proxy reporting only 1 proxy
 #>
 
 # =======================================================
@@ -238,31 +241,30 @@ function Get-DCVB365BackupCopyJob
  .EXAMPLE 
     Get-DCVB365Proxy
  #>
-function Get-DCVB365Proxy
-{
-
-    Write-host "$(Get-Date -Format "yyyy-MM-dd HH:mm") - VBM365 Proxy"
-
-    foreach ($Proxy in (Get-VBOProxy -ExtendedView:$False))
-    {
-        $Proxy = [PScustomObject]@{
-            Name            = $Proxy.hostname
-            Port            = $Proxy.port
-            Thread          = $Proxy.ThreadsNumber
-            Throttling      = [string]$Proxy.ThrottlingValue + " " + $Proxy.ThrottlingUnit
-            IntProxyHost    = "<N/A>"
-            IntProxyPort    = "<N/A>"
-            IntProxyAccount = "<N/A>"
-        }
-        if ($Proxy.InternetProxy.UseInternetProxy)
-        {
-            $Proxy.IntProxyHost     = $Proxy.InternetProxy.UseInternetProxy.Host
-            $Proxy.IntProxyPort     = $Proxy.InternetProxy.UseInternetProxy.Port
-            $Proxy.IntProxyAccount  = $Proxy.InternetProxy.UseInternetProxy.User
-        }
-    }
-    $Proxy
-}
+ function Get-DCVB365Proxy
+ {
+ 
+     Write-host "$(Get-Date -Format "yyyy-MM-dd HH:mm") - VBM365 Proxy"
+ 
+     foreach ($Proxy in (Get-VBOProxy -ExtendedView:$False))
+     {
+        [PScustomObject]@{
+             Name            = $Proxy.hostname
+             Port            = $Proxy.port
+             Thread          = $Proxy.ThreadsNumber
+             Throttling      = [string]$Proxy.ThrottlingValue + " " + $Proxy.ThrottlingUnit
+             IntProxyHost    = "<N/A>"
+             IntProxyPort    = "<N/A>"
+             IntProxyAccount = "<N/A>"
+         }
+         if ($Proxy.InternetProxy.UseInternetProxy)
+         {
+             $Proxy.IntProxyHost     = $Proxy.InternetProxy.UseInternetProxy.Host
+             $Proxy.IntProxyPort     = $Proxy.InternetProxy.UseInternetProxy.Port
+             $Proxy.IntProxyAccount  = $Proxy.InternetProxy.UseInternetProxy.User
+         }
+     }
+ }
 
  <#
  .SYNOPSIS
