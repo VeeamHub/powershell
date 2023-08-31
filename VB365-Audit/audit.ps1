@@ -3,7 +3,7 @@
 # AUTHOR: Commenge Damien, Axians Cloud Builder
 # DATE: 11/07/2022
 #
-# VERSION 1.08
+# VERSION 1.09
 # COMMENTS: This script is created to Audit Veeam backup for microsoft 365
 # <N/A> is used for not available
 # =======================================================
@@ -27,6 +27,8 @@
     Can get several organizations
 # 25/08/2023
     Fix issue on Get-DCVB365Proxy reporting only 1 proxy
+# 31/08/2023
+    Get included and excluded object in backup job
 #>
 
 # =======================================================
@@ -153,36 +155,53 @@ function Get-DCVB365Summary
  .EXAMPLE 
     Get-DCVB365BackupJob
  #>
-function Get-DCVB365BackupJob
-{
-    Write-host "$(Get-Date -Format "yyyy-MM-dd HH:mm") - VBM365 Backup Jobs"
-
-    foreach ($Job in Get-VBOJob)
-    {
-        #Get proxy name from associated proxy ID repository
-        $JobSchedule = "<N/A>"
-        if ($Job.schedulepolicy.EnableSchedule -and $Job.SchedulePolicy.Type -eq "daily")
-        {
-             $JobSchedule = [string]$Job.SchedulePolicy.DailyTime + " " + $Job.SchedulePolicy.DailyType
-        }
-        if ($Job.schedulepolicy.EnableSchedule -and $Job.SchedulePolicy.Type -eq "Periodically")
-        {
-             $JobSchedule = $Job.SchedulePolicy.PeriodicallyEvery
-        }
-
-        [PScustomObject]@{
-            Name        = $Job.Name
-            Type        = $Job.JobBackupType
-            InclObject  = $Job.SelectedItems -join ", "
-            ExclObject  = $Job.ExcludedItems -join ", "
-            Repository  = $Job.Repository
-            Proxy       = (Get-VBOProxy -id (Get-VBORepository -Name $Job.Repository).Proxy.Id -ExtendedView:$False).Hostname
-            Schedule    = $JobSchedule
-            Enabled     = $Job.IsEnabled
-        }
-    }
-}
-
+ function Get-DCVB365BackupJob
+ {
+     Write-host "$(Get-Date -Format "yyyy-MM-dd HH:mm") - VBM365 Backup Jobs"
+ 
+     foreach ($Job in Get-VBOJob)
+     {
+         #Get proxy name from associated proxy ID repository
+         $JobSchedule = "<N/A>"
+         if ($Job.schedulepolicy.EnableSchedule -and $Job.SchedulePolicy.Type -eq "daily")
+         {
+              $JobSchedule = [string]$Job.SchedulePolicy.DailyTime + " " + $Job.SchedulePolicy.DailyType
+         }
+         if ($Job.schedulepolicy.EnableSchedule -and $Job.SchedulePolicy.Type -eq "Periodically")
+         {
+              $JobSchedule = $Job.SchedulePolicy.PeriodicallyEvery
+         }
+         $InclObject = foreach ($obj in $Job.SelectedItems)
+                       {
+                             switch ($obj.Type) {
+                                 "O365Group"     { "Group - {0}" -f $obj.Group.DisplayName }
+                                 "Organization"  { "Organization - {0}" -f $obj.Organization.Name }
+                                 "User"          { "User - {0}" -f $obj.User.DisplayName }
+                                 "Site"          { "Sharepoint - {0}" -f $obj.Site.Name }
+                                 "Team"          { "Teams - {0}" -f $obj.Team.DisplayName }
+                             }
+                       }
+         $ExclObject = foreach ($obj in $Job.ExcludedItems)
+                 {
+                     switch ($obj.Type) {
+                         "O365Group"     { "Group - {0}" -f $obj.Group.DisplayName }
+                         "Organization"  { "Organization - {0}" -f $obj.Organization.Name }
+                         "User"          { "User - {0}" -f $obj.User.DisplayName }
+                         "Site"          { "Sharepoint - {0}" -f $obj.Site.Name }
+                         "Team"          { "Teams - {0}" -f $obj.Team.DisplayName }
+                     }
+                 }
+         [PScustomObject]@{
+             Name        = $Job.Name
+             InclObject  = $InclObject -join ";"
+             ExclObject  = $ExclObject -join ";"
+             Repository  = $Job.Repository
+             Proxy       = (Get-VBOProxy -id (Get-VBORepository -Name $Job.Repository).Proxy.Id -ExtendedView:$False).Hostname
+             Schedule    = $JobSchedule
+             Enabled     = $Job.IsEnabled
+         }
+     }
+ }
 <#
  .SYNOPSIS
     Get configuration about backup copy job configuration
@@ -776,7 +795,7 @@ Function Get-HTMLReport
     <h3> Proxy </h3>
     $DCVB365Proxy
 
-    <h3> Backup job </h3>
+    <h3>Backup job</h3>
     $DCVB365BackupJob
 
     <h3> Backup copy job </h3>
@@ -809,7 +828,7 @@ Function Get-HTMLReport
 
 $DCVB365Summary                   = Get-DCVB365Summary | ConvertTo-Html -Fragment
 $DCVB365Organization              = Get-DCVB365Organization | Sort-object Name | ConvertTo-Html -Fragment
-$DCVB365BackupJob                 = Get-DCVB365BackupJob | Sort-object Name | ConvertTo-Html -Fragment
+$DCVB365BackupJob                 = (Get-DCVB365BackupJob | Sort-object Name | ConvertTo-Html -Fragment).replace(";","<br>")
 $DCVB365Proxy                     = Get-DCVB365Proxy | Sort-object Name | ConvertTo-Html -Fragment
 $DCVB365Repository                = Get-DCVB365Repository | Sort-object Name | ConvertTo-Html -Fragment
 $DCVB365License                   = Get-DCVB365License | ConvertTo-Html -Fragment
@@ -831,7 +850,3 @@ $DCVB365TeamsGraphAPIState        = Get-DCVB365TeamsGraphAPIState | ConvertTo-Ht
 Get-HTMLReport -Path $HTMLReportPath
 
 Disconnect-VBOServer
-
-
-
-
