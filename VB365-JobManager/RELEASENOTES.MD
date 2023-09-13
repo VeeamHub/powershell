@@ -1,3 +1,7 @@
+v1.0.2 - 13.09.2023
+- Fixed an issue with schedule delay not working (thanks Maximilian Pelster)
+* Added more documentation for `-recurseSP`
+
 v1.0.1 - 10.05.2023
 + Added log entry to include script version
 + Added log entry for processed objects
