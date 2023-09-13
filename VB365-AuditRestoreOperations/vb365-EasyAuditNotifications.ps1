@@ -96,53 +96,105 @@ $typeChoice = Read-Host "Enter your choice"
 # Depending on the choice, fetch Users or Groups
 if ($typeChoice -eq 1) {
     $entities = Invoke-RestMethod -Method Get -Uri "$baseUrl/Organizations/$($selectedOrgId)/Users" -Headers $headers
-} else {
-    Write-Host "`nGroups support is not yet implemented." -ForegroundColor Red
-    exit
-}
 
-# Display entities for selection
-Write-Host "`nPlease select one or more users, separated with comma:"
-for ($i=0; $i -lt $entities.results.Count; $i++) {
-    Write-Host ("{0}.- {1}" -f ($i + 1), $entities.results[$i].displayName) -ForegroundColor Cyan
-}
-Write-Host "-----------------------------------------------------------"
-
-# Get user choices
-$userChoices = Read-Host "Enter your choices (e.g. 1,2,3)"
-$selectedEntities = $userChoices -split ',' | ForEach-Object { $entities.results[$_ - 1] }
-
-# Process the selected entities
-$processedEntities = $selectedEntities | ForEach-Object {
-    @{
-        id          = $_.id
-        displayName = $_.displayName
-        name        = $_.name
+    # Display entities for selection
+    Write-Host "`nPlease select one or more users, separated with comma:"
+    for ($i=0; $i -lt $entities.results.Count; $i++) {
+        Write-Host ("{0}.- {1}" -f ($i + 1), $entities.results[$i].displayName) -ForegroundColor Cyan
     }
-}
+    Write-Host "-----------------------------------------------------------"
 
-$headers = @{
-    "Content-Type" = "application/json"
-    "Accept" = "application/json"
-    "Authorization" = "Bearer $veeamBearer"
-}
+    # Get user choices
+    $userChoices = Read-Host "Enter your choices (e.g. 1,2,3)"
+    $selectedEntities = $userChoices -split ',' | ForEach-Object { $entities.results[$_ - 1] }
 
-$processedEntities | ForEach-Object {
-    $bodyData = @{
-        type = "user"
-        user = @{
+    # Process the selected entities
+    $processedEntities = $selectedEntities | ForEach-Object {
+        @{
             id          = $_.id
             displayName = $_.displayName
             name        = $_.name
         }
     }
 
-    $bodyJson = ConvertTo-Json @($bodyData)
+    $headers = @{
+        "Content-Type" = "application/json"
+        "Accept" = "application/json"
+        "Authorization" = "Bearer $veeamBearer"
+    }
 
-    try {
-        $response = Invoke-RestMethod -Method Post -Uri "$baseUrl/Organizations/$($selectedOrgId)/AuditItems" -Headers $headers -Body $bodyJson
-        Write-Host "Successfully added user $($_.name) to the Audit." -ForegroundColor Green
-    } catch {
-        Write-Host "Failed to add user $($_.name). Details: $($_.Exception.Message)" -ForegroundColor Red
+    $processedEntities | ForEach-Object {
+        $bodyData = @{
+            type = "user"
+            user = @{
+                id          = $_.id
+                displayName = $_.displayName
+                name        = $_.name
+            }
+        }
+
+        $bodyJson = ConvertTo-Json @($bodyData)
+
+        try {
+            $response = Invoke-RestMethod -Method Post -Uri "$baseUrl/Organizations/$($selectedOrgId)/AuditItems" -Headers $headers -Body $bodyJson
+            Write-Host "Successfully added user $($_.name) to the Audit." -ForegroundColor Green
+        } catch {
+            Write-Host "Failed to add user $($_.name). Details: $($_.Exception.Message)" -ForegroundColor Red
+        }
+    }
+
+} elseif ($typeChoice -eq 2) {
+    $entities = Invoke-RestMethod -Method Get -Uri "$baseUrl/Organizations/$($selectedOrgId)/Groups" -Headers $headers
+
+    # Display entities for selection
+    Write-Host "`nPlease select one or more groups, separated with comma:"
+    for ($i=0; $i -lt $entities.results.Count; $i++) {
+        Write-Host ("{0}.- {1}" -f ($i + 1), $entities.results[$i].displayName) -ForegroundColor Cyan
+    }
+    Write-Host "-----------------------------------------------------------"
+
+    # Get user choices
+    $groupChoices = Read-Host "Enter your choices (e.g. 1,2,3)"
+    $selectedEntities = $groupChoices -split ',' | ForEach-Object { $entities.results[$_ - 1] }
+
+    # Process the selected entities
+    $processedEntities = $selectedEntities | ForEach-Object {
+        @{
+            id          = $_.id
+            displayName = $_.displayName
+            name        = $_.name
+            type        = $_.type
+            locationType        = $_.locationType
+        }
+    }
+
+    $headers = @{
+        "Content-Type" = "application/json"
+        "Accept" = "application/json"
+        "Authorization" = "Bearer $veeamBearer"
+    }
+
+    $processedEntities | ForEach-Object {
+        $bodyData = @{
+            type = "group"
+            group = @{
+                id          = $_.id
+                displayName = $_.displayName
+                name        = $_.name
+                type        = $_.type
+                locationType        = $_.locationType
+            }
+        }
+
+        $bodyJson = ConvertTo-Json @($bodyData)
+
+        try {
+            $response = Invoke-RestMethod -Method Post -Uri "$baseUrl/Organizations/$($selectedOrgId)/AuditItems" -Headers $headers -Body $bodyJson
+            Write-Host "Successfully added user $($_.name) to the Audit." -ForegroundColor Green
+        } catch {
+            Write-Host "Failed to add user $($_.name). Details: $($_.Exception.Message)" -ForegroundColor Red
+        }
     }
 }
+
+
