@@ -271,7 +271,7 @@ function Add-FileToZip (
 
 }
 
-#Check to make sure we are not running this on the VBR server
+#Check if running on VBR server. Prompt user for confirmation if running on VBR server, as this is rarely necessary.
 $isVBR = Get-Service -Name "VeeamBackupSv*"
 if ($isVBR) {
     Add-Type -AssemblyName PresentationCore, PresentationFramework
@@ -282,19 +282,15 @@ if ($isVBR) {
     $Result = [System.Windows.MessageBox]::Show($msgBody,$msgTitle,$msgButton,$msgImage)
     switch ($Result)
     {
-        0 { Exit }
-        6 { Break }
-        7 { Exit }
+        "No" { Exit }
+        "Yes" { Break }
     }
 }
 
 #Initialize variables
 if ((Get-Item -Path 'HKLM:\SOFTWARE\Veeam\Veeam Backup and Replication').Property -Contains "LogDirectory") {
     $veeamDir = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Veeam\Veeam Backup and Replication').LogDirectory
-}
-else {
-    $veeamDir = $env:ProgramData + "\Veeam\Backup"    
-}
+} else { $veeamDir = $env:ProgramData + "\Veeam\Backup" }
 
 $date = Get-Date -f yyyy-MM-ddTHHmmss_
 $temp = "C:\temp"
