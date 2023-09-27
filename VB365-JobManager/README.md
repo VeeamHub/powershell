@@ -113,7 +113,7 @@ That's why I came up with the **weight** of an object.
 
 Here are two examples:
 
-Let's assume we have to SP sites.
+Let's assume we have two SP sites.
 SiteA is a simple site with no subsites, while SiteB has 100 subsites.
 From a joblevel you just add SiteA and SiteB and they'll appear as two objects within  the job configuration in VB365.
 At runtime the sites will be resolved and SiteA resolves to a single object, while SiteB resolves to 101 objects.
@@ -136,12 +136,32 @@ Adds all SharePoint sites which are currently not in backup to jobs and search f
 Limit the counted objects to 200 per job while each SP site will be counted as 1 and each team as 3.
 
 ```powershell
-./vb365-JobManager.ps1 -Organization "my-org.onmicrosoft.com" -Repositories Proxy1-Repo1,Proxy1-Repo2,Proxy2-Repo1,Proxy2-Repo2 -objectsPerJob 200
+./vb365-JobManager.ps1 -Organization "my-org.onmicrosoft.com" -Repository Proxy1-Repo1,Proxy1-Repo2,Proxy2-Repo1,Proxy2-Repo2 -objectsPerJob 200
 ```
 
 Adds all SPO and teams to backup jobs but recurses every single SP site for subsites to calculate the real object weight which will be respected for `-objectsPerJob`
 
 ```powershell
-./vb365-JobManager.ps1 -Organization "my-org.onmicrosoft.com" -Repositories Proxy1-Repo1,Proxy1-Repo2 -recurseSP -objectsPerJob 200
+./vb365-JobManager.ps1 -Organization "my-org.onmicrosoft.com" -Repository Proxy1-Repo1,Proxy1-Repo2 -recurseSP -objectsPerJob 200
 ```
 
+## ToDo
+
+This is a short list of open topics to improve this script further onwards
+
+ - Schedule delay only for next job with same repository (2 proxies can start jobs at the same time - throttling?)
+    - Repos might be on the same proxy - how to handle then? Remember the last proxy used?
+  
+ - Group jobs based on a pattern (e.g. all SPO pages matching a pattern grouped to their own jobs) - Include this option in the naming pattern?
+   - Like a pattern file with JSON
+        ```
+        "group1": [
+            "pattern1",
+            "pattern2",
+            "pattern3"
+        ]
+
+  - Update functionality
+    - Run through current jobs, re-calculate the object count e.g. for removed sites or newly added subsites
+  - Rebalance
+    - After updating being able to rebalance jobs so that in the end all jobs have the configured max object limit, but are still going to the same repository as before

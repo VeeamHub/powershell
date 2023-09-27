@@ -1,7 +1,7 @@
 
 <#PSScriptInfo
 
-.VERSION 1.0.0
+.VERSION 1.0.2
 
 .GUID f3795945-b130-4740-84f4-e8248a847263
 
@@ -87,7 +87,9 @@ Param(
     # If not set will try to load a file with the same name as the script and ending ".excludes"    
     [string] $excludeFile = $null,
 
-    # Recurse through SharePoint sites to count subsites when sizing jobs
+    # Recurse through SharePoint sites to count subsites when sizing jobs.
+    # Setting this parameter to true will drastically impact script runtime for recursing on SPO sites.
+    # Do only use it when you really are using subsites (a lot) and want to ensure object limits for jobs are met.
     [switch] $recurseSP = $false,
 
     # Check if backups exist in given repositories and align objects to jobs pointing to these repositories
@@ -142,7 +144,8 @@ DynamicParam {
 }
 
 BEGIN {
-    $global:version = '1.0.0'
+
+    $global:version = '1.0.2'
     filter timelog { "$(Get-Date -Format "yyyy-MM-dd HH:mm:ss"): $_" }
 
     # Save in global variables for easier use in classes
@@ -370,7 +373,7 @@ BEGIN {
             $this.org = $Organization
             $this.JobnamePattern = $JobnamePattern
             $this.ObjectLimit = $ObjectLimit
-
+            $this.scheduleDelay = $scheduleDelay
             $this.Repositories = $Repositories
 
             # Create schedules per repository (as should be linked to a proxy)
@@ -531,10 +534,34 @@ BEGIN {
     #        $groups += $myGroup            
     #    }
     #}
+
+    # Build a dict of all options/variables/parameters to easily log them
+    # This might be easier achievable, but I didn't find anything yet.
+    # As defaults can also be changed in the script all variables need to be logged, not just arguments passed to the script
+    $myParameters = @{
+        "objectsPerJob" = $objectsPerJob;
+        "limitServiceTo" = $limitServiceTo;
+        "jobNamePattern" = $jobNamePattern;
+        "withTeamsChats" = $withTeamsChats;
+        "baseSchedule" = $baseSchedule;
+        "scheduleDelay" = $scheduleDelay;
+        "includeFile" = $includeFile;
+        "excludeFile" = $excludeFile;
+        "recurseSP" = $recurseSP;
+        "checkBackups" = $checkBackups;
+        "countTeamAs" = $countTeamAs;
+    }
+
     Start-Transcript -IncludeInvocationHeader -Path "${PSScriptRoot}\logs\vb365-spo-teams-jobs-$(get-Date -Format FileDateTime).log" -NoClobber
 }
 
 PROCESS {
+    "Starting VB365-JobManager - v{0}" -f $global:version| timelog
+    "Commandline: {0}" -f $MyInvocation.Line | timelog   
+    $myParameters.Keys | ForEach-Object {
+        "{0}: {1}" -f $_,$myParameters[$_]
+    }
+
     $org = Get-VBOOrganization -Name $organization
     $global:org = $org
     $repos = $repository | ForEach-Object { Get-VBORepository -Name $_ }    
@@ -592,6 +619,8 @@ PROCESS {
     $jobCreatedStart = $jobManager.Jobs.Count
 
     foreach ($o in $objects) {
+
+        "Processing object: {0}" -f $o.toString() | timelog
         
         #$assignedGroup = $null
         $assignedRepo = $null
