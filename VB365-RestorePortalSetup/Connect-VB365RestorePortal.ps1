@@ -146,8 +146,10 @@ if ( -not($module)){
   Write-Host "AzureAD module already present" -ForegroundColor Green
   # Updating module if version 2.0.2.180
   if ( "2.0.2.180" -eq ($module.Version.ToString())){
-    Write-Warning "Upgrading to the latest version of the module"
+    Write-Warning "Bug found! Upgrading the AzureAD module.."
+    Uninstall-Module -Name AzureAD -Force -ErrorAction Stop
     Install-Module -Name AzureAD -SkipPublisherCheck -Force -ErrorAction Stop
+    Write-Host "AzureAD module upgraded successfully" -ForegroundColor Green
   }
 }
 
