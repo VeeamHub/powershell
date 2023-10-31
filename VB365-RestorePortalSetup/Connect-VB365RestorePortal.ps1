@@ -138,11 +138,17 @@ if ( -not(Get-Module -ListAvailable -Name Az.Accounts)){
   Write-Host "Az.Accounts module already present" -ForegroundColor Green
 }
 # Determine if AzureAd module is already present
-if ( -not(Get-Module -ListAvailable -Name AzureAd)){
+$module = Get-Module -ListAvailable -Name AzureAd
+if ( -not($module)){
   Install-Module -Name AzureAD -SkipPublisherCheck -Force -ErrorAction Stop
   Write-Host "AzureAD module installed successfully" -ForegroundColor Green
 } else {
   Write-Host "AzureAD module already present" -ForegroundColor Green
+  # Updating module if version 2.0.2.180
+  if ( "2.0.2.180" -eq ($module.Version.ToString())){
+    Write-Warning "Upgrading to the latest version of the module"
+    Install-Module -Name AzureAD -SkipPublisherCheck -Force -ErrorAction Stop
+  }
 }
 
 Connect-VB365RestorePortal -ApplicationId $applicationId
