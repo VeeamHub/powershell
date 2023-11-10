@@ -72,7 +72,7 @@ Date | Comments
 ---  | ---
 2022.12.09 | initial release 
 2023.08.07 | added support for VBR v12 job type "PerVMParentBackup" (new backup chain format of v12)
-
+2023.11.10 | fixed a bug which lead to restore points being ignored when a job was changed to target a different repository
 
 <!-- referenced links -->
 [Veeam Backup & Replication]: https://www.veeam.com/vm-backup-recovery-replication-software.html
