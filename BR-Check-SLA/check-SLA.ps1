@@ -27,10 +27,10 @@
 #   -excludeJobsFile = filename containing jobs to be excluded explicitly (textfile, one job name per line default = "exclude-Jobs.txt")
 #   -verbose = write details about script steps to screen while executing (only for debugging, default off)
 # 
-# Backup windows start will be calculated as follows:
+# Backup window start will be calculated as follows:
 #   Day  = today minus parameter 'lookBackDays'
 #   Time = time of day set in parameter 'backupWindowStart'
-# Backup windo end will be calculated as follows:
+# Backup window end will be calculated as follows:
 #   Day  = yesterday, if time in 'backupWindowEnd' is in the future; otherwise today
 #   Time = time of day set in parameter 'backupWindowEnd'
 # 
@@ -44,6 +44,7 @@
 # 2022.11.24 added option to explicitly ignore VMs or jobs provided in separate textfiles
 # 2022.11.25 enhanced explicit VM exclusions to be based on combination of VM name and VM-ID (vSphere MoRefID)
 # 2023-08-07 added support for VBR v12 job type "PerVMParentBackup" (new backup chain format of v12)
+# 2023.11.10 fixed a bug which lead to restore points being ignored when a job was changed to target a different repository
 # -----------------------------------------------
 
 # vbrServer passed as parameter (script will ask for credentials if there is no credentials file!)
@@ -375,8 +376,18 @@ Process {
 
         if ($processThisJob) {
             try {
+                # get repopsitory information
+                $myRepoName = $null
+                $extentName = $null
                 $objThisRepo = $null
                 $objThisRepo = $objBackup.GetRepository()
+                if ($null -ne $objThisRepo) {
+                    $myRepoName = $objThisRepo.Name
+                    if ($objThisRepo.TypeDisplay -eq "Scale-out") {
+                        $extentName = $restorePoint.FindChainRepositories().Name
+                    }
+                }
+                Write-Verbose "--> $myRepoName"
             }
             catch {
             }
@@ -400,7 +411,6 @@ Process {
             # iterate through all discovered restore points
             foreach ($restorePoint in $objRPs) {            
                 Write-Progress -Activity "Getting restore points" -PercentComplete ($countRPs / $objRPs.Count * 100) -Id 3 -ParentId 2
-                $myBackupJob = $null
 
                 $myName = $restorePoint.VmName
                 $moRefID = $restorePoint.GetTargetVmInfo().VmRef
@@ -428,24 +438,12 @@ Process {
                         # ignore restore points which are newer than the backup window end time
                         if ($completionTime -le $intervalEnd) {
 
-                            # only proceed if we do NOT already have a restore point for this VM from this job
-                            if ("$($restorePoint.VmName)-$($objBackup.Name)" -notin $VMJobList) {
+                            # only proceed if we do NOT already have a restore point for this VM from this job on this repository
+                            if ("$($restorePoint.VmName)-$($objBackup.Name)-$myRepoName" -notin $VMJobList) {
+                                Write-Verbose "    $($restorePoint.VmName)"
                                 
                                 $rpDuration = New-TimeSpan -Start $restorePoint.CreationTimeUtc -End $restorePoint.CompletionTimeUTC
                                 
-                                try {
-                                    $myBackupJob = $objBackup.GetJob()
-                                }
-                                catch {
-                                    # ignore error
-                                }
-                                if ($null -eq $myBackupJob ) {
-                                    $myBlockSize = "[n/a]"
-                                }
-                                else {
-                                    $myBlocksize = $jobBlockSizes."$($restorePoint.GetStorage().Blocksize)"
-                                }
-
                                 $myBackupType = $restorePoint.algorithm
                                 if ($myBackupType -eq "Increment") {
                                     $myDataRead = $restorePoint.GetStorage().stats.DataSize
@@ -458,14 +456,6 @@ Process {
                                 if ($myDedup -gt 1) { $myDedup = 100 / $myDedup } else { $myDedup = 1 }
                                 if ($myCompr -gt 1) { $myCompr = 100 / $myCompr } else { $myCompr = 1 }
 
-                                $myRepoName = $null
-                                $extentName = $null
-                                if ($null -ne $objThisRepo) {
-                                    $myRepoName = $objThisRepo.Name
-                                    if ($objThisRepo.TypeDisplay -eq "Scale-out") {
-                                        $extentName = $restorePoint.FindChainRepositories().Name
-                                    }
-                                }
                                 # check if rp is within backup window
                                 $rpInBackupWindow = $false
                                 if (($completionTime -ge $intervalStart) -and ($completionTime -le $intervalEnd)) {
@@ -496,14 +486,13 @@ Process {
                                     DedupRatio     = $myDedup
                                     ComprRatio     = $myCompr
                                     Reduction      = $myDedup * $myCompr
-                                    Blocksize      = $myBlocksize
                                     Folder         = get_backupfile_path $restorePoint
                                     Filename       = $restorePoint.GetStorage().PartialPath.Internal.Elements[0]
                                 }
 
                                 $totalRPs++
                                 $allRPs.Add($tmpObject) | Out-Null
-                                $VMJobList.Add("$($restorePoint.VmName)-$($objBackup.Name)")
+                                $VMJobList.Add("$($restorePoint.VmName)-$($objBackup.Name)-$myRepoName")
                                 $tmpObject = $null
                             }
                         }
