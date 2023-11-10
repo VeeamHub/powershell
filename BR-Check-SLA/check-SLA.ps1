@@ -364,6 +364,7 @@ Process {
         # ignore jobs explicitly excluded via $excludeJobsFile
         if ($excludeJobsList.Count -gt 0) {
             if ($excludeJobsList.Contains($objBackup.JobName)) {
+
                 $processThisJob = $false
             }
         }
@@ -426,7 +427,6 @@ Process {
                         if (($null -eq $excludeID) -or ($excludeID -eq $moRefID)) {
                             $processThisVM = $false
                         }
-                    
                     }
                 }
                 if ($processThisVM) {
