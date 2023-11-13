@@ -117,14 +117,6 @@ Begin {
         "EpAgentManagement",
         "EPAgentPolicy")
 
-    $jobBlockSizes = [PSCustomobject]@{ kbBlockSize256 = 256 * 1024
-        kbBlockSize512                                 = 512 * 1024
-        kbBlockSize1024                                = 1024 * 1024
-        kbBlockSize4096                                = 4096 * 1024
-        kbBlockSize8192                                = 8192 * 1024
-        Automatic                                      = "[Automatic]"
-    }
-
     # build proper wildcards for exclusion filters
     if ("" -ne $excludeJobs) {
         $excludeJobs = "*$($excludeJobs.Trim('*'))*" 
@@ -334,7 +326,7 @@ Process {
     Write-Verbose "Getting all backup jobs."
     $allBackups = Get-VBRBackup | Where-Object { $_.JobType -in $jobTypesScope }
     $allRPs = New-Object -TypeName 'System.Collections.Generic.List[object]'
-    $VMJobList = New-Object -TypeName 'System.Collections.Generic.List[string]'
+    $VMJobRepoList = New-Object -TypeName 'System.Collections.Generic.List[string]'
     $countJobs = 0
     $rpId = 0
     $totalRPs = 0
@@ -439,7 +431,7 @@ Process {
                         if ($completionTime -le $intervalEnd) {
 
                             # only proceed if we do NOT already have a restore point for this VM from this job on this repository
-                            if ("$($restorePoint.VmName)-$($objBackup.Name)-$myRepoName" -notin $VMJobList) {
+                            if ("$($restorePoint.VmName)-$($objBackup.Name)-$myRepoName" -notin $VMJobRepoList) {
                                 Write-Verbose "    $($restorePoint.VmName)"
                                 
                                 $rpDuration = New-TimeSpan -Start $restorePoint.CreationTimeUtc -End $restorePoint.CompletionTimeUTC
@@ -492,7 +484,7 @@ Process {
 
                                 $totalRPs++
                                 $allRPs.Add($tmpObject) | Out-Null
-                                $VMJobList.Add("$($restorePoint.VmName)-$($objBackup.Name)-$myRepoName")
+                                $VMJobRepoList.Add("$($restorePoint.VmName)-$($objBackup.Name)-$myRepoName")
                                 $tmpObject = $null
                             }
                         }
@@ -511,16 +503,31 @@ Process {
     Write-Verbose "Calculating and preparing output."
 
     # sort restore points for processing
-    $allRPs = $allRPs | Sort-Object -Property VMName, BackupJob, @{Expression = 'CreationTime'; Descending = $true }
+    $allRPs = $allRPs | Sort-Object -Property VMName, @{Expression = 'CompletionTime'; Descending = $true }
+    
+    # find and remove duplicate entries (e.g. VM being processed by multiple jobs / located on multiple repositories)
+    $previousVMName = $null
+    $allResultingRPs = New-Object -TypeName 'System.Collections.Generic.List[object]'
+    foreach($restorePoint in $allRPs) {
+        if($previousVMName -ne $restorePoint.VMName) {
+            $allResultingRPs.Add($restorePoint)
+        } else {
+            $totalRPs--
+            if($restorePoint.InBackupWindow) {
+                $totalRPsInBackupWindow--
+            }
+        }
+        $previousVMName = $restorePoint.VMName
+    }
 
     # ...and re-number sorted list
-    $rpID = 0
-    foreach ($rp in $allRPs) { $rp.RpId = ++$rpID }
+    $restorePointID = 1
+    foreach ($rp in $allResultingRPs) { $rp.RpId = $restorePointID++ }
 
     # create SLA output object
     $SLACompliance = 0
-    if ($allRPs.Count -gt 0) {
-        $SLACompliance = [math]::Round($totalRPsInBackupWindow / $allRPs.Count * 100, 2)
+    if ($allResultingRPs.Count -gt 0) {
+        $SLACompliance = [math]::Round($totalRPsInBackupWindow / $allResultingRPs.Count * 100, 2)
     }
     $procDuration = formatDuration(New-TimeSpan -Start $procStartTime)
     $SLAObject = [PSCustomobject]@{
@@ -530,16 +537,16 @@ Process {
         BackupWindowEnd      = $intervalEnd
         ExcludedJobsFilter   = $excludeJobs
         ExcludedVMsFilter    = $excludeVMs
-        TotalRestorePoints   = $allRPs.Count
+        TotalRestorePoints   = $allResultingRPs.Count
         RPsInBackupWindow    = $totalRPsInBackupWindow
         SLACompliancePercent = $SLACompliance
     }
 
     # output everything
     # -----------------
-    if ($allRPs.Count -gt 0) {
+    if ($allResultingRPs.Count -gt 0) {
 
-        $allRPs | Export-Csv -Path $outfileRP -NoTypeInformation -Delimiter ';'
+        $allResultingRPs | Export-Csv -Path $outfileRP -NoTypeInformation -Delimiter ';'
         Write-Verbose "output to file: $outfileRP"
 
         $SLAObject | Export-Csv -Path $outfileStatistics -NoTypeInformation -Delimiter ';' -Append
@@ -548,7 +555,7 @@ Process {
         if ($displayGrid) {
             # prepare 'human readable' figures for GridViews
             Write-Verbose "Preparing GridViews."
-            foreach ($rp in $allRPs) {
+            foreach ($rp in $allResultingRPs) {
                 $rp.ProcessedData = Format-Bytes $rp.ProcessedData
                 $rp.DataSize = Format-Bytes $rp.DataSize
                 $rp.DataRead = Format-Bytes $rp.DataRead
@@ -559,7 +566,7 @@ Process {
 
             # output GridViews
             Write-Verbose "GridView display."
-            $allRPs | Out-GridView -Title "List of most recent restore points ($outFileRP)" -Verbose 
+            $allResultingRPs | Out-GridView -Title "List of most recent restore points ($outFileRP)" -Verbose 
             Import-Csv -Path $outfileStatistics -Delimiter ";" | Out-GridView -Title "SLA compliance overview ($outFileStatistics)" -Verbose 
         }
     }
