@@ -117,8 +117,8 @@ function get-lastbackupjobs {
             default   { $Info = ""; break }
         }
 
-        $lastBackupJobs += [PSCustomObject]@{'BackupJob' = $session.JobName.split(' ')[0]
-                                             'Server'    = $session.Name.split(' ')[0].split('.')[0]
+        $lastBackupJobs += [PSCustomObject]@{'BackupJob' = $session.JobName
+                                             'Server'    = $session.Name.split(' ')[0]
                                              'StartTime' = $session.Progress.StartTimeLocal.ToString('dd/MM/yyyy HH\hmm')
                                              'EndTime'   = $endTime
                                              'Duration'  = $duration
