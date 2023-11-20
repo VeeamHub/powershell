@@ -3,7 +3,7 @@
 # AUTHOR: Commenge Damien, Axians Cloud Builder
 # DATE: 11/07/2022
 #
-# VERSION 1.05
+# VERSION 1.09
 # COMMENTS: This script is created to Audit Veeam backup for microsoft 365
 # <N/A> is used for not available
 # =======================================================
@@ -20,7 +20,15 @@
     Add backup copy
     Add encryption key
     Add Teams graph API
-    
+    Add modern authentication notifications
+# 21/08/2023
+    Fix issue on storage repository function with B instead of GB
+# 22/08/2023
+    Can get several organizations
+# 25/08/2023
+    Fix issue on Get-DCVB365Proxy reporting only 1 proxy
+# 31/08/2023
+    Get included and excluded object in backup job
 #>
 
 # =======================================================
@@ -102,39 +110,42 @@ function Get-DCVB365Summary
  .EXAMPLE 
     Get-DCVB365Organization
  #>
-function Get-DCVB365Organization
-{
-    Write-host "$(Get-Date -Format "yyyy-MM-dd HH:mm") - VBM365 Organization"
-
-    $Organization = Get-VBOOrganization
-
-    if ($Organization.Office365ExchangeConnectionSettings)
-    {
-        $OrgAuth = (Get-VBOOrganization).Office365ExchangeConnectionSettings.AuthenticationType
-    }
-    else
-    {
-        $OrgAuth = (Get-VBOOrganization).Office365SharePointConnectionSettings.AuthenticationType
-    }
-    if ($OrgAuth -eq "Basic")
-    {
-        $AuxAccount = (Get-VBOOrganization).backupaccounts.count
-    }
-    else
-    {
-        $AuxAccount = (Get-VBOOrganization).backupapplications.count
-    }
-
-    [PScustomObject]@{
-        Name            = $Organization.OfficeName
-        Account         = $Organization.username
-        Type            = $Organization.type
-        Service         = $Organization.BackupParts
-        Region          = $Organization.region
-        Authentication  = $OrgAuth
-        AuxAccount      = $AuxAccount
-    }
-}
+ function Get-DCVB365Organization
+ {
+     Write-host "$(Get-Date -Format "yyyy-MM-dd HH:mm") - VBM365 Organization"
+ 
+     $Organization = Get-VBOOrganization
+     foreach ($org in $Organization)
+     {
+ 
+         if ($Org.Office365ExchangeConnectionSettings)
+         {
+             $OrgAuth = $org.Office365ExchangeConnectionSettings.AuthenticationType
+         }
+         else
+         {
+             $OrgAuth = $org.Office365SharePointConnectionSettings.AuthenticationType
+         }
+         if ($OrgAuth -eq "Basic")
+         {
+             $AuxAccount = $org.backupaccounts.count
+         }
+         else
+         {
+             $AuxAccount = $org.backupapplications.count
+         }
+ 
+         [PScustomObject]@{
+             Name            = $org.OfficeName
+             Account         = $org.username
+             Type            = $org.type
+             Service         = $org.BackupParts
+             Region          = $org.region
+             Authentication  = $OrgAuth
+             AuxAccount      = $AuxAccount
+         }
+     }
+ }
 
  <#
  .SYNOPSIS
@@ -144,36 +155,53 @@ function Get-DCVB365Organization
  .EXAMPLE 
     Get-DCVB365BackupJob
  #>
-function Get-DCVB365BackupJob
-{
-    Write-host "$(Get-Date -Format "yyyy-MM-dd HH:mm") - VBM365 Backup Jobs"
-
-    foreach ($Job in Get-VBOJob)
-    {
-        #Get proxy name from associated proxy ID repository
-        $JobSchedule = "<N/A>"
-        if ($Job.schedulepolicy.EnableSchedule -and $Job.SchedulePolicy.Type -eq "daily")
-        {
-             $JobSchedule = [string]$Job.SchedulePolicy.DailyTime + " " + $Job.SchedulePolicy.DailyType
-        }
-        if ($Job.schedulepolicy.EnableSchedule -and $Job.SchedulePolicy.Type -eq "Periodically")
-        {
-             $JobSchedule = $Job.SchedulePolicy.PeriodicallyEvery
-        }
-
-        [PScustomObject]@{
-            Name        = $Job.Name
-            Type        = $Job.JobBackupType
-            InclObject  = $Job.SelectedItems -join ", "
-            ExclObject  = $Job.ExcludedItems -join ", "
-            Repository  = $Job.Repository
-            Proxy       = (Get-VBOProxy -id (Get-VBORepository -Name $Job.Repository).Proxy.Id -ExtendedView:$False).Hostname
-            Schedule    = $JobSchedule
-            Enabled     = $Job.IsEnabled
-        }
-    }
-}
-
+ function Get-DCVB365BackupJob
+ {
+     Write-host "$(Get-Date -Format "yyyy-MM-dd HH:mm") - VBM365 Backup Jobs"
+ 
+     foreach ($Job in Get-VBOJob)
+     {
+         #Get proxy name from associated proxy ID repository
+         $JobSchedule = "<N/A>"
+         if ($Job.schedulepolicy.EnableSchedule -and $Job.SchedulePolicy.Type -eq "daily")
+         {
+              $JobSchedule = [string]$Job.SchedulePolicy.DailyTime + " " + $Job.SchedulePolicy.DailyType
+         }
+         if ($Job.schedulepolicy.EnableSchedule -and $Job.SchedulePolicy.Type -eq "Periodically")
+         {
+              $JobSchedule = $Job.SchedulePolicy.PeriodicallyEvery
+         }
+         $InclObject = foreach ($obj in $Job.SelectedItems)
+                       {
+                             switch ($obj.Type) {
+                                 "O365Group"     { "Group - {0}" -f $obj.Group.DisplayName }
+                                 "Organization"  { "Organization - {0}" -f $obj.Organization.Name }
+                                 "User"          { "User - {0}" -f $obj.User.DisplayName }
+                                 "Site"          { "Sharepoint - {0}" -f $obj.Site.Name }
+                                 "Team"          { "Teams - {0}" -f $obj.Team.DisplayName }
+                             }
+                       }
+         $ExclObject = foreach ($obj in $Job.ExcludedItems)
+                 {
+                     switch ($obj.Type) {
+                         "O365Group"     { "Group - {0}" -f $obj.Group.DisplayName }
+                         "Organization"  { "Organization - {0}" -f $obj.Organization.Name }
+                         "User"          { "User - {0}" -f $obj.User.DisplayName }
+                         "Site"          { "Sharepoint - {0}" -f $obj.Site.Name }
+                         "Team"          { "Teams - {0}" -f $obj.Team.DisplayName }
+                     }
+                 }
+         [PScustomObject]@{
+             Name        = $Job.Name
+             InclObject  = $InclObject -join ";"
+             ExclObject  = $ExclObject -join ";"
+             Repository  = $Job.Repository
+             Proxy       = (Get-VBOProxy -id (Get-VBORepository -Name $Job.Repository).Proxy.Id -ExtendedView:$False).Hostname
+             Schedule    = $JobSchedule
+             Enabled     = $Job.IsEnabled
+         }
+     }
+ }
 <#
  .SYNOPSIS
     Get configuration about backup copy job configuration
@@ -232,31 +260,30 @@ function Get-DCVB365BackupCopyJob
  .EXAMPLE 
     Get-DCVB365Proxy
  #>
-function Get-DCVB365Proxy
-{
-
-    Write-host "$(Get-Date -Format "yyyy-MM-dd HH:mm") - VBM365 Proxy"
-
-    foreach ($Proxy in (Get-VBOProxy -ExtendedView:$False))
-    {
-        $Proxy = [PScustomObject]@{
-            Name            = $Proxy.hostname
-            Port            = $Proxy.port
-            Thread          = $Proxy.ThreadsNumber
-            Throttling      = [string]$Proxy.ThrottlingValue + " " + $Proxy.ThrottlingUnit
-            IntProxyHost    = "<N/A>"
-            IntProxyPort    = "<N/A>"
-            IntProxyAccount = "<N/A>"
-        }
-        if ($Proxy.InternetProxy.UseInternetProxy)
-        {
-            $Proxy.IntProxyHost     = $Proxy.InternetProxy.UseInternetProxy.Host
-            $Proxy.IntProxyPort     = $Proxy.InternetProxy.UseInternetProxy.Port
-            $Proxy.IntProxyAccount  = $Proxy.InternetProxy.UseInternetProxy.User
-        }
-    }
-    $Proxy
-}
+ function Get-DCVB365Proxy
+ {
+ 
+     Write-host "$(Get-Date -Format "yyyy-MM-dd HH:mm") - VBM365 Proxy"
+ 
+     foreach ($Proxy in (Get-VBOProxy -ExtendedView:$False))
+     {
+        [PScustomObject]@{
+             Name            = $Proxy.hostname
+             Port            = $Proxy.port
+             Thread          = $Proxy.ThreadsNumber
+             Throttling      = [string]$Proxy.ThrottlingValue + " " + $Proxy.ThrottlingUnit
+             IntProxyHost    = "<N/A>"
+             IntProxyPort    = "<N/A>"
+             IntProxyAccount = "<N/A>"
+         }
+         if ($Proxy.InternetProxy.UseInternetProxy)
+         {
+             $Proxy.IntProxyHost     = $Proxy.InternetProxy.UseInternetProxy.Host
+             $Proxy.IntProxyPort     = $Proxy.InternetProxy.UseInternetProxy.Port
+             $Proxy.IntProxyAccount  = $Proxy.InternetProxy.UseInternetProxy.User
+         }
+     }
+ }
 
  <#
  .SYNOPSIS
@@ -312,15 +339,16 @@ function Get-DCVB365Proxy
          $SizeLimit = "<N/A>"
          if ($ObjectStorage.EnableSizeLimit)
          {
-             $SizeLimit = [String]$ObjectStorage.UsedSpace + "/" + $ObjectStorage.SizeLimit
+             $SizeLimit = $ObjectStorage.SizeLimit
          }
+         $UsedSpace = $ObjectStorage.UsedSpace / 1GB -as [INT]
          [PScustomObject]@{
-             Name        = $ObjectStorage.name
-             Folder      = $ObjectStorage.Folder
-             Type        = $ObjectStorage.Type
-             'UsedSpace(GB)'   = [int]($ObjectStorage.UsedSpace / 1GB)
-             SizeLimit   = $SizeLimit
-             LongTerm    = $ObjectStorage.IsLongTerm
+             Name            = $ObjectStorage.name
+             Folder          = $ObjectStorage.Folder
+             Type            = $ObjectStorage.Type
+             'UsedSpace(GB)' = $UsedSpace
+             SizeLimit       = $SizeLimit
+             LongTerm        = $ObjectStorage.IsLongTerm
          }
      }
  }
@@ -767,7 +795,7 @@ Function Get-HTMLReport
     <h3> Proxy </h3>
     $DCVB365Proxy
 
-    <h3> Backup job </h3>
+    <h3>Backup job</h3>
     $DCVB365BackupJob
 
     <h3> Backup copy job </h3>
@@ -800,7 +828,7 @@ Function Get-HTMLReport
 
 $DCVB365Summary                   = Get-DCVB365Summary | ConvertTo-Html -Fragment
 $DCVB365Organization              = Get-DCVB365Organization | Sort-object Name | ConvertTo-Html -Fragment
-$DCVB365BackupJob                 = Get-DCVB365BackupJob | Sort-object Name | ConvertTo-Html -Fragment
+$DCVB365BackupJob                 = (Get-DCVB365BackupJob | Sort-object Name | ConvertTo-Html -Fragment).replace(";","<br>")
 $DCVB365Proxy                     = Get-DCVB365Proxy | Sort-object Name | ConvertTo-Html -Fragment
 $DCVB365Repository                = Get-DCVB365Repository | Sort-object Name | ConvertTo-Html -Fragment
 $DCVB365License                   = Get-DCVB365License | ConvertTo-Html -Fragment
@@ -822,7 +850,3 @@ $DCVB365TeamsGraphAPIState        = Get-DCVB365TeamsGraphAPIState | ConvertTo-Ht
 Get-HTMLReport -Path $HTMLReportPath
 
 Disconnect-VBOServer
-
-
-
-
