@@ -3,15 +3,15 @@
 ## Function
 
 This script will read all the most recent restore points from all backup jobs of a single or multiple VBR servers. SLA compliance ratio (in percent) is calculated based on which percentage of the restore points have been created within the given backup window in comparison to the total number of restore points.
-Per default, all backup jobs and VMs (or computers in case of agent jobs) will be processed. To exclude particular jobs or VMs from the SLA calculation, parameters `excludeJobs`, `excludeVMs` and `excludeVMFile` can be used as described below.
+Per default, all backup jobs and VMs (or computers in case of agent jobs) will be processed. If a VM is processed by multiple jobs, only the job which created the most recent restore point will be considered for this VM. To exclude particular jobs or VMs from the SLA calculation, parameters `excludeJobs`, `excludeVMs` and `excludeVMFile` can be used as described below.
 
 > **Note:** If a VM within a particular job has NEVER been backed up successfully (i.e., no restore points exist for this VM at all), or if a job didn't run at least successfully once, this script will not be able report these as being 'outside of backup window' as it simply cannot process something that doesn't exist.
 
 > **2nd Note:** If a restore point is newer than the backup window end time, it will be ignored and the next (older) restore point will be checked for backup window compliance instead.
 
 ## Requirements
-- [Veeam Backup & Replication] v11
-  - older versions haven't been tested
+- [Veeam Backup & Replication] v11 or newer
+  - script has been tested against v11, v11a and v12 only
 - [Veeam Powershell module]
 
 ## Parameters:
@@ -67,6 +67,12 @@ vmA,vm-305     # VM 'vmA' will be excluded, but only if its VM-ID is 'vm-305'
 ```
 (Comments in the example above are for this readme only, __do not use comments__ in your real exception file!)
 
+## Version History
+Date | Comments
+---  | ---
+2022.12.09 | initial release 
+2023.08.07 | added support for VBR v12 job type "PerVMParentBackup" (new backup chain format of v12)
+2023.11.13 | fixed a bug which lead to restore points being ignored when a job was changed to target a different repository
 
 <!-- referenced links -->
 [Veeam Backup & Replication]: https://www.veeam.com/vm-backup-recovery-replication-software.html
