@@ -271,7 +271,7 @@ function Add-FileToZip (
 
 }
 
-#Check to make sure we are not running this on the VBR server
+#Check if running on VBR server. Prompt user for confirmation if running on VBR server, as this is rarely necessary.
 $isVBR = Get-Service -Name "VeeamBackupSv*"
 if ($isVBR) {
     Add-Type -AssemblyName PresentationCore, PresentationFramework
