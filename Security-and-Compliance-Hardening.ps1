@@ -1,7 +1,7 @@
 # Veeam Security & Compliance Analyzer enforcement script
 # This script can report current status and enforce recommended security settings on backup server
 # This script should be ran locally on backup server
-# Version 1.1 12/14/2023
+# Version 1.2 12/15/2023
 
 # Making sure Veeam PowerCLI is working
 Write-Output "Importing VBR Powershell module..."
@@ -272,7 +272,7 @@ function Set-VBRComplianceRecommendations($id)
             Write-host "Disabling Windows Remote Management (WinRM) service..." -NoNewline
             Try {
                 Set-Service "WinRM" -StartupType "Disabled" -ErrorAction SilentlyContinue
-                Write-host "OK" -ForegroundColor Green
+                Write-host "OK (Reboot required)" -ForegroundColor Green
             } 
             Catch {Write-host "Failed" -ForegroundColor Red}
         }
@@ -288,7 +288,7 @@ function Set-VBRComplianceRecommendations($id)
             Write-host "Disabling WDigest credentials caching..." -NoNewline
             Try {
                 Remove-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\WDigest" -Name "UseLogonCredential" -ErrorAction Ignore
-                Write-host "OK" -ForegroundColor Green
+                Write-host "OK (Reboot required)" -ForegroundColor Green
             } 
             Catch {Write-host "Failed" -ForegroundColor Red}
         }
@@ -296,7 +296,7 @@ function Set-VBRComplianceRecommendations($id)
             Write-host "Disabling Web Proxy Auto-Discovery service (WinHttpAutoProxySvc)..." -NoNewline
             Try {
                 Set-ItemProperty -Path HKLM:\SYSTEM\CurrentControlSet\Services\WinHttpAutoProxySvc -Name Start -Value 4
-                Write-host "OK" -ForegroundColor Green
+                Write-host "OK (Reboot required)" -ForegroundColor Green
                 
             } 
             Catch {Write-host "Failed" -ForegroundColor Red}
@@ -355,7 +355,7 @@ function Set-VBRComplianceRecommendations($id)
 
                 Set-SmbServerConfiguration -EnableSMB1Protocol $false -Force -ErrorAction SilentlyContinue | Out-Null
                 Disable-WindowsOptionalFeature -Online -FeatureName "SMB1Protocol" -NoRestart -ErrorAction SilentlyContinue | Out-Null 
-                Write-host "OK" -ForegroundColor Green
+                Write-host "OK (Reboot required)" -ForegroundColor Green
             } 
             Catch {Write-host "Failed" -ForegroundColor Red}
             
@@ -365,7 +365,7 @@ function Set-VBRComplianceRecommendations($id)
             Try {
                 New-Item "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT" -Name "DNSClient" -Force -ErrorAction SilentlyContinue | Out-Null
                 New-ItemProperty "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\DNSClient" -Name "EnableMultiCast" -Value "0" -PropertyType "DWORD" -Force -ErrorAction SilentlyContinue | Out-Null
-                Write-host "OK" -ForegroundColor Green
+                Write-host "OK (Reboot required)" -ForegroundColor Green
             } 
             Catch {Write-host "Failed" -ForegroundColor Red}
         }
