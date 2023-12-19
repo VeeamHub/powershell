@@ -5,6 +5,13 @@ Maps a VSPC Company to a VCD Organization
 .DESCRIPTION
 This script identifies VMware Cloud Director (VCD) Organizations using the specified Veeam Backup & Replication (VBR) server and then attempts to map each Organization to a Veeam Service Provider Console (VSPC) Company. Mappings are stored in a csv file. Organizations that cannot be mapped will be identified in the output.
 
+Four different methods of mapping are available:
+
+1. VCD-backed Cloud Connect Tenants
+2. Identical names (VCD Organization/VSPC Company)
+3. Mapping from already existing mappings (different VSPC servers)
+4. Manual (outside of script)
+
 .PARAMETER VSPC
 VSPC Server IP or FQDN
 
@@ -35,39 +42,49 @@ VBR Backup Administrator account PS Credential Object
 .PARAMETER VbrPort
 VBR Rest API port
 
+.PARAMETER IncludeMapped
+Flag to include already mapped objects in the output
+
 .PARAMETER AllowSelfSignedCerts
 Flag allowing self-signed certificates (insecure)
 
 .OUTPUTS
-Get-VspcUsageReport generates/updates a csv file and returns a PowerShell Object containing all data
+Sync-VcdOrganizationMapping.ps1 generates/updates a csv file and returns a PowerShell Object containing all data
 
 .EXAMPLE
-Get-VspcUsageReport.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password"
+Sync-VcdOrganizationMapping.ps1 -VSPC "vspc.contoso.local" -VspcUser "contoso\jsmith" -VspcPass "password" -VBR "vbr.contoso.local" -VbrUser "contoso\jsmith" -VbrPass "password"
 
 Description
 -----------
-Connect to the specified VSPC server using the username/password specified
+Connect to the specified VSPC & VBR server using a username/password and attempt to map a VCD Organization to a VSPC Company
 
 .EXAMPLE
-Get-VspcUsageReport.ps1 -Server "vspc.contoso.local" -Credential (Get-Credential)
+Sync-VcdOrganizationMapping.ps1 -VSPC "vspc.contoso.local" -VspcCredential (Get-Credential) -VBR "vbr.contoso.local" -VbrCredential (Get-Credential)
 
 Description
 -----------
 PowerShell credentials object is supported
 
 .EXAMPLE
-Get-VspcUsageReport.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password" -Port 9999
+Sync-VcdOrganizationMapping.ps1 -VSPC "vspc.contoso.local" -VspcPort 9999 -VspcUser "contoso\jsmith" -VspcPass "password" -VBR "vbr.contoso.local" -VbrPort 9999 -VbrUser "contoso\jsmith" -VbrPass "password"
 
 Description
 -----------
-Connecting to a VSPC server using a non-standard API port
+Connecting to a VSPC and/or VBR server using a non-standard API port
 
 .EXAMPLE
-Get-VspcUsageReport.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password" -AllowSelfSignedCerts
+Sync-VcdOrganizationMapping.ps1 -VSPC "vspc.contoso.local" -VspcUser "contoso\jsmith" -VspcPass "password" -VBR "vbr.contoso.local" -VbrUser "contoso\jsmith" -VbrPass "password" -AllowSelfSignedCerts
 
 Description
 -----------
-Connecting to a VSPC server that uses Self-Signed Certificates (insecure)
+Connecting to a VSPC and/or VBR server that uses Self-Signed Certificates (insecure)
+
+.EXAMPLE
+Sync-VcdOrganizationMapping.ps1 -VSPC "vspc.contoso.local" -VspcUser "contoso\jsmith" -VspcPass "password" -VBR "vbr.contoso.local" -VbrUser "contoso\jsmith" -VbrPass "password" -IncludeMapped
+
+Description
+-----------
+Include already mapped organizations in the output results
 
 .NOTES
 NAME:  Sync-VcdOrganizationMapping.ps1
@@ -110,22 +127,10 @@ param(
     [Parameter(Mandatory = $false)]
     [Int] $VbrPort = 9419,
     [Parameter(Mandatory = $false)]
+    [Switch] $IncludeMapped,
+    [Parameter(Mandatory = $false)]
     [Switch] $AllowSelfSignedCerts
 )
-
-
-Function Confirm-Value {
-    param($value)
-
-    # If value exists, return value.
-    if ($value) {
-        return $value
-    }
-    else {
-        # Otherwise, return zero.
-        return 0
-    }
-}
 
 Function Get-AsyncAction {
     param(
@@ -259,11 +264,11 @@ Function Confirm-Mapping {
     )
 
     # Is object empty?
-    if ($null -eq $obj){
+    if ($null -eq $obj) {
         # No mappings found.
         return $false
     }
-    Write-Verbose "Checking Map: $($obj)"
+
     # If mapping already exists, return true.
     if ($obj.VCD_Organization_Id -contains $id) {
         return $true
@@ -344,7 +349,7 @@ try {
     [string] $vbrToken = $response.access_token
 }
 catch {
-    Write-Error "ERROR: Authorization Failed! Make sure the correct server and port were specified."
+    Write-Error "ERROR: VBR Authorization Failed! Make sure the correct server and port were specified."
     throw
 }
 
@@ -376,7 +381,7 @@ try {
     [string] $vspcToken = $response.access_token
 }
 catch {
-    Write-Error "ERROR: Authorization Failed! Make sure the correct server and port were specified."
+    Write-Error "ERROR: VSPC Authorization Failed! Make sure the correct server and port were specified."
     throw
 }
 
@@ -502,7 +507,7 @@ $companies = Get-VspcApiResult -URL $url -Type "Companies" -Token $vspcToken
 
 # Retrieve Site Resources (VCD Cloud Connect Tenants)
 [string] $url = $vspcBaseUrl + "/api/v3/organizations/companies/sites?filter=[{""property"":""cloudTenantType"",""operation"":""equals"",""collation"":""ignorecase"",""value"":""VCD""}]&limit=500"
-$sites = Get-VspcApiResult -URL $url -Type "Site Resources" -Token $vspcToken
+$sites = Get-VspcApiResult -URL $url -Type "VCD Site Resources" -Token $vspcToken
 
 ### End - VSPC API interaction
 
@@ -519,10 +524,9 @@ try {
         $csv = Import-Csv -Path $file
         Write-Verbose "CSV found & imported: $file"
 
-        # $csv | ForEach-Object {
-        #     [ref] $null = $mapping.Add($_)
-        # }
-        [ref] $null = $mapping.Add($csv)
+        $csv | ForEach-Object {
+            [ref] $null = $mapping.Add($_)
+        }
     }
     else {
         Write-Verbose "CSV not found. New CSV will be created: $file"
@@ -537,23 +541,40 @@ catch {
 foreach ($org in $organizations) {
     Write-Verbose "Mapping $($org.name) ($($org.objectId))"
     
-    # Reducing organization URN to UID
+    # Reducing organization vCloud URN to UID
     $uid = $org.objectId -replace "urn:vcloud:org:", ""
 	
     # Has organization already been mapped?
     if (Confirm-Mapping -obj $mapping -id $uid) {
         Write-Verbose "Organization ($($org.name)) has already been mapped."
+        
+        # Including already mapped objects in the output
+        if ($IncludeMapped) {
+            Write-Verbose "Adding already mapped Organization ($($org.name)) to output."
+            $match = $mapping | Where-Object { $_.VCD_Organization_Id -eq $uid }
+            $object = [PSCustomObject] @{
+                Mapping               = "SUCCESS"
+                VCD_Organization_Name = $match.VCD_Organization_Name
+                VSPC_Company_Name     = $match.VSPC_Company_Name
+                Mapping_Method        = $match.Mapping_Method
+            }
+
+            [ref] $null = $output.Add($object)
+            Clear-Variable -Name match, object
+        }
+        
+        # Skip to next organization in loop
         Continue
     }
 
     ### Mapping criteria - VCD-backed Cloud Connect Tenants
     # Look for matching VCD-backed Cloud Connect Tenant
-    $tenant = $sites | Where-Object { $_.vCloudOrganizationUid -eq $uid }
-    if ($tenant) {
+    $match = $sites | Where-Object { $_.vCloudOrganizationUid -eq $uid }
+    if ($match) {
         Write-Verbose "VCD-backed Cloud Connect Tenant found!"
 		
         # Identify VSPC Company associated with tenant
-        $company = $companies | Where-Object { $_.instanceUid -eq $tenant.companyUid }
+        $company = $companies | Where-Object { $_.instanceUid -eq $match.companyUid }
 
         # Mapping
         $mapping, $output = New-Mapping `
@@ -569,29 +590,61 @@ foreach ($org in $organizations) {
         # Skip to next organization in loop
         Continue
     }
+    Clear-Variable -Name match
 
-    # ### Mapping criteria - Already existing mappings from 
-    # # Look for matching VCD-backed Cloud Connect Tenant
-    # $tenant = $sites | Where-Object { $_.vCloudOrganizationUid -eq $uid }
-    # if ($tenant) {
-    #     Write-Verbose "VCD-backed Cloud Connect Tenant found!"
+    ### Mapping criteria - Identical name for VCD Organization & VSPC Company
+    # Look for matching names
+    $match = $companies | Where-Object { $_.name -eq $org.name }
+    if ($match) {
+        Write-Verbose "Matching name found!"
 		
-    #     # Identify VSPC Company associated with tenant
-    #     $company = $companies | Where-Object { $_.instanceUid -eq $tenant.companyUid }
+        # Mapping
+        $mapping, $output = New-Mapping `
+            -map $mapping `
+            -out $output `
+            -vcdHostname $org.hostName `
+            -vcdOrgName $org.name `
+            -vcdOrgId $uid `
+            -vspcOrgName $match.name `
+            -vspcOrgId $match.instanceUid `
+            -method "name"
+        
+        # Skip to next organization in loop
+        Continue
+    }
+    Clear-Variable -Name match
 
-    #     # Mapping
-    #     $mapping, $output = New-Mapping `
-    #         -map $mapping `
-    #         -out $output `
-    #         -vcdHostname $org.hostName `
-    #         -vcdOrgName $org.name `
-    #         -vcdOrgId $uid `
-    #         -vspcOrgName $company.name `
-    #         -vspcOrgId $company.instanceUid `
-    #         -method "cloud_connect"
-    # }
+    ### Mapping criteria - Already existing mappings (different VSPC servers)
+    # Look for matching VCD Organization name
+    $match = $mapping | Where-Object { $_.VCD_Organization_Name -eq $org.name }
+    if ($match) {
+        Write-Verbose "A similar mapping has been found!"
+		
+        # Is there a VSPC Company with the same name?
+        $match2 = $companies | Where-Object { $_.name -eq $match.VSPC_Company_Name }
+        if ($match2) {
+            Write-Verbose "A VSPC Company with the same name ($($company.name)) has been found!"
+
+            # Mapping
+            $mapping, $output = New-Mapping `
+                -map $mapping `
+                -out $output `
+                -vcdHostname $org.hostName `
+                -vcdOrgName $org.name `
+                -vcdOrgId $uid `
+                -vspcOrgName $match2.name `
+                -vspcOrgId $match2.instanceUid `
+                -method "different_vspc"
+        }
+        Clear-Variable -Name match2
+        
+        # Skip to next organization in loop
+        Continue
+    }
+    Clear-Variable -Name match
 
     # Unable to find match
+    Write-Verbose "Unable to find match for the $($org.name) organization."
     $object = [PSCustomObject] @{
         Mapping               = "INCOMPLETE"
         VCD_Organization_Name = $org.name
