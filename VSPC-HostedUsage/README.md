@@ -8,7 +8,9 @@ Chris Arceneaux (@chris_arceneaux)
 
 Veeam Service Provider Console v8 includes enhanced support for hosted Veeam Backup & Replication servers. Scripts located here expand on this already amazing feature! See below for a list of scripts in this collection and their function:
 
-[Sync-VcdOrganizationMapping.ps1](#sync-vcdorganizationmappingps1)
+* [Sync-VcdOrganizationMapping.ps1](#sync-vcdorganizationmappingps1)
+* [Set-HostedVbrJobAssignment.ps1](#set-hostedvbrjobassignmentps1)
+
 
 ### Sync-VcdOrganizationMapping.ps1
 
@@ -23,11 +25,11 @@ Four different methods of mapping are available:
 
 Any organization mapping that cannot be completed using methods 1-3 will be listed as `INCOMPLETE` and must be mapped manually using the CSV file.
 
-## Known Issues
+#### Known Issues
 
 * *None*
 
-## Requirements
+#### Requirements
 
 * Veeam Service Provider Console v8
   * Portal Administrator account used to access the REST API
@@ -36,8 +38,34 @@ Any organization mapping that cannot be completed using methods 1-3 will be list
   * The server executing the script needs to be able to access the VSPC REST API and/or the VBR REST API
 * PowerShell Core
 
-## Usage
+#### Usage
 
 Get-Help .\Sync-VcdOrganizationMapping.ps1
 
 ![sample output](sample_sync.png)
+
+### Set-HostedVbrJobAssignment.ps1
+
+This script assigns hosted Veeam Backup & Replication (VBR) server backup jobs to a Veeam Service Provider Console (VSPC) Company. It first identifies VMware Cloud Director (VCD) backup jobs on the specified VBR server. Then, it ensures the job protects a single VCD Organization. Finally, it assigns the job to a VSPC Company.
+
+Any job that cannot be assigned will be listed as `ERROR` and will include a message with more information.
+
+#### Known Issues
+
+* *None*
+
+#### Requirements
+
+* Veeam Service Provider Console v8
+  * Portal Administrator account used to access the REST API
+* Veeam Backup & Replication v12.1
+* `VcdOrganizationMapping.csv`: CSV file mapping a VCD Organization to a VSPC Company
+* Network connectivity
+  * The server executing the script needs to be able to access the VSPC REST API and/or the VBR REST API
+* PowerShell Core
+
+#### Usage
+
+Get-Help .\Sync-VcdOrganizationMapping.ps1
+
+![sample output](sample_assignment.png)

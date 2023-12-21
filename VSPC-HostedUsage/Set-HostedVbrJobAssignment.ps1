@@ -3,7 +3,7 @@
 Assigns hosted VBR server backup jobs to a VSPC Company
 
 .DESCRIPTION
-This script assigns hosted Veeam Backup & Replication (VBR) server backup jobs to a Veeam Service Provider Console (VSPC) Company. It first identifies VMware Cloud Director (VCD) backup jobs. Then, it ensures the job protects a single VCD Organization. Finally, once confirmed, it assigns the job to a VSPC Company where a mapping exists.
+This script assigns hosted Veeam Backup & Replication (VBR) server backup jobs to a Veeam Service Provider Console (VSPC) Company. It first identifies VMware Cloud Director (VCD) backup jobs on the specified VBR server. Then, it ensures the job protects a single VCD Organization. Finally, it assigns the job to a VSPC Company.
 
 Mappings are stored in a CSV file and can be generated automatically using the Sync-VcdOrganizationMapping.ps1 cmdlet.
 
@@ -38,7 +38,7 @@ VBR Backup Administrator account PS Credential Object
 VBR Rest API port
 
 .PARAMETER IncludeAssigned
-Flag to include already mapped objects in the output
+Flag to include already assigned jobs in the output
 
 .PARAMETER AllowSelfSignedCerts
 Flag allowing self-signed certificates (insecure)
@@ -51,7 +51,7 @@ Set-HostedVbrJobAssignment.ps1 -VSPC "vspc.contoso.local" -VspcUser "contoso\jsm
 
 Description
 -----------
-Connect to the specified VSPC & VBR server using a username/password and attempt to map a VCD Organization to a VSPC Company
+Connect to the specified VSPC & VBR server using a username/password and attempt to assign a VCD backup job to a VSPC Company
 
 .EXAMPLE
 Set-HostedVbrJobAssignment.ps1 -VSPC "vspc.contoso.local" -VspcCredential (Get-Credential) -VBR "vbr.contoso.local" -VbrCredential (Get-Credential)
@@ -79,7 +79,7 @@ Set-HostedVbrJobAssignment.ps1 -VSPC "vspc.contoso.local" -VspcUser "contoso\jsm
 
 Description
 -----------
-Include already mapped organizations in the output results
+Include already assigned jobs in the output results
 
 .NOTES
 NAME:  Set-HostedVbrJobAssignment.ps1
@@ -417,13 +417,13 @@ foreach ($job in $response.data) {
 	
     # Matching up VBR backup job with VSPC backup job
     $vspcJob = $vspcJobs | Where-Object { $_.instanceUid -eq $job.id }
-    if ($vspcJob){
+    if ($vspcJob) {
         Write-Verbose "VSPC Job has been found."
         $vspcOrgId = $vspcJob._embedded.backupServerJob.organizationUid
         $vspcMappedOrgId = $vspcJob._embedded.backupServerJob.mappedOrganizationUid
 
         # Has job already been assigned to a company? If these two IDs differ, the job has already been assigned.
-        if ($vspcOrgId -ne $vspcMappedOrgId){
+        if ($vspcOrgId -ne $vspcMappedOrgId) {
             Write-Verbose "Job ($($job.name)) has already been assigned."
         
             # Including already mapped objects in the output
@@ -443,8 +443,12 @@ foreach ($job in $response.data) {
             # Skip to next organization in loop
             Continue
         }
-    } else {
+    }
+    else {
         Write-Warning "Unable to match VBR job $($job.name) ($($job.id)) with a VSPC job. If this does not resolve itself within the hour, this indicates a VSPC synchronization issue."
+
+        # Skip to next organization in loop
+        Continue
     }
     
     # Is job protecting workloads from multiple VCD environments?
@@ -456,7 +460,7 @@ foreach ($job in $response.data) {
             Job_Name        = $job.name
             Job_Id          = $job.id
             VSPC_Company_Id = $null
-            Message         = "Unable to be imported as job is protecting multiple VCD environments. Please limit the job to a single VCD Organization."
+            Message         = "Unable to be assigned as job is protecting multiple VCD environments. Please limit the job to a single VCD Organization."
         }
         [ref] $null = $output.Add($object)
         Clear-Variable -Name object
@@ -569,7 +573,7 @@ foreach ($job in $response.data) {
                 Job_Name        = $job.name
                 Job_Id          = $job.id
                 VSPC_Company_Id = $null
-                Message         = "Unable to be imported as job is protecting workloads of multiple VCD Organizations. Please limit the job to a single VCD Organization."
+                Message         = "Unable to be assigned as job is protecting workloads of multiple VCD Organizations. Please limit the job to a single VCD Organization."
             }
             [ref] $null = $output.Add($object)
             Clear-Variable -Name object
@@ -581,148 +585,66 @@ foreach ($job in $response.data) {
 
 ### Assigning jobs to a VSPC Company
 
-return $mapping
+# Loop through each job awaiting assignment
+foreach ($job in $jobs) {
+    Write-Verbose "Analyzing job: $($job.Job_Name) ($($job.Job_Id))"
+
+    # Has VCD Organization been mapped?
+    $map = $mapping | Where-Object { $_.VCD_Organization_Id -eq $job.VCD_Organization_Id }
+    if ($null -eq $map){
+        Write-Verbose "VCD Organization ($($job.VCD_Organization_Id)) is not currently mapped to a VSPC Company."
+        $object = [PSCustomObject] @{
+            Assignment      = "INCOMPLETE"
+            Job_Name        = $job.Job_Name
+            Job_Id          = $job.Job_Id
+            VSPC_Company_Id = $null
+            Message         = "VCD Organization ($($job.VCD_Organization_Id)) is not currently mapped to a VSPC Company. Please add a corresponding mapping to the CSV file (VcdOrganizationMapping.csv)."
+        }
+        [ref] $null = $output.Add($object)
+        Clear-Variable -Name object
+
+        # Skip to next organization in loop
+        Continue
+    } else {
+        Write-Verbose "VCD Organization ($($job.VCD_Organization_Id)) mapping has been found!"
+    }
+
+    try {
+        # Setting headers
+        $headers = New-Object "System.Collections.Generic.Dictionary[[string],[string]]"
+        $headers.Add("Authorization", "Bearer $vspcToken")
+        $guid = (New-Guid).Guid
+        $headers.Add("x-request-id", $guid)
+        $headers.Add("x-client-version", $vspcApiVersion)  # API versioning for backwards compatibility
+
+        # Making API call - Assigning job
+        [string] $url = $vspcBaseUrl + "/api/v3/infrastructure/backupServers/jobs/$($job.Job_Id)/assign?companyUid=$($map.VSPC_Organization_Id)"
+        Write-Verbose "POST - $URL"
+        Write-Verbose "x-request-id: $guid"
+        $response = Invoke-RestMethod $URL -Method 'POST' -Headers $headers -ErrorAction Stop -SkipCertificateCheck:$AllowSelfSignedCerts -StatusCodeVariable responseCode
+        if (202 -eq $responseCode) {
+            # retrieve async action response
+            $response = Get-AsyncAction -ActionId $guid -Headers $headers
+        }
+
+        Write-Verbose "Job $($job.Job_Name) ($($job.Job_Id)) has been successfully assigned to a VSPC Company ($($map.VSPC_Organization_Id))"
+        $object = [PSCustomObject] @{
+            Assignment      = "SUCCESS"
+            Job_Name        = $job.Job_Name
+            Job_Id          = $job.Job_Id
+            VSPC_Company_Id = $map.VSPC_Organization_Id
+            Message         = "Assigned using mapping from CSV file."
+        }
+        [ref] $null = $output.Add($object)
+        Clear-Variable -Name object
+    } catch {
+        Write-Verbose "An error occurred during job assignment"
+        throw
+    }
+
+    Clear-Variable -Name map
+}
 
 ### End - Assigning jobs to a VSPC Company
-
-# ### Mapping each VCD Organization to a VSPC Company
-
-# # Initializing output objects
-# $mapping = [System.Collections.ArrayList]::new()
-# $output = [System.Collections.ArrayList]::new()
-
-
-
-# # Mapping each VCD Organization
-# foreach ($org in $organizations) {
-#     Write-Verbose "Mapping $($org.name) ($($org.objectId))"
-    
-#     # Reducing organization vCloud URN to UID
-#     $uid = $org.objectId -replace "urn:vcloud:org:", ""
-	
-#     # Has organization already been mapped?
-#     if (Confirm-JobAssignment -obj $mapping -id $uid) {
-#         Write-Verbose "Organization ($($org.name)) has already been mapped."
-        
-#         # Including already mapped objects in the output
-#         if ($IncludeAssigned) {
-#             Write-Verbose "Adding already mapped Organization ($($org.name)) to output."
-#             $match = $mapping | Where-Object { $_.VCD_Organization_Id -eq $uid }
-#             $object = [PSCustomObject] @{
-#                 Mapping               = "SUCCESS"
-#                 VCD_Organization_Name = $match.VCD_Organization_Name
-#                 VSPC_Company_Name     = $match.VSPC_Company_Name
-#                 Mapping_Method        = $match.Mapping_Method
-#             }
-
-#             [ref] $null = $output.Add($object)
-#             Clear-Variable -Name match, object
-#         }
-        
-#         # Skip to next organization in loop
-#         Continue
-#     }
-
-#     ### Mapping criteria - VCD-backed Cloud Connect Tenants
-#     # Look for matching VCD-backed Cloud Connect Tenant
-#     $match = $sites | Where-Object { $_.vCloudOrganizationUid -eq $uid }
-#     if ($match) {
-#         Write-Verbose "VCD-backed Cloud Connect Tenant found!"
-		
-#         # Identify VSPC Company associated with tenant
-#         $company = $companies | Where-Object { $_.instanceUid -eq $match.companyUid }
-
-#         # Mapping
-#         $mapping, $output = New-Mapping `
-#             -map $mapping `
-#             -out $output `
-#             -vcdHostname $org.hostName `
-#             -vcdOrgName $org.name `
-#             -vcdOrgId $uid `
-#             -vspcOrgName $company.name `
-#             -vspcOrgId $company.instanceUid `
-#             -method "cloud_connect"
-        
-#         # Skip to next organization in loop
-#         Continue
-#     }
-#     Clear-Variable -Name match
-
-#     ### Mapping criteria - Identical name for VCD Organization & VSPC Company
-#     # Look for matching names
-#     $match = $companies | Where-Object { $_.name -eq $org.name }
-#     if ($match) {
-#         Write-Verbose "Matching name found!"
-		
-#         # Mapping
-#         $mapping, $output = New-Mapping `
-#             -map $mapping `
-#             -out $output `
-#             -vcdHostname $org.hostName `
-#             -vcdOrgName $org.name `
-#             -vcdOrgId $uid `
-#             -vspcOrgName $match.name `
-#             -vspcOrgId $match.instanceUid `
-#             -method "name"
-        
-#         # Skip to next organization in loop
-#         Continue
-#     }
-#     Clear-Variable -Name match
-
-#     ### Mapping criteria - Already existing mappings (different VSPC servers)
-#     # Look for matching VCD Organization name
-#     $match = $mapping | Where-Object { $_.VCD_Organization_Name -eq $org.name }
-#     if ($match) {
-#         Write-Verbose "A similar mapping has been found!"
-		
-#         # Is there a VSPC Company with the same name?
-#         $match2 = $companies | Where-Object { $_.name -eq $match.VSPC_Company_Name }
-#         if ($match2) {
-#             Write-Verbose "A VSPC Company with the same name ($($company.name)) has been found!"
-
-#             # Mapping
-#             $mapping, $output = New-Mapping `
-#                 -map $mapping `
-#                 -out $output `
-#                 -vcdHostname $org.hostName `
-#                 -vcdOrgName $org.name `
-#                 -vcdOrgId $uid `
-#                 -vspcOrgName $match2.name `
-#                 -vspcOrgId $match2.instanceUid `
-#                 -method "different_vspc"
-#         }
-#         Clear-Variable -Name match2
-        
-#         # Skip to next organization in loop
-#         Continue
-#     }
-#     Clear-Variable -Name match
-
-#     # Unable to find match
-#     Write-Verbose "Unable to find match for the $($org.name) organization."
-#     $object = [PSCustomObject] @{
-#         Mapping               = "INCOMPLETE"
-#         VCD_Organization_Name = $org.name
-#         VSPC_Company_Name     = $null
-#         Mapping_Method        = $null
-#     }
-#     [ref] $null = $output.Add($object)
-#     Clear-Variable -Name object
-# }
-
-# # Creating/Updating CSV mapping file
-# try {
-#     if ($mapping) {
-#         $mapping | Export-Csv -Path $file
-#         Write-Verbose "CSV mapping file updated: $file"
-#     }
-# }
-# catch {
-#     Write-Error "ERROR: Updating CSV mapping file failed!"
-#     throw
-# }
-
-# ### End - Mapping each VCD Organization to a VSPC Company
 
 return $output
