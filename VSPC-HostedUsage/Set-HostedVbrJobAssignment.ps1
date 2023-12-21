@@ -372,7 +372,7 @@ if ($null -eq $vspcServerInfo) {
 [string] $url = $vspcBaseUrl + "/api/v3/organizations/companies?expand=Organization&limit=500"
 $companies = Get-VspcApiResult -URL $url -Type "Companies" -Token $vspcToken
 
-# Retrieve backup jobs belonging to specified server
+# Retrieve VCD backup jobs belonging to specified server
 [string] $url = $vspcBaseUrl + "/api/v3/infrastructure/backupServers/$($vspcServerInfo.instanceUid)/jobs/backupVmJobs?expand=BackupServerJob&filter=[{""property"":""subtype"",""operation"":""equals"",""collation"":""ignorecase"",""value"":""vcd""}]&limit=500"
 $vspcJobs = Get-VspcApiResult -URL $url -Type "VCD Backup Jobs" -Token $vspcToken
 
