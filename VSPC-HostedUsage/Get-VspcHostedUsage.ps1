@@ -3,7 +3,7 @@
 Veeam Service Provider Console (VSPC) Hosted Usage Report
 
 .DESCRIPTION
-This script will return VSPC point in time usage VMware Cloud Director backup jobs. Usage is separated for each VSPC Company.
+This script will return VSPC point in time usage for VMware Cloud Director backup jobs. Usage is separated for each VSPC Company.
 
 .PARAMETER Server
 VSPC Server IP or FQDN
@@ -51,6 +51,13 @@ Description
 Connecting to a VSPC server using a non-standard API port
 
 .EXAMPLE
+Get-VspcHostedUsage.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password" -Detailed
+
+Description
+-----------
+Include detailed usage in the output results
+
+.EXAMPLE
 Get-VspcHostedUsage.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password" -AllowSelfSignedCerts
 
 Description
@@ -69,8 +76,6 @@ https://arsano.ninja/
 
 .LINK
 https://helpcenter.veeam.com/docs/vac/rest/about_rest.html?ver=80
-
-.LINK
 
 #>
 #Requires -Version 6.2
@@ -266,7 +271,6 @@ catch {
 }
 
 ### Checking for active alarms that could cause incorrect numbers on the report
-[bool] $alarms = $false
 
 # Retrieving unique alarm IDs for the following built-in VSPC Alarms...
 # Alarm 17: Veeam Service Provider Console lost connection to the managed Veeam Backup & Replication server.
@@ -274,16 +278,50 @@ catch {
 $alarmUids = Get-VspcApiResult -URL $url -Type "Alarm IDs" -Token $token
 
 # Retrieving active alarms for the specified ID
-[string] $url = $baseUrl + "/api/v3/alarms/active?filter=[{'property':'alarmTemplateUid','operation':'equals','value':'$($alarmUids[0].instanceUid)'}]"
+[string] $url = $baseUrl + "/api/v3/alarms/active?filter=[{'property':'alarmTemplateUid','operation':'equals','value':'$($alarmUids[0].instanceUid)'}]&limit=500"
 $alarm17 = Get-VspcApiResult -URL $url -Type "Active Alarms $($alarmUids[0].instanceUid)" -Token $token
 
 if ($alarm17) {
-	$alarms = $true
-	Write-Warning "`nActive alarms are present that will cause usage report numbers to be inaccurate.`nPlease resolve these alarms and re-run this script to ensure accurate numbers.`nVeeam Service Provider Console lost connection to the following managed Veeam Backup & Replication server(s):`n$(foreach ($event in $alarm17) {"`n$($event.object.computerName) ($($event.object.instanceUid))"})"
+	# Retrieve hosted VBR servers
+	[string] $url = $baseUrl + "/api/v3/infrastructure/backupServers?filter=[{'property':'backupServerRoleType','operation':'equals','value':'Hosted'}]&limit=500"
+	$servers = Get-VspcApiResult -URL $url -Type "Hosted VBR Servers" -Token $token
+
+	$alarms = [System.Collections.ArrayList]::new()
+	foreach ($event in $alarm17) {
+		# # Is alarm resolved?
+		# if ("Resolved" -eq $event.lastActivation.status) {
+		# 	# Skip to next alarm event in loop
+		# 	Continue
+		# }
+		
+		# Checking to see if server is hosted.
+		# - As this script is retrieving usage hosted VBR servers, we don't care about the rest.
+		[PSCustomObject]$server = $servers | Where-Object { $_.instanceUid -eq $event.object.objectUid }
+		if ($server) {
+			[ref] $null = $alarms.Add($server)
+		}
+		Clear-Variable -Name server
+	}
+
+	# Display warning if alarms found
+	if ($alarms) {
+		Write-Warning "`nActive alarms are present that will cause usage report numbers to be inaccurate.`nPlease resolve these alarms and re-run this script to ensure accurate numbers.`nVeeam Service Provider Console lost connection to the following managed Veeam Backup & Replication server(s):`n$(
+			$alarms | ForEach-Object {
+				"`n- $($_.name) ($($_.instanceUid))"
+			}
+		)"
+	}
+
+	Clear-Variable -Name servers, alarms
 }
+
 ### End - Checking for active alarms
 
 ### Retrieving usage numbers
+
+# Retrieve Service Provider
+[string] $url = $baseUrl + "/api/v3/organizations?filter=[{'property':'type','operation':'equals','value':'Provider'}]"
+$provider = Get-VspcApiResult -URL $url -Type "Service Provider Organization" -Token $token
 
 # Retrieve Companies
 [string] $url = $baseUrl + "/api/v3/organizations/companies?expand=Organization&limit=500"
@@ -309,6 +347,12 @@ foreach ($job in $jobs) {
 ### End - Retrieving usage numbers
 
 ### Calculating per-Company usage
+
+# Are there still unassigned VCD backup jobs?
+$filteredJobs = $jobs | Where-Object { $_._embedded.backupServerJob.mappedOrganizationUid -eq $provider.instanceUid }
+if ($filteredJobs) {
+	Write-Warning "`nThe following VCD backup job(s) are still unassigned. This will cause usage report numbers to be inaccurate. Please ensure all VCD Organizations are mapped to a VSPC Company in the 'VcdOrganizationMapping.csv' CSV file:`n$($filteredJobs | ForEach-Object {"`n- $($_._embedded.backupServerJob.name) ($($_.instanceUid))"})"
+}
 
 # Loop through each company
 foreach ($company in $companies) {
@@ -338,7 +382,8 @@ foreach ($company in $companies) {
 			VMs            = $filteredVms
 		}
 		[ref] $null = $usage.Add($object)
-	} else {
+	}
+ else {
 		$object = [PSCustomObject] @{
 			CompanyName    = $company.name
 			CompanyId      = $company.instanceUid

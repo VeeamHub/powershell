@@ -50,6 +50,8 @@ This script assigns hosted Veeam Backup & Replication (VBR) server backup jobs t
 
 Any job that cannot be assigned will be listed as `ERROR` and will include a message with more information.
 
+***Please note that a CSV mapping file is required. This file can be generated using the [Sync-VcdOrganizationMapping.ps1](#sync-vcdorganizationmappingps1) script located in this collection.***
+
 #### Known Issues
 
 * *None*
@@ -66,6 +68,32 @@ Any job that cannot be assigned will be listed as `ERROR` and will include a mes
 
 #### Usage
 
-Get-Help .\Sync-VcdOrganizationMapping.ps1
+Get-Help .\Set-HostedVbrJobAssignment.ps1
 
 ![sample output](sample_assignment.png)
+
+### Get-VspcHostedUsage.ps1
+
+This script will return point in time usage for VMware Cloud Director (VCD) backup jobs. Usage is separated for each VSPC Company.
+
+For usage report numbers to be accurate and holistic, **all** hosted Veeam Backup & Replication (VBR) servers must have a *Healthy* connection to VSPC and **all** VCD backup jobs must be assigned to a VSPC Company. Script will provide a warning(s) if this is not the case.
+
+#### Known Issues
+
+* *None*
+
+#### Requirements
+
+* Veeam Service Provider Console v8
+  * Portal Administrator account used to access the REST API
+* Veeam Backup & Replication v12.1
+* `VcdOrganizationMapping.csv`: CSV file mapping a VCD Organization to a VSPC Company
+* Network connectivity
+  * The server executing the script needs to be able to access the VSPC REST API and/or the VBR REST API
+* PowerShell Core
+
+#### Usage
+
+Get-Help .\Get-VspcHostedUsage.ps1
+
+![sample output](sample_usage.png)
