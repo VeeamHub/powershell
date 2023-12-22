@@ -36,7 +36,7 @@ Any organization mapping that cannot be completed using methods 1-3 will be list
   * Portal Administrator account used to access the REST API
 * Veeam Backup & Replication v12.1
 * Network connectivity
-  * The server executing the script needs to be able to access the VSPC REST API and/or the VBR REST API
+  * The server executing the script needs to be able to access the VSPC REST API and the VBR REST API
 * PowerShell Core
 
 #### Usage
@@ -64,7 +64,7 @@ Any job that cannot be assigned will be listed as `ERROR` and will include a mes
 * Veeam Backup & Replication v12.1
 * `VcdOrganizationMapping.csv`: CSV file mapping a VCD Organization to a VSPC Company
 * Network connectivity
-  * The server executing the script needs to be able to access the VSPC REST API and/or the VBR REST API
+  * The server executing the script needs to be able to access the VSPC REST API and the VBR REST API
 * PowerShell Core
 
 #### Usage
@@ -90,7 +90,7 @@ For usage report numbers to be accurate and holistic, **all** hosted Veeam Backu
 * Veeam Backup & Replication v12.1
 * `VcdOrganizationMapping.csv`: CSV file mapping a VCD Organization to a VSPC Company
 * Network connectivity
-  * The server executing the script needs to be able to access the VSPC REST API and/or the VBR REST API
+  * The server executing the script needs to be able to access the VSPC REST API
 * PowerShell Core
 
 #### Usage
