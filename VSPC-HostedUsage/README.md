@@ -88,7 +88,6 @@ For usage report numbers to be accurate and holistic, **all** hosted Veeam Backu
 * Veeam Service Provider Console v8
   * Portal Administrator account used to access the REST API
 * Veeam Backup & Replication v12.1
-* `VcdOrganizationMapping.csv`: CSV file mapping a VCD Organization to a VSPC Company
 * Network connectivity
   * The server executing the script needs to be able to access the VSPC REST API
 * PowerShell Core
