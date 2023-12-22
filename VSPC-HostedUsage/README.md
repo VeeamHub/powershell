@@ -64,6 +64,7 @@ Any job that cannot be assigned will be listed as `ERROR` and will include a mes
   * Portal Administrator account used to access the REST API
 * Veeam Backup & Replication v12.1
   * Backup Administrator account used to access the REST API
+  * Specified server must be a *Hosted* server in VSPC. [See Veeam documentation for more information.](https://helpcenter.veeam.com/docs/vac/provider_admin/connect_backup_servers.html?ver=80#hosted)
 * `VcdOrganizationMapping.csv`: CSV file mapping a VCD Organization to a VSPC Company
 * Network connectivity
   * The server executing the script needs to be able to access the VSPC REST API and the VBR REST API

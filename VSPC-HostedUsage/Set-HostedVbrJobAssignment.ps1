@@ -83,7 +83,7 @@ Include already assigned jobs in the output results
 
 .NOTES
 NAME:  Set-HostedVbrJobAssignment.ps1
-VERSION: 1.0
+VERSION: 1.1
 AUTHOR: Chris Arceneaux
 TWITTER: @chris_arceneaux
 GITHUB: https://github.com/carceneaux
@@ -362,6 +362,9 @@ $vspcServerInfo = Get-VspcApiResult -URL $url -Type "VBR server info from VSPC" 
 # Is VSPC managing the specified VBR server?
 if ($null -eq $vspcServerInfo) {
     throw "VSPC is not managing the specified VBR server. As such, no mappings can be determined."
+} # Is VBR server a hosted VBR server? 
+elseif ("Hosted" -ne $vspcServerInfo.backupServerRoleType) {
+    throw "VBR server specified is not hosted. See Veeam documentation on how to add a Hosted VBR server to VSPC: https://helpcenter.veeam.com/docs/vac/provider_admin/connect_backup_servers.html?ver=80#hosted"
 }
 
 ### End - Pre-check validation
@@ -591,7 +594,7 @@ foreach ($job in $jobs) {
 
     # Has VCD Organization been mapped?
     $map = $mapping | Where-Object { $_.VCD_Organization_Id -eq $job.VCD_Organization_Id }
-    if ($null -eq $map){
+    if ($null -eq $map) {
         Write-Verbose "VCD Organization ($($job.VCD_Organization_Id)) is not currently mapped to a VSPC Company."
         $object = [PSCustomObject] @{
             Assignment      = "INCOMPLETE"
@@ -605,7 +608,8 @@ foreach ($job in $jobs) {
 
         # Skip to next organization in loop
         Continue
-    } else {
+    }
+    else {
         Write-Verbose "VCD Organization ($($job.VCD_Organization_Id)) mapping has been found!"
     }
 
@@ -637,7 +641,8 @@ foreach ($job in $jobs) {
         }
         [ref] $null = $output.Add($object)
         Clear-Variable -Name object
-    } catch {
+    }
+    catch {
         Write-Verbose "An error occurred during job assignment"
         throw
     }
