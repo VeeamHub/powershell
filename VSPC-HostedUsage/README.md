@@ -27,8 +27,7 @@ Any organization mapping that cannot be completed using methods 1-3 will be list
 
 #### Known Issues
 
-* A single backup job that protects workloads from *multiple VCD environments* or *multiple VCD Organizations* is not supported.
-  * FIX: Ensure that each job is protecting a single VCD environment & Organization. Veeam makes it easy to split up jobs by [moving protected workloads to a new job](https://helpcenter.veeam.com/docs/backup/vsphere/backup_moving.html?ver=120#how-moving-to-another-job-works).
+* *None*
 
 #### Requirements
 
@@ -56,7 +55,8 @@ Any job that cannot be assigned will be listed as `ERROR` and will include a mes
 
 #### Known Issues
 
-* *None*
+* A single backup job that protects workloads from *multiple VCD environments* or *multiple VCD Organizations* is not supported.
+  * FIX: Ensure that each job is protecting a single VCD environment & Organization. Veeam makes it easy to split up jobs by [moving protected workloads to a new job](https://helpcenter.veeam.com/docs/backup/vsphere/backup_moving.html?ver=120#how-moving-to-another-job-works).
 
 #### Requirements
 
