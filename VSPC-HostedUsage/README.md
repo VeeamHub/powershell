@@ -35,6 +35,7 @@ Any organization mapping that cannot be completed using methods 1-3 will be list
 * Veeam Service Provider Console v8
   * Portal Administrator account used to access the REST API
 * Veeam Backup & Replication v12.1
+  * Backup Administrator account used to access the REST API
 * Network connectivity
   * The server executing the script needs to be able to access the VSPC REST API and the VBR REST API
 * PowerShell Core
@@ -62,6 +63,7 @@ Any job that cannot be assigned will be listed as `ERROR` and will include a mes
 * Veeam Service Provider Console v8
   * Portal Administrator account used to access the REST API
 * Veeam Backup & Replication v12.1
+  * Backup Administrator account used to access the REST API
 * `VcdOrganizationMapping.csv`: CSV file mapping a VCD Organization to a VSPC Company
 * Network connectivity
   * The server executing the script needs to be able to access the VSPC REST API and the VBR REST API
