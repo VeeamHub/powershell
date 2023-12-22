@@ -288,11 +288,11 @@ if ($alarm17) {
 
 	$alarms = [System.Collections.ArrayList]::new()
 	foreach ($event in $alarm17) {
-		# # Is alarm resolved?
-		# if ("Resolved" -eq $event.lastActivation.status) {
-		# 	# Skip to next alarm event in loop
-		# 	Continue
-		# }
+		# Is alarm resolved?
+		if ("Resolved" -eq $event.lastActivation.status) {
+			# Skip to next alarm event in loop
+			Continue
+		}
 		
 		# Checking to see if server is hosted.
 		# - As this script is retrieving usage hosted VBR servers, we don't care about the rest.
