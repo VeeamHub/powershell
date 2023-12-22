@@ -1,5 +1,7 @@
 # Veeam Usage Report for VMware Cloud Director
 
+***Deprecated: This script will not work with Veeam Backup & Replication v12. For v12 support, please use the [VSPC-HostedUsage scripts](../VSPC-HostedUsage/).***
+
 ## Author
 
 * Chris Arceneaux (@chris_arceneaux)
