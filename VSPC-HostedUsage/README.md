@@ -84,7 +84,7 @@ For usage report numbers to be accurate and holistic, **all** hosted Veeam Backu
 
 #### Known Issues
 
-* *None*
+* Usage for orphaned VCD backups is not captured.
 
 #### Requirements
 
