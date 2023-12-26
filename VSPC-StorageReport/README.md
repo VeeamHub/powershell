@@ -1,6 +1,6 @@
 # Veeam Service Provider Console (VSPC) Storage Usage Report
 
-Note: The script for this project was replaced with another script. The older script can still be accessed [here](https://github.com/VeeamHub/powershell/blob/c45ffa2f7b08231d8e523a22af22cac57bb89301/VSPC-StorageReport/vspcStorageReport.ps1).
+***NOTE:** The script for this project was replaced with another script. The older script can still be accessed [here](https://github.com/VeeamHub/powershell/blob/c45ffa2f7b08231d8e523a22af22cac57bb89301/VSPC-StorageReport/vspcStorageReport.ps1).*
 
 ## Author
 
@@ -10,8 +10,6 @@ Note: The script for this project was replaced with another script. The older sc
 ## Function
 
 This script will return usage and metadata for all backup repositories for the specified VSPC server.
-
-***NOTE:***
 
 * `BackupSizeGB` - the sum of all backup files - is unavailable for object storage repositories. This is by design. Instead, please use `UsedSpaceGB`.
 * `CapacityGB` and `FreeSpaceGB` may be unavailable for object storage repositories. This is by design as not all object storage vendors provide this information.
