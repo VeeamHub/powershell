@@ -13,7 +13,8 @@ This script will return usage and metadata for all backup repositories for the s
 
 ***NOTE:***
 
-`BackupSizeGB` - the sum of all backup files - is unavailable for object storage repositories. This is by design. Instead, please use `UsedSpaceGB`.
+* `BackupSizeGB` - the sum of all backup files - is unavailable for object storage repositories. This is by design. Instead, please use `UsedSpaceGB`.
+* `CapacityGB` and `FreeSpaceGB` may be unavailable for object storage repositories. This is by design as not all object storage vendors provide this information.
 
 ## Known Issues
 
