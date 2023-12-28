@@ -56,7 +56,7 @@ Connecting to a VSPC server that uses Self-Signed Certificates (insecure)
 
 .NOTES
 NAME:  Get-VspcStorageUsage.ps1
-VERSION: 1.0
+VERSION: 1.1
 AUTHOR: Chris Arceneaux
 TWITTER: @chris_arceneaux
 GITHUB: https://github.com/carceneaux
