@@ -351,8 +351,8 @@ foreach ($repo in $repositories) {
 		BackupSizeGB          = [math]::round( $repo.backupSize / 1Gb, 2) # sum of all backups located on repo
 		# Is available?
 		IsCapacityAvailable   = $repo.isCapacityAvailable
-		IsFreeSpaceAvailable  = $repo.isCapacityAvailable
-		IsUsedAvailable       = $repo.isCapacityAvailable
+		IsFreeSpaceAvailable  = $repo.isFreeSpaceAvailable
+		IsUsedAvailable       = $repo.isUsedSpaceAvailable
 		# Is immutability enabled?
 		IsImmutabilityEnabled = $repo.isImmutabilityEnabled
 		ImmutabilityIntervalDays  = $repo.immutabilityInterval / 60 / 60 / 24 # converting seconds to days
