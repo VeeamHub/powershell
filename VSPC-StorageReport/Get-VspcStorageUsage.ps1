@@ -56,7 +56,7 @@ Connecting to a VSPC server that uses Self-Signed Certificates (insecure)
 
 .NOTES
 NAME:  Get-VspcStorageUsage.ps1
-VERSION: 1.0
+VERSION: 1.1
 AUTHOR: Chris Arceneaux
 TWITTER: @chris_arceneaux
 GITHUB: https://github.com/carceneaux
@@ -351,8 +351,8 @@ foreach ($repo in $repositories) {
 		BackupSizeGB          = [math]::round( $repo.backupSize / 1Gb, 2) # sum of all backups located on repo
 		# Is available?
 		IsCapacityAvailable   = $repo.isCapacityAvailable
-		IsFreeSpaceAvailable  = $repo.isCapacityAvailable
-		IsUsedAvailable       = $repo.isCapacityAvailable
+		IsFreeSpaceAvailable  = $repo.isFreeSpaceAvailable
+		IsUsedAvailable       = $repo.isUsedSpaceAvailable
 		# Is immutability enabled?
 		IsImmutabilityEnabled = $repo.isImmutabilityEnabled
 		ImmutabilityIntervalDays  = $repo.immutabilityInterval / 60 / 60 / 24 # converting seconds to days
