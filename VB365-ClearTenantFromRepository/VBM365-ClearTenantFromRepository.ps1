@@ -483,7 +483,7 @@ if ($null -ne $VBMUserObjectsModification)
                     }
                     
                     # Why on earth would we work with object ID's... Remove-vboentitydata command requires original and complete objectline from output get-vboentitydata -type user.
-                    $ObjItem = $VBMUserObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName} 
+                    $ObjItem = $VBMUserObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName -and $_.MailboxBackedUpTime -eq $obj.MailboxBackedUpTime}
                     $action = Remove-VBOEntityData -Repository $VBMRepository -User $ObjItem -Mailbox -Confirm:$false
                     
                     #log result
@@ -841,7 +841,7 @@ if ($null -ne $VBMSharepointObjectsModification)
                     }
 
                     # Why on earth would we work with object ID's... Remove-vboentitydata command requires original and complete objectline from output get-vboentitydata -type user.
-                    $ObjItem = $VBMSharePointObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName} 
+                    $ObjItem = $VBMSharePointObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName -and $_.BackedUpTime -eq $obj.BackedUpTime} 
                     $action = Remove-VBOEntityData -Repository $VBMRepository -Site $ObjItem -Confirm:$false
                     
                     #log result
