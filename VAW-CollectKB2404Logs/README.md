@@ -26,7 +26,7 @@ Local Administrator permissions and permission to execute scripts in an elevated
 
 > 2: PowerShell.exe -ExecutionPolicy ByPass -File $env:temp\CollectKB2404Logs.ps1 
     
-2) If the script was manually dowloaded on the machine in question, open an Administrative PowerShell Console, and navigate to the directory where the script was saved.
+2) If the script was manually downloaded to the machine in question, open an Administrative PowerShell Console, and navigate to the directory where the script was saved.
     (NOTE: Running the script in PowerSell ISE is NOT supported due to the additional modules that PowerShell ISE loads that can conflict with the script's execution.)
 3) Run the following to execute the script: 
 
