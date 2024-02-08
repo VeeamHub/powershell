@@ -715,7 +715,7 @@ if ($null -ne $VBMGroupObjectsModification)
                     }
 
                     # Why on earth would we work with object ID's... Remove-vboentitydata command requires original and complete objectline from output get-vboentitydata -type user.
-                    $ObjItem = $VBMGroupObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName} 
+                    $ObjItem = $VBMGroupObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName -and $_.MailboxBackedUpTime -eq $obj.MailboxBackedUpTime} 
                     $action = Remove-VBOEntityData -Repository $VBMRepository -Group $ObjItem -GroupMailbox -Confirm:$false
                     
                     #log result
@@ -765,7 +765,7 @@ if ($null -ne $VBMGroupObjectsModification)
                     }
 
                     # Why on earth would we work with object ID's... Remove-vboentitydata command requires original and complete objectline from output get-vboentitydata -type user.
-                    $ObjItem = $VBMGroupObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName} 
+                    $ObjItem = $VBMGroupObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName -and $_.SiteBackedUpTime -eq $obj.SiteBackedUpTime} 
                     $action = Remove-VBOEntityData -Repository $VBMRepository -Group $ObjItem -GroupSite -Confirm:$false
                     
                     #log result
