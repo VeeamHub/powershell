@@ -20,9 +20,13 @@ Local Administrator permissions and permission to execute scripts in an elevated
 
 # Usage:
 
-1) Download the script (Right-click link > 'Save link as') and save it to the Windows machine where logs need to be collected.
+1) For Windows machines with an internet connection, open an Administrative PowerShell console on the Windows machine where Veeam Agent for Microsoft Windows is installed and run these two lines to automatically download the log collection script to %temp% and execute it:
+
+> 1: Invoke-WebRequest https://raw.githubusercontent.com/VeeamHub/powershell/master/VAW-CollectKB2404Logs/CollectKB2404Logs.ps1 -o $Env:Temp\CollectKB2404Logs.ps1 
+
+> 2: PowerShell.exe -ExecutionPolicy ByPass -File $env:temp\CollectKB2404Logs.ps1 
     
-2) Open an Administrative PowerShell Console, and navigate to the directory where the script was saved.
+2) If the script was manually downloaded to the machine in question, open an Administrative PowerShell Console, and navigate to the directory where the script was saved.
     (NOTE: Running the script in PowerSell ISE is NOT supported due to the additional modules that PowerShell ISE loads that can conflict with the script's execution.)
 3) Run the following to execute the script: 
 

@@ -3,6 +3,7 @@
 ###[12.12.2022] v.2.0 - added System Information: GPO, network configuration, firewall configuration, installed software & updates; TLS settings, v6 specifics.
 ###[23.02.2023] v.2.0.1 - added Cloud Native machine logs. 
 ###[25.08.2023] v.2.0.5 - added dism to grab updates, whoami, fsutil
+###[07.02.2024] v 2.0.6 - added additional checks for VAW installation, changed folder for logs from "Case_logs" -> Veeam_Case_logs
 
 Start-Sleep 1
 Write-Warning -Message "This script is provided as is as a courtesy for collecting logs from the Guest Machine. Please be aware that due to certain Microsoft Operations, there may be a short burst of high CPU activity, and that some 
@@ -20,13 +21,33 @@ if (!(New-Object Security.Principal.WindowsPrincipal([Security.Principal.Windows
 }
 else {Write-Host -ForegroundColor Green "You're running PowerShell as an Administrator. Starting data collection."}
 
+#Checking if VAW is installed on the machine in question via reg value
+
+$VAW_installed = Test-path -Path "HKLM:\SOFTWARE\Veeam\Veeam Endpoint Backup"
+
+if ($VAW_installed -eq $False) {
+    Write-Warning -Message "Looks like Veeam Agent is not installed on this machine."
+     $VAW_not_installed = Read-Host -Prompt "Press Y to continue (some errors are expected during log collection process and the logs will be saved in C:\Veeam_Case_logs) or press N to exit"
+    if ($VAW_not_installed -eq 'N')
+        {
+        exit
+        }
+    else 
+    {
+        Write-Host -ForegroundColor Green "Starting data collection"
+    }
+
+}
+
+#If VAW is installed or input is 'Y' - continue logs collection
+
 #Variables
 $PS = $PSVersionTable.PSVersion.Major
 $date = Get-Date -f yyyy-MM-ddTHHmmss_
 $hostname = HOSTNAME.EXE
 $item = Get-ItemProperty -Path "HKLM:\SOFTWARE\Veeam\Veeam Endpoint Backup" -Name "LogDirectory" -ErrorAction SilentlyContinue
 $logvolume = Split-Path -Path $item.LogDirectory -Parent -ErrorAction SilentlyContinue #<---- "-ErrorAction SilentlyContinue was added"
-$veeamlogs = "$logvolume\Case_Logs"
+$veeamlogs = "$logvolume\Veeam_Case_Logs"
 $directory = "$veeamlogs\VAWLogs_$date$hostname"
 $Execution = "$directory\Execution.log"
 $VAW = "$directory\Endpoint"
