@@ -1,5 +1,7 @@
 # Automated Upgrade to Veeam Backup & Replication v12
 
+***Please note this script does not support upgrade to version 12.1. For 12.1, use [this script](https://github.com/VeeamHub/powershell/tree/master/BR-UpgradeV12.1).***
+
 ## Author
 
 Chris Arceneaux (@chris_arceneaux)
