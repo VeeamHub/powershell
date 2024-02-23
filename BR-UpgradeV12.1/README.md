@@ -1,6 +1,4 @@
-# Automated Upgrade to Veeam Backup & Replication v12
-
-***Please note this script does not support upgrade to version 12.1. For 12.1, use [this script](https://github.com/VeeamHub/powershell/tree/master/BR-UpgradeV12.1).***
+# Automated Upgrade to Veeam Backup & Replication v12.1
 
 ## Author
 
@@ -37,36 +35,3 @@ This script was written to work with standard Veeam Backup & Replication environ
 ```powershell
 Get-Help .\Update-Veeam.ps1 -Full
 ```
-
-Here's a high-level view of the upgrade process:
-
-### VEEAM BACKUP ENTERPRISE MANAGER UPGRADE #######
-
-1. Veeam Backup Catalog
-2. Veeam Backup Enterprise Manager
-3. Veeam Cloud Connect Portal (if installed)
-
-### VEEAM BACKUP & REPLICATION SERVER UPGRADE #######
-
-1. Veeam Backup Catalog
-2. Veeam Backup & Replication Server
-3. Veeam Backup & Replication Console
-4. Veeam Explorer for Microsoft Active Directory
-5. Veeam Explorer for Microsoft Exchange
-6. Veeam Explorer for Oracle
-7. Veeam Explorer for PostgreSQL
-8. Veeam Explorer for Microsoft SharePoint
-9. Veeam Explorer for Microsoft SQL Server
-10. Veeam Explorer for Microsoft Teams
-11. Veeam Distribution Service
-12. Veeam Installer Service
-13. Veeam Plug-ins for Enterprise Applications Redistributable
-14. Veeam Agent for Linux Redistributable
-15. Veeam Agent for MacOS Redistributable
-16. Veeam Agent for Microsoft Windows Redistributable
-17. Veeam Agent for Unix Redistributable
-18. Veeam Cloud Plug-ins (AWS/Azure/GCP)
-19. Veeam Backup for Nutanix AHV
-20. Veeam Backup for Red Hat Virtualization
-21. Veeam Plug-in for Kasten K10
-22. Veeam Backup Cloud Gateway (if installed)

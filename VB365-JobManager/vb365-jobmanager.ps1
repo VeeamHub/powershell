@@ -1,7 +1,7 @@
 
 <#PSScriptInfo
 
-.VERSION 1.0.1
+.VERSION 1.0.2
 
 .GUID f3795945-b130-4740-84f4-e8248a847263
 
@@ -87,7 +87,9 @@ Param(
     # If not set will try to load a file with the same name as the script and ending ".excludes"    
     [string] $excludeFile = $null,
 
-    # Recurse through SharePoint sites to count subsites when sizing jobs
+    # Recurse through SharePoint sites to count subsites when sizing jobs.
+    # Setting this parameter to true will drastically impact script runtime for recursing on SPO sites.
+    # Do only use it when you really are using subsites (a lot) and want to ensure object limits for jobs are met.
     [switch] $recurseSP = $false,
 
     # Check if backups exist in given repositories and align objects to jobs pointing to these repositories
@@ -143,7 +145,7 @@ DynamicParam {
 
 BEGIN {
 
-    $global:version = '1.0.1'
+    $global:version = '1.0.2'
     filter timelog { "$(Get-Date -Format "yyyy-MM-dd HH:mm:ss"): $_" }
 
     # Save in global variables for easier use in classes
@@ -371,7 +373,7 @@ BEGIN {
             $this.org = $Organization
             $this.JobnamePattern = $JobnamePattern
             $this.ObjectLimit = $ObjectLimit
-
+            $this.scheduleDelay = $scheduleDelay
             $this.Repositories = $Repositories
 
             # Create schedules per repository (as should be linked to a proxy)

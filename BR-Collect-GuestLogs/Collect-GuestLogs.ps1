@@ -11,7 +11,7 @@
     NAME: Collect_Veeam_Guest_Logs.ps1
     AUTHOR: Chris Evans, Veeam Software
     CONTACT: chris.evans@veeam.com
-    LASTEDIT: 03-31-2023
+    LASTEDIT: 12-04-2023
     KEYWORDS: Log collection, AAiP, Guest Processing
 #> 
 #Requires -Version 4.0
@@ -271,7 +271,7 @@ function Add-FileToZip (
 
 }
 
-#Check to make sure we are not running this on the VBR server
+#Check if running on VBR server. Prompt user for confirmation if running on VBR server, as this is rarely necessary.
 $isVBR = Get-Service -Name "VeeamBackupSv*"
 if ($isVBR) {
     Add-Type -AssemblyName PresentationCore, PresentationFramework
@@ -282,19 +282,15 @@ if ($isVBR) {
     $Result = [System.Windows.MessageBox]::Show($msgBody,$msgTitle,$msgButton,$msgImage)
     switch ($Result)
     {
-        0 { Exit }
-        6 { Break }
-        7 { Exit }
+        "No" { Exit }
+        "Yes" { Break }
     }
 }
 
 #Initialize variables
 if ((Get-Item -Path 'HKLM:\SOFTWARE\Veeam\Veeam Backup and Replication').Property -Contains "LogDirectory") {
     $veeamDir = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Veeam\Veeam Backup and Replication').LogDirectory
-}
-else {
-    $veeamDir = $env:ProgramData + "\Veeam\Backup"    
-}
+} else { $veeamDir = $env:ProgramData + "\Veeam\Backup" }
 
 $date = Get-Date -f yyyy-MM-ddTHHmmss_
 $temp = "C:\temp"
@@ -303,7 +299,8 @@ $logvolume = Split-Path -Path $veeamDir -Parent
 $logDir = Join-Path -Path $logVolume -ChildPath "Case_Logs" 
 $directory = Join-Path -Path $logDir -ChildPath $date$hostname
 $VBR = "$directory\Backup"
-$tempEvents = "$temp\Events"
+$tempEVTXEvents = "$temp\EVTXEvents"
+$tempCSVEvents = "$temp\CSVEvents"
 $Events = "$directory\Events"
 $VSS = "$directory\VSS"
 $PSVersion = $PSVersionTable.PSVersion.Major
@@ -334,7 +331,7 @@ Start-Transcript -Path $temp\Execution.log > $null
 
 #Create directories
 Write-Console "Creating temporary directories..." "White" 1
-New-Dir $directory, $VBR, $tempEvents, $Events, $VSS, $temp
+New-Dir $directory, $VBR, $Events, $VSS, $temp, $tempEVTXEvents, $tempCSVEvents
 Write-Console
 
 #Copy Backup Folder
@@ -485,22 +482,21 @@ Write-Console "Exporting Windows Event Viewer logs..." "White" 1
 Get-WinEvent -ListLog * | Select-Object Logname, LogFilePath | % {
 	$name = $_.Logname
 	$validName = $name.Replace("/","-")
-	wevtutil epl $name $tempEvents\$validName.evtx
+	wevtutil epl $name "$tempEVTXEvents\$validName.evtx"
+    $_ | Export-Csv -Path "$tempCSVEvents\$validName.csv"
 }
 
 #Generate LocaleMetadata for each event log
-Get-ChildItem -File -Path $tempEvents | % {
-	wevtutil al ($tempEvents + "\" + $_.Name)
+Get-ChildItem -File -Path $tempEVTXEvents | % {
+	wevtutil al ($tempEVTXEvents + "\" + $_.Name)
 }
 
 #Check to see if PowerShell version is 5.x or newer. Compress-Archive cmdlet did not exist prior to version 5.
 if ($PSVersionTable.PSVersion.Major -ge '5') {
-    Compress-Archive -Path $tempEvents\* -DestinationPath ((Split-Path $Events) + "\Event_Logs.zip")
-    Remove-Item $tempEvents -Recurse -Force
-} else {
-    #Manually zipping up event logs would be necessary if PowerShell version is less than 5.x. Display this to the user.
-    [System.Windows.MessageBox]::Show("Unable to automatically add logs to .zip archive. `n`nPlease archive manually before uploading. `n`nPress 'OK' to open log directory.")
-    (Split-Path $tempEvents) | Invoke-Item
+    Compress-Archive -Path $tempEVTXEvents\* -DestinationPath "$Events\Event_Logs_EVTX.zip"
+    Compress-Archive -Path $tempCSVEvents\* -DestinationPath "$Events\Event_Logs_CSV.zip"
+    Remove-Item $tempEVTXEvents -Recurse -Force
+    Remove-Item $tempCSVEvents -Recurse -Force
 }
 
 #Check if this is a Server Edition of Windows because Workstation Edition servers would throw an error.
