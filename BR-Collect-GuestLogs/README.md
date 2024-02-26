@@ -15,7 +15,7 @@ Local Administrator permissions and permission to execute scripts in an elevated
 
 ## **Usage:** <br>
 
-1. **[Download the script](https://raw.githubusercontent.com/VeeamHub/powershell/master/BR-Collect-GuestLogs/Collect-GuestLogs.ps1)** <--- (Right-click THE LINK TO THE LEFT > '_Save link as_') and save it to the Windows machine where logs need to be collected. DO NOT right-click and save the Collect-GuestLogs.ps1 at the top of this page, otherwise you will end up with a ps1 file containing nothing but HTML code.
+1. **[Download the script](https://raw.githubusercontent.com/VeeamHub/powershell/master/BR-Collect-GuestLogs/Collect-GuestLogs.ps1)** <--- THIS LINK! (Right-click > '_Save link as_') and save it to the Windows machine where logs need to be collected. DO NOT right-click and save the Collect-GuestLogs.ps1 at the top of this page, otherwise you will end up with a ps1 file containing nothing but HTML code.
 2. Open an Administrative PowerShell Console, and navigate to the directory where the script was saved. 
      - (**NOTE**: Running the script in PowerSell ISE is **NOT** supported due to the additional modules that PowerShell ISE loads that can conflict with the script's execution.)
 4. Run the following to execute the script:
