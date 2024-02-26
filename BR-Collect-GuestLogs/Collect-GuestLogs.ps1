@@ -11,7 +11,7 @@
     NAME: Collect_Veeam_Guest_Logs.ps1
     AUTHOR: Chris Evans, Veeam Software
     CONTACT: chris.evans@veeam.com
-    LASTEDIT: 12-04-2023
+    LASTEDIT: 2-26-2023
     KEYWORDS: Log collection, AAiP, Guest Processing
 #> 
 #Requires -Version 4.0
@@ -300,7 +300,6 @@ $logDir = Join-Path -Path $logVolume -ChildPath "Case_Logs"
 $directory = Join-Path -Path $logDir -ChildPath $date$hostname
 $VBR = "$directory\Backup"
 $tempEVTXEvents = "$temp\EVTXEvents"
-$tempCSVEvents = "$temp\CSVEvents"
 $Events = "$directory\Events"
 $VSS = "$directory\VSS"
 $PSVersion = $PSVersionTable.PSVersion.Major
@@ -331,7 +330,7 @@ Start-Transcript -Path $temp\Execution.log > $null
 
 #Create directories
 Write-Console "Creating temporary directories..." "White" 1
-New-Dir $directory, $VBR, $Events, $VSS, $temp, $tempEVTXEvents, $tempCSVEvents
+New-Dir $directory, $VBR, $Events, $VSS, $temp, $tempEVTXEvents
 Write-Console
 
 #Copy Backup Folder
@@ -370,11 +369,11 @@ Write-Console "Exporting Veeam registry values..." "White" 1
 $regKeys = @()
 #Must test to see if registry hives exist, otherwise would cause a stack overflow error.
 if (Test-Path 'HKLM:\SOFTWARE\Veeam') {
-    reg export 'HKLM\SOFTWARE\Veeam' "$directory\64-Bit_Veeam_Registry_Keys.log"
+    reg export 'HKLM\SOFTWARE\Veeam' "$directory\64-Bit_Veeam_Registry_Keys.log" | Out-Null
     $regKeys += Get-ChildItem "HKLM:\Software\Veeam" -Recurse
 }
 if (Test-Path 'HKLM:\SOFTWARE\WOW6432Node\Veeam') {
-    reg export 'HKLM\SOFTWARE\WOW6432Node\Veeam' "$directory\32-Bit_Veeam_Registry_Keys.log"
+    reg export 'HKLM\SOFTWARE\WOW6432Node\Veeam' "$directory\32-Bit_Veeam_Registry_Keys.log" | Out-Null
     $regKeys += Get-ChildItem "HKLM:\SOFTWARE\WOW6432Node\Veeam" -Recurse
 }
 
@@ -477,16 +476,16 @@ if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System')
 }
 Write-Console
 
-#Export event viewer logs
+#Export event viewer logs excluding any event logs with no records.
 Write-Console "Exporting Windows Event Viewer logs..." "White" 1
-Get-WinEvent -ListLog * | Select-Object Logname, LogFilePath | % {
-	$name = $_.Logname
-	$validName = $name.Replace("/","-")
-	wevtutil epl $name "$tempEVTXEvents\$validName.evtx"
-    $_ | Export-Csv -Path "$tempCSVEvents\$validName.csv"
+Write-Console "This step can possibly take several minutes. Please do not cancel or exit the console." "Yellow" 1
+Get-WinEvent -ListLog * | ? { $_.RecordCount } | % {
+	$name = $_.LogName
+	$validName = $name -replace '\\', '_' -replace '/', '_'
+    wevtutil epl $name "$tempEVTXEvents\$validName.evtx"
 }
 
-#Generate LocaleMetadata for each event log
+#Generate LocaleMetadata for each event log.
 Get-ChildItem -File -Path $tempEVTXEvents | % {
 	wevtutil al ($tempEVTXEvents + "\" + $_.Name)
 }
@@ -494,9 +493,7 @@ Get-ChildItem -File -Path $tempEVTXEvents | % {
 #Check to see if PowerShell version is 5.x or newer. Compress-Archive cmdlet did not exist prior to version 5.
 if ($PSVersionTable.PSVersion.Major -ge '5') {
     Compress-Archive -Path $tempEVTXEvents\* -DestinationPath "$Events\Event_Logs_EVTX.zip"
-    Compress-Archive -Path $tempCSVEvents\* -DestinationPath "$Events\Event_Logs_CSV.zip"
     Remove-Item $tempEVTXEvents -Recurse -Force
-    Remove-Item $tempCSVEvents -Recurse -Force
 }
 
 #Check if this is a Server Edition of Windows because Workstation Edition servers would throw an error.
