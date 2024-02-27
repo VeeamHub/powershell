@@ -11,7 +11,7 @@
     NAME: Collect_Veeam_Guest_Logs.ps1
     AUTHOR: Chris Evans, Veeam Software
     CONTACT: chris.evans@veeam.com
-    LASTEDIT: 2-27-2023
+    LASTEDIT: 2-27-2024
     KEYWORDS: Log collection, AAiP, Guest Processing
 #> 
 #Requires -Version 4.0
