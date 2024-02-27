@@ -4,10 +4,9 @@ July 19 2022 Update:
 - Reworked the way registry values are exported. Now uses 'reg.exe export <path\to\reg\hive>' as it gives better output and is more useful.
 - Included export of 32-bit Veeam registry values (HKLM\SOFTWARE\WOW6432Node\Veeam)
 
-Regression testing performed on: 
-    - Server 2012 R2 running PowerShell 4.0
-    - Server 2019 running PowerShell 5.1
-    - Windows 10 Pro for Workstations running PowerShell 5.1
-
-February 26 2024 Update:
-- Removed Event Viewer export in CSV format due to substantially increased overall execution time required.
+February 27 2024 Update:
+- Overhaul of event viewer log export to CSV code to drastically speed up overall execution time.
+- Removed forced resizing of console and instead modified the default Out-File width.
+- Removed copy of %ProgramData%\Veeam\Backup if the script was executed on the VBR server as this could potentially be a massive folder.
+- Added extensionless file to exported zip archive letting the engineer know if this script was ran on the VBR server as this is not the typical use case.
+- Redirected various output to null that wasn't intended to be sent to console.
