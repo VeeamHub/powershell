@@ -11,12 +11,14 @@
     NAME: Collect_Veeam_Guest_Logs.ps1
     AUTHOR: Chris Evans, Veeam Software
     CONTACT: chris.evans@veeam.com
-    LASTEDIT: 2-26-2023
+    LASTEDIT: 2-27-2023
     KEYWORDS: Log collection, AAiP, Guest Processing
 #> 
 #Requires -Version 4.0
 #Requires -RunAsAdministrator
 $ErrorActionPreference = "SilentlyContinue"
+#Set default width of all invocations of Out-File and redirection operators to 2000 to prevent truncation of output.
+$PSDefaultParameterValues['Out-File:Width'] = 2000
 
 #Check if script running in PowerShell ISE. If so, instruct to call the script again from a normal PowerShell console. This is due to PS ISE loading additional modules that can cause issues with transcription.
 if ($psISE) {
@@ -295,30 +297,17 @@ if ((Get-Item -Path 'HKLM:\SOFTWARE\Veeam\Veeam Backup and Replication').Propert
 $date = Get-Date -f yyyy-MM-ddTHHmmss_
 $temp = "C:\temp"
 $hostname = hostname
-$logvolume = Split-Path -Path $veeamDir -Parent
+$logVolume = Split-Path -Path $veeamDir -Parent
 $logDir = Join-Path -Path $logVolume -ChildPath "Case_Logs" 
 $directory = Join-Path -Path $logDir -ChildPath $date$hostname
 $VBR = "$directory\Backup"
 $tempEVTXEvents = "$temp\EVTXEvents"
+$tempCSVEvents = "$temp\CSVEvents"
 $Events = "$directory\Events"
 $VSS = "$directory\VSS"
 $PSVersion = $PSVersionTable.PSVersion.Major
 
 Clear-Host
-
-#Resize PowerShell console so that output is not truncated unnecessarily.
-Write-Console "`n`nTemporarily resizing PowerShell console to prevent truncation of output." "Green" 2
-$PSHost = Get-Host
-$PSWindow = $PSHost.UI.RawUI
-$NewSize = $PSWindow.BufferSize
-$NewSize.Height = 3000
-$NewSize.Width = 270
-$PSWindow.BufferSize = $NewSize
-$NewSize = $PSWindow.WindowSize
-$NewSize.Height = 50
-$NewSize.Width = 270
-$PSWindow.WindowSize = $NewSize
-
 
 Write-Console "This script is provided as is as a courtesy for collecting Guest Proccessing logs from a guest server. `
 Please be aware that due to certain Microsoft operations there may be a short burst `
@@ -330,13 +319,22 @@ Start-Transcript -Path $temp\Execution.log > $null
 
 #Create directories
 Write-Console "Creating temporary directories..." "White" 1
-New-Dir $directory, $VBR, $Events, $VSS, $temp, $tempEVTXEvents
+New-Dir $directory, $Events, $VSS, $temp, $tempEVTXEvents, $tempCSVEvents
+#If not running on VBR server, create additional folder as destination for GuestHelper logs
+if (!($isVBR)){
+    New-Dir $VBR
+}
 Write-Console
 
-#Copy Backup Folder
-Write-Console "Copying Veeam guest operation logs..." "White" 1
-Get-ChildItem -Path $veeamDir | Copy-Item -Destination $VBR -Recurse -Force
-Write-Console
+#Copy backup folder unless being ran on VBR server. Backup folder can potentially be massive if this is ran on the VBR server.
+if (!($isVBR)) {
+    Write-Console "Copying Veeam guest operation logs..." "White" 1
+    Get-ChildItem -Path $veeamDir | Copy-Item -Destination $VBR -Recurse -Force
+    Write-Console
+} else {
+    #Create extensionless file letting engineer reviewing know that the script was ran on the customer's VBR server since this is typically not the use case
+    New-Item -ItemType File -Path "$directory\!!!__THIS_SCRIPT_WAS_RAN_ON_THE_VBR_SERVER_!!!" | Out-Null
+}
 
 #Export VSS logs
 Write-Console "Copying VSS logs..." "White" 1
@@ -415,7 +413,7 @@ if (!($hasSQLDefaultInstance) -and !($hasSQL)) {
 }
 else {
     if ($hasSQL -and $hasSMO) {
-        Write-Console "Yes. Enumerating permissions for each database." "White" 1
+        Write-Console "Yes. Enumerating permissions for each database..." "White" 1
         foreach ($instance in $hasSQL) {
                 $SQLServerInstance = ($instance.Name -replace '^.*\$',($hostname + "\"))
         }
@@ -448,10 +446,10 @@ Get-Service | Select-Object DisplayName, Status | Sort-Object DisplayName | Form
 Write-Console
 
 #Get network security settings (This is where customizations such as disabling TLS 1.0/1.1 or key exchange algorithms are done)
-Write-Console "Checking for network customizations (ie. Is TLS 1.0/1.1 disabled? Custom key exchange algorithms?)..." "White" 1
+Write-Console "Checking for common network customizations (ie. Is TLS 1.0/1.1 disabled? Custom key exchange algorithms?)..." "White" 1
 #Must test to see if registry hive exists, otherwise would cause a stack overflow error.
 if (Test-Path 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL') {
-    reg export "HKLM\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL" "$directory\network_customizations.log" 
+    reg export "HKLM\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL" "$directory\network_customizations.log" | Out-Null
 }
 Write-Console
 
@@ -469,31 +467,44 @@ Write-Console
 Write-Console "Checking if 'Remote UAC' is disabled..." "White" 1
 #Must test to see if registry hive exists, otherwise would cause a stack overflow error.
 if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System') {
-    reg export "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" "$directory\System_Policies.log"
+    reg export "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" "$directory\System_Policies.log" | Out-Null
     $content = Get-Content "$directory\System_Policies.log"
     Write-Output "If 'LocalAccountTokenFilterPolicy' = 1 then 'RemoteUAC' has been disabled. If it does not exist or is set to '0' then it is still enabled.`r`n" > "$directory\System_Policies.log"
     $content | Out-File "$directory\System_Policies.log" -Append
 }
 Write-Console
 
-#Export event viewer logs excluding any event logs with no records.
+#Export event viewer logs in EVTX format excluding Security event logs (typically massive and not useful for 99.99% of cases) and any event logs with zero records.
 Write-Console "Exporting Windows Event Viewer logs..." "White" 1
 Write-Console "This step can possibly take several minutes. Please do not cancel or exit the console." "Yellow" 1
-Get-WinEvent -ListLog * | ? { $_.RecordCount } | % {
-	$name = $_.LogName
-	$validName = $name -replace '\\', '_' -replace '/', '_'
+$evLogNames = (Get-WinEvent -ListLog * | Where-Object { $_.RecordCount -and $_.LogName -ne "Security" })
+foreach ($evLog in $evLogNames) {
+	$name = $evLog.LogName
+	$validName = $name -replace '/', '_'
     wevtutil epl $name "$tempEVTXEvents\$validName.evtx"
 }
 
 #Generate LocaleMetadata for each event log.
-Get-ChildItem -File -Path $tempEVTXEvents | % {
+Get-ChildItem -File -Path $tempEVTXEvents | ForEach-Object {
 	wevtutil al ($tempEVTXEvents + "\" + $_.Name)
+}
+
+#Export past 14 days of event viewer logs in CSV format excluding Security event logs (typically massive and not useful for 99.99% of cases) and any event logs with zero records.
+foreach ($evLog in $evLogNames) {
+    $name = $evLog.LogName
+	$validName = $name -replace '/', '_'
+	$sumEvents = (Get-WinEvent -ErrorAction SilentlyContinue -FilterHashTable @{ LogName = $name; StartTime = (Get-Date).AddDays(-14) } | Select-Object LevelDisplayName, TimeCreated, ProviderName, Id, Message)
+	if ($sumEvents) {
+		$sumEvents | Export-CSV -Path "$tempCSVEvents\$validName.csv" -NoTypeInformation
+	}
 }
 
 #Check to see if PowerShell version is 5.x or newer. Compress-Archive cmdlet did not exist prior to version 5.
 if ($PSVersionTable.PSVersion.Major -ge '5') {
     Compress-Archive -Path $tempEVTXEvents\* -DestinationPath "$Events\Event_Logs_EVTX.zip"
+    Compress-Archive -Path $tempCSVEvents\* -DestinationPath "$Events\Event_Logs_CSV.zip"
     Remove-Item $tempEVTXEvents -Recurse -Force
+    Remove-Item $tempCSVEvents -Recurse -Force
 }
 
 #Check if this is a Server Edition of Windows because Workstation Edition servers would throw an error.
@@ -536,6 +547,9 @@ if (!(Test-Path -Path $veeamDir)) {
 else { 
     Write-Console "Log collection finished. Please find the collected logs at $logDir" "Green" 3
 }
+
+#Remove custom Out-File width setting just in case.
+$PSDefaultParameterValues.Remove('Out-File:Width')
 
 #Stop transcript, copy Execution.log into the .zip archive, then cleanup Execution.log from C:\temp directory.
 Stop-Transcript > $null
