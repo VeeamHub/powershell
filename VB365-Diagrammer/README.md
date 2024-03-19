@@ -40,4 +40,6 @@ Run the script against target VB365 Server 'veeam-vb365.domain.local' and export
 Import-Module .\Get-VB365Diagram.ps1 -Force
 Get-VB365Diagram -Target veeam-vb365.domain.local -Username 'domain\username' -Password password -Format png -OutputFolderPath C:\Users\god\ -Filename Out.png -Signature -AuthorName "Jonathan Colon" -CompanyName "Zen PR Solutuons"
 ```
+
+##### Sample output
 ![sample output](Out.png)
