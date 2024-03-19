@@ -34,9 +34,10 @@ Import-Module .\Get-VB365Diagram.ps1 -Force
 Get-Help Get-VB365Diagram -Full
 ```
 
-Script is designed to be interactive. As such, no parameters are required during execution:
+Run the script against target VB365 Server 'veeam-vb365.domain.local' and export to PNG image format:
 
 ```powershell
 Import-Module .\Get-VB365Diagram.ps1 -Force
-Get-VB365Diagram -Target veeam-vb365.domain.local -Username 'domain\username' -Password password -Format png -OutputFolderPath C:\Users\god\ -Filename Out.png 
+Get-VB365Diagram -Target veeam-vb365.domain.local -Username 'domain\username' -Password password -Format png -OutputFolderPath C:\Users\god\ -Filename Out.png -Signature -AuthorName "Jonathan Colon" -CompanyName "Zen PR Solutuons"
 ```
+![sample output](Out.png)
