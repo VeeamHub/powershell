@@ -62,12 +62,13 @@ This script will collect the following information from the machine:
 - Installed updates : get-wmiobject -class win32_quickfixengineering
 - Windows Firewall settings : Get-NetFirewallProfile | Format-List
 - TLS Settings : reg export "HKLM\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL"
-- Installed software : Get-WmiObject Win32_Product | Sort-Object Name | Format-Table IdentifyingNumber, Name, InstallDate -AutoSize
+- Installed software : "Get-ItemProperty "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" | select DisplayName, DisplayVersion, InstallDate" and "Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" | select DisplayName, DisplayVersion, InstallDate"
 - Windows services status : gwmi win32_service | select displayname, name, startname,startmode,state
 - Windows events : Microsoft-Windows-SMBClient/Connectivity, Microsoft-Windows-SMBClient/Operational
 - Windows cluster events
 - Network configuration settings: "Get-NetAdapterBinding | Where-Object { $_.DisplayName -match "File and Printer Sharing" } | Format-Table -AutoSize"
 - Network configuration: "ipconfig /all" , "netstat -bona" , "route print"
+- information about ciphers: Get-TlsCipherSuite | Format-Table name 
 
 # Feedback
 
