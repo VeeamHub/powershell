@@ -4,6 +4,7 @@
 ###[23.02.2023] v.2.0.1 - added Cloud Native machine logs. 
 ###[25.08.2023] v.2.0.5 - added dism to grab updates, whoami, fsutil
 ###[07.02.2024] v 2.0.6 - added additional checks for VAW installation, changed folder for logs from "Case_logs" -> Veeam_Case_logs
+###[13.05.2024] v 2.0.7 - changed method for collection installed software from Get-WmiObject to faster and more reliable one, added information about ciphers
 
 Start-Sleep 1
 Write-Warning -Message "This script is provided as is as a courtesy for collecting logs from the Guest Machine. Please be aware that due to certain Microsoft Operations, there may be a short burst of high CPU activity, and that some 
@@ -516,6 +517,7 @@ Write-Host "Getting network information" -ForegroundColor White -BackgroundColor
 ipconfig /all > "$SysInfo\ipconfig.log"
 netstat -bona > "$SysInfo\netstat.log"
 route print > "$SysInfo\route.log"
+Get-TlsCipherSuite | Format-Table name | Out-File -FilePath "$SysInfo\ciphers.txt"
 Start-Sleep 1
 Write-Host -ForegroundColor Yellow "Done"
 
@@ -539,7 +541,11 @@ Write-Host -ForegroundColor Yellow "Done"
 
 #Get list of installed software
 Write-Host "Getting list of installed software..." -ForegroundColor White -BackgroundColor Black -ErrorAction SilentlyContinue
-Get-WmiObject Win32_Product | Sort-Object Name | Format-Table Name, InstallDate > "$SysInfo\installed_software.log"
+
+$Installed_apps = @()
+$Installed_apps += Get-ItemProperty "HKLM:\SOFTWARE\Wow6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*" | select DisplayName, DisplayVersion, InstallDate # 32 Bit
+$Installed_apps += Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*" | select DisplayName, DisplayVersion, InstallDate # 64 Bit
+$Installed_apps | Out-File -FilePath "$SysInfo\installed_software.log"
 Start-Sleep 1
 Write-Host -ForegroundColor Yellow "Done"
 
