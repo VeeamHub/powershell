@@ -1,4 +1,4 @@
-﻿<#
+<#
 .NAME
     Veeam Backup for Microsoft Office 365 Data Manager
 .SYNOPSIS
@@ -11,7 +11,7 @@
     http://www.github.com/nielsengelen
     http://www.github.com/VeeamHub
 .VERSION
-    2.1
+    2.2
 #>
 
 Add-Type -AssemblyName System.Windows.Forms
@@ -21,7 +21,7 @@ Import-Module "C:\Program Files\Veeam\Backup365\Veeam.Archiver.PowerShell\Veeam.
 
 #region Begin GUI{
 $VBO365                          = New-Object system.Windows.Forms.Form
-$VBO365.ClientSize               = '300,300'
+$VBO365.ClientSize               = '300,320'
 $VBO365.text                     = "VBO365 Data Manager"
 $VBO365.FormBorderStyle          = 'Fixed3D'
 $VBO365.MaximizeBox              = $false
@@ -33,9 +33,9 @@ $lblInfo.AutoSize                = $true
 $lblInfo.Location                = New-Object System.Drawing.Point(15,10)
 $lblInfo.Font                    = 'Microsoft Sans Serif, 10'
 
-$lblSourceServer                   = New-Object system.Windows.Forms.Label
-$lblSourceServer.Text              = "Source Server:"
-$lblSourceServer.Location          = New-Object System.Drawing.Point(15,50)
+$lblSourceServer                 = New-Object system.Windows.Forms.Label
+$lblSourceServer.Text            = "Source Server:"
+$lblSourceServer.Location        = New-Object System.Drawing.Point(15,50)
 
 $lblSourceRepo                   = New-Object system.Windows.Forms.Label
 $lblSourceRepo.Text              = "Source repository:"
@@ -54,9 +54,9 @@ $lblTargetRepo.Text              = "Target repository:"
 $lblTargetRepo.Location          = New-Object System.Drawing.Point(15,150)
 
 $lblDisclaimer                   = New-Object system.Windows.Forms.Label
-$lblDisclaimer.Text              = [char]0x00A9 + " 2019 VeeamHub`n`nDistributed under MIT license."
+$lblDisclaimer.Text              = [char]0x00A9 + " 2019 VeeamHub`nDistributed under MIT license."
 $lblDisclaimer.AutoSize          = $true
-$lblDisclaimer.Location          = New-Object System.Drawing.Point(55,225)
+$lblDisclaimer.Location          = New-Object System.Drawing.Point(55,280)
 $lblDisclaimer.Font              = 'Microsoft Sans Serif, 10'
 #endregion Labels }
 
@@ -72,9 +72,11 @@ $dropDownBoxType.Location        = New-Object System.Drawing.Size(135,100)
 $dropDownBoxType.Size            = New-Object System.Drawing.Size(150,20)
 $dropDownBoxType.DropDownStyle   = 'DropDownList'
 
+#[void]$dropDownBoxType.Items.Add( " ")
 [void]$dropDownBoxType.Items.Add("User")
 [void]$dropDownBoxType.Items.Add("Group")
 [void]$dropDownBoxType.Items.Add("Site")
+[void]$dropDownBoxType.Items.Add("Team")
 
 $dropDownBoxType.SelectedItem    = $dropDownBoxType.Items[0]
 #endregion Dropdown list }
@@ -93,27 +95,118 @@ $cmbTargetRepo.Width             = 150
 $cmbTargetRepo.Location          = New-Object System.Drawing.Point(135,150)
 #endregion Comboboxes }
 
+#region Checkboxes {
+$chkMailbox                   = New-Object System.Windows.Forms.CheckBox
+$chkMailbox.Size              = New-Object System.Drawing.Size(70,20)
+$chkMailbox.Location          = New-Object System.Drawing.Point(10,180)
+$chkMailbox.Text              = "Mailbox"
+$chkMailbox.Checked           = $true
+$chkMailbox.Visible           = $false
+
+$chkArchiveMailbox            = New-Object System.Windows.Forms.CheckBox
+$chkArchiveMailbox.Size       = New-Object System.Drawing.Size(70,20)
+$chkArchiveMailbox.Location   = New-Object System.Drawing.Point(90,180)
+$chkArchiveMailbox.Text       = "Archive"
+$chkArchiveMailbox.Checked    = $true
+$chkArchiveMailbox.Visible    = $false
+
+$chkOneDrive                  = New-Object System.Windows.Forms.CheckBox
+$chkOneDrive.Size             = New-Object System.Drawing.Size(80,20)
+$chkOneDrive.Location         = New-Object System.Drawing.Point(170,180)
+$chkOneDrive.Text             = "OneDrive"
+$chkOneDrive.Checked          = $true
+$chkOneDrive.Visible          = $false
+
+$chkSite                      = New-Object System.Windows.Forms.CheckBox
+$chkSite.Size                 = New-Object System.Drawing.Size(70,20)
+$chkSite.Location             = New-Object System.Drawing.Point(250,180)
+$chkSite.Text                 = "Site"
+$chkSite.Checked              = $true
+$chkSite.Visible              = $false
+
+$chkGrpSite                   = New-Object System.Windows.Forms.CheckBox
+$chkGrpSite.Size              = New-Object System.Drawing.Size(80,20)
+$chkGrpSite.Location          = New-Object System.Drawing.Point(10,210)
+$chkGrpSite.Text              = "Group Site"
+$chkGrpSite.Checked           = $true
+$chkGrpSite.Visible           = $false
+
+$chkGrpMailbox                = New-Object System.Windows.Forms.CheckBox
+$chkGrpMailbox.Size           = New-Object System.Drawing.Size(100,20)
+$chkGrpMailbox.Location       = New-Object System.Drawing.Point(90,210)
+$chkGrpMailbox.Text           = "Group Mailbox"
+$chkGrpMailbox.Checked        = $true
+$chkGrpMailbox.Visible        = $false
+
+#endregion Checkboxes }
+
 #region Buttons {
 $btnConnect                      = New-Object system.Windows.Forms.Button
 $btnConnect.Text                 = "Connect"
 $btnConnect.Width                = 60
 $btnConnect.Height               = 30
-$btnConnect.Location             = New-Object System.Drawing.Point(40,180)
+$btnConnect.Location             = New-Object System.Drawing.Point(40,230)
 
 $btnDelete                       = New-Object system.Windows.Forms.Button
 $btnDelete.Text                  = "Delete"
 $btnDelete.Width                 = 60
 $btnDelete.Height                = 30
-$btnDelete.Location              = New-Object System.Drawing.Point(110,180)
+$btnDelete.Location              = New-Object System.Drawing.Point(110,230)
 
 $btnMigrate                      = New-Object system.Windows.Forms.Button
 $btnMigrate.Text                 = "Migrate"
 $btnMigrate.Width                = 60
 $btnMigrate.Height               = 30
-$btnMigrate.Location             = New-Object System.Drawing.Point(180,180)
+$btnMigrate.Location             = New-Object System.Drawing.Point(180,230)
 #endregion Buttons }
 
-$VBO365.Controls.AddRange(@($lblInfo, $lblSourceServer, $lblObject, $lblObjectType, $lblSourceRepo, $lblTargetRepo, $lblDisclaimer, $textBox, $dropDownBoxType, $cmbObject, $cmbSourceRepo, $cmbTargetRepo, $btnConnect, $btnDelete, $btnMigrate))
+#region functions {
+  function Set-CheckboxDisplay {
+    if ($DropDownBoxType.SelectedItem -eq "User") {
+      $chkMailbox.Visible = $true
+      $chkArchiveMailbox.Visible = $true
+      $chkOneDrive.Visible = $true
+      $chkSite.Visible = $true
+      $chkGrpSite.Visible = $false
+      $chkGrpMailbox.Visible = $false
+    } elseif ($DropDownBoxType.SelectedItem -eq "Group") {
+      $chkMailbox.Visible = $true
+      $chkMailbox.Checked = $false
+      $chkArchiveMailbox.Visible = $true
+      $chkArchiveMailbox.Checked = $false
+      $chkOneDrive.Visible = $true
+      $chkOneDrive.Checked = $false
+      $chkSite.Visible = $true
+      $chkSite.Checked = $false
+      $chkGrpSite.Visible = $true
+      $chkGrpMailbox.Visible = $true
+
+      $chkMailbox.Add_Click({[System.Windows.Forms.MessageBox]::Show("This will delete all  mailboxes of group members.", "Warning" , 0, 48).AutoSize})
+      $chkArchiveMailbox.Add_Click({[System.Windows.Forms.MessageBox]::Show("This will delete all archive mailboxes of group members.", "Warning" , 0, 48).AutoSize})
+      $chkOneDrive.Add_Click({[System.Windows.Forms.MessageBox]::Show("This will delete all OneDrives of group members.", "Warning" , 0, 48).AutoSize})
+      $chkSite.Add_Click({[System.Windows.Forms.MessageBox]::Show("This will delete all personal sites of group members.", "Warning" , 0, 48).AutoSize})
+    } else {
+      $chkMailbox.Visible = $false
+      $chkArchiveMailbox.Visible = $false
+      $chkOneDrive.Visible = $false
+      $chkSite.Visible = $false
+      $chkGrpSite.Visible = $false
+      $chkGrpMailbox.Visible = $false
+    }
+  }
+  function Clear-Fields([boolean]$clearSourceRepo = $false) {
+    $cmbObject.Items.Clear()
+    $cmbObject.Text = ""
+    $cmbTargetRepo.Text = ""
+
+    if ($clearSourceRepo -eq $true){
+      $cmbSourceRepo.Text = ""
+    }
+  }
+
+#}
+
+$VBO365.Controls.AddRange(@($lblInfo, $lblSourceServer, $lblObject, $lblObjectType, $lblSourceRepo, $lblTargetRepo, $lblDisclaimer, $textBox, $dropDownBoxType, $cmbObject, $cmbSourceRepo, $cmbTargetRepo, $btnConnect, $btnDelete, $btnMigrate, $chkMailbox, $chkArchiveMailbox, $chkOneDrive, $chkSite, $chkGrpSite, $chkGrpMailbox))
 
 #region gui events {
 $reposList = Get-VBORepository | Sort-Object
@@ -124,9 +217,8 @@ foreach ($repos in $reposList) {
 }
 
 $cmbSourceRepo.Add_SelectedIndexChanged({
-  $cmbObject.Items.Clear()
-  $cmbObject.Text = ""
-  $cmbTargetRepo.Text = ""
+  Clear-Fields
+  Set-CheckboxDisplay
 
   $repo = Get-VBORepository -Name $cmbSourceRepo.SelectedItem | Sort-Object
   $objectsList = Get-VBOEntityData -Type $dropDownBoxType.SelectedItem -Repository $repo | Sort-Object
@@ -137,9 +229,8 @@ $cmbSourceRepo.Add_SelectedIndexChanged({
 })
 
 $dropDownBoxType.Add_SelectedIndexChanged({
-  $cmbObject.Items.Clear()
-  $cmbObject.Text = ""
-  $cmbTargetRepo.Text = ""
+  Clear-Fields
+  Set-CheckboxDisplay
 
   $repo = Get-VBORepository -Name $cmbSourceRepo.SelectedItem | Sort-Object
   $objectsList = Get-VBOEntityData -Type $dropDownBoxType.SelectedItem -Repository $repo | Sort-Object
@@ -157,13 +248,9 @@ $btnConnect.Add_Click({
     $disconnect = Disconnect-VBOServer
     Connect-VBOServer -Server $vboServer
 
-    $cmbObject.Items.Clear()
     $cmbSourceRepo.Items.Clear()
     $cmbTargetRepo.Items.Clear()
-
-    $cmbObject.Text = ""
-    $cmbSourceRepo.Text = ""
-    $cmbTargetRepo.Text = ""
+    Clear-Fields -clearSourceRepo:$true
 
     $reposList = Get-VBORepository | Sort-Object
 
@@ -187,33 +274,38 @@ $btnDelete.Add_Click({
       [System.Windows.Forms.MessageBox]::Show("No object selected.", "Error" , 0, 48)
     } else {
       $repo = Get-VBORepository -Name $sourceRepo | Sort-Object
-      $objectdata = Get-VBOEntityData -Type $dropDownBoxType.SelectedItem -Repository $repo -Name $object | Sort-Object
+      $objectdata = Get-VBOEntityData -Type $dropDownBoxType.SelectedItem -Repository $repo -Name $object
       $type = $dropDownBoxType.SelectedItem
 
-      if ($type -eq 'User') {
-         try {
-           Remove-VBOEntityData -Repository $repo -User $objectdata
-         } catch {
-           [System.Windows.Forms.MessageBox]::Show("Failed to remove data.", "Error" , 0, 48)
-         }
-      } elseif ($type -eq 'Group') {
-         try {
-           Remove-VBOEntityData -Repository $repo -Group $objectdata
-         } catch {
-           [System.Windows.Forms.MessageBox]::Show("Failed to remove data.", "Error" , 0, 48)
-         }
-      } elseif ($type -eq 'Site') {
-         try {
-           Remove-VBOEntityData -Repository $repo -Site $objectdata
-         } catch {
-           [System.Windows.Forms.MessageBox]::Show("Failed to remove data.", "Error" , 0, 48)
-         }
+      try {
+        if ($chkMailbox.Checked -eq $true -and $chkArchiveMailbox.Checked -eq $true -and $chkSite.Checked -eq $true -and $chkSite.Checked -eq $true -and $type -eq 'User') {
+          Remove-VBOEntityData -Repository $repo -User $objectdata -Confirm:$False
+        } elseif ($chkGrpMailbox -eq $true -and $chkGrpSite -eq $true -and $type -eq 'Group') {
+          Remove-VBOEntityData -Repository $repo -Group $objectdata -Confirm:$False
+        } elseif ($type -eq 'Site') {
+          Remove-VBOEntityData -Repository $repo -Site $objectdata -Confirm:$False
+        } elseif ($type -eq 'Team') {
+          Remove-VBOEntityData -Repository $repo -Team $objectdata -Confirm:$False
+        }else {
+          switch ($type) {
+            {$type -eq "User" -and $chkMailbox.Checked -eq $true} {Remove-VBOEntityData -Repository $repo -User $objectdata -Mailbox -Confirm:$False}
+            {$type -eq "User" -and $chkArchiveMailbox.Checked -eq $true} {Remove-VBOEntityData -Repository $repo -User $objectdata -ArchiveMailbox -Confirm:$False}
+            {$type -eq "User" -and $chkOneDrive.Checked -eq $true} {Remove-VBOEntityData -Repository $repo -User $objectdata -OneDrive -Confirm:$False}
+            {$type -eq "User" -and $chkSite.Checked -eq $true} {Remove-VBOEntityData -Repository $repo -User $objectdata -Sites -Confirm:$False}
+            {$type -eq "Group" -and $chkMailbox.Checked -eq $true} {Remove-VBOEntityData -Repository $repo -Group $objectdata -Mailbox -Confirm:$False}
+            {$type -eq "Group" -and $chkArchiveMailbox.Checked -eq $true} {Remove-VBOEntityData -Repository $repo -Group $objectdata -ArchiveMailbox -Confirm:$False}
+            {$type -eq "Group" -and $chkOneDrive.Checked -eq $true} {Remove-VBOEntityData -Repository $repo -Group $objectdata -OneDrive -Confirm:$False}
+            {$type -eq "Group" -and $chkSite.Checked -eq $true} {Remove-VBOEntityData -Repository $repo -Group $objectdata -Sites -Confirm:$False}
+            {$type -eq "Group" -and $chkGrpMailbox.Checked -eq $true} {Remove-VBOEntityData -Repository $repo -Group $objectdata -GroupMailbox -Confirm:$False}
+            {$type -eq "Group" -and $chkGrpSite.Checked -eq $true} {Remove-VBOEntityData -Repository $repo -Group $objectdata -GroupSites -Confirm:$False}
+            #Default {}
+            }
+        }
+      } catch {
+        [System.Windows.Forms.MessageBox]::Show("Failed to remove $type $objectdData.`nPlease try again.", "Error" , 0, 60).AutoSize
       }
 
-      $cmbObject.Items.Clear()
-      $cmbObject.Text = ""
-      $cmbSourceRepo.Text = ""
-      $cmbTargetRepo.Text = ""
+      Clear-Fields -clearSourceRepo:$true
 
       [System.Windows.Forms.MessageBox]::Show("Data has been removed.", "Success", 0, 64)
     }
@@ -262,10 +354,7 @@ $btnMigrate.Add_Click({
           }
         }
 
-        $cmbObject.Items.Clear()
-        $cmbObject.Text = ""
-        $cmbSourceRepo.Text = ""
-        $cmbTargetRepo.Text = ""
+        Clear-Fields -clearSourceRepo:$true
 
         [System.Windows.Forms.MessageBox]::Show("Data has been moved.", "Success", 0, 64)
       }
