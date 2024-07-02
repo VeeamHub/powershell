@@ -297,12 +297,12 @@ $btnDelete.Add_Click({
             {$type -eq "Group" -and $chkOneDrive.Checked -eq $true} {Remove-VBOEntityData -Repository $repo -Group $objectdata -OneDrive -Confirm:$False}
             {$type -eq "Group" -and $chkSite.Checked -eq $true} {Remove-VBOEntityData -Repository $repo -Group $objectdata -Sites -Confirm:$False}
             {$type -eq "Group" -and $chkGrpMailbox.Checked -eq $true} {Remove-VBOEntityData -Repository $repo -Group $objectdata -GroupMailbox -Confirm:$False}
-            {$type -eq "Group" -and $chkGrpSite.Checked -eq $true} {Remove-VBOEntityData -Repository $repo -Group $objectdata -GroupSites -Confirm:$False}
+            {$type -eq "Group" -and $chkGrpSite.Checked -eq $true} {Remove-VBOEntityData -Repository $repo -Group $objectdata -GroupSite -Confirm:$False}
             #Default {}
             }
         }
       } catch {
-        [System.Windows.Forms.MessageBox]::Show("Failed to remove $type $objectdData.`nPlease try again.", "Error" , 0, 60).AutoSize
+        [System.Windows.Forms.MessageBox]::Show("Failed to remove $type $objectData.`nPlease try again.", "Error" , 0, 48).AutoSize
       }
 
       Clear-Fields -clearSourceRepo:$true
