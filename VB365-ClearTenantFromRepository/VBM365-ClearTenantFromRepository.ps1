@@ -919,7 +919,7 @@ if ($null -ne $VBMTeamsObjectsModification)
                     }
 
                     # Why on earth would we work with object ID's... Remove-vboentitydata command requires original and complete objectline from output get-vboentitydata -type user.
-                    $ObjItem = $VBMTeamsObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName}
+                    $ObjItem = $VBMTeamsObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName -and $_.BackedUpTime -eq $obj.BackedUpTime}
                     $action = Remove-VBOEntityData -Repository $VBMRepository -Team $ObjItem -Confirm:$false
                     
                     #log result
