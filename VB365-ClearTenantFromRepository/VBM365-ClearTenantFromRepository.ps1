@@ -1,5 +1,7 @@
 
-#### tested against VBM365 7.1.0.1401 P20231218
+#### tested against: 
+# VBM365 7.1.0.1401 P20231218
+# VBM365 7.1.0.1501 P20240123
 
 ## Import VBM365 Powershell Modules
 Import-Module "C:\Program Files\Veeam\Backup365\Veeam.Archiver.PowerShell\Veeam.Archiver.PowerShell.psd1"
@@ -584,7 +586,7 @@ if ($null -ne $VBMUserObjectsModification)
                     }
 
                     # Why on earth would we work with object ID's... Remove-vboentitydata command requires original and complete objectline from output get-vboentitydata -type user.
-                    $ObjItem = $VBMUserObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName} 
+                    $ObjItem = $VBMUserObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName -and $_.PersonalSiteBackedUpTime -eq $obj.PersonalSiteBackedUpTime}
                     $action = Remove-VBOEntityData -Repository $VBMRepository -User $ObjItem -Sites -Confirm:$false
                     
                     #log result
@@ -634,7 +636,7 @@ if ($null -ne $VBMUserObjectsModification)
                     }
 
                     # Why on earth would we work with object ID's... Remove-vboentitydata command requires original and complete objectline from output get-vboentitydata -type user.
-                    $ObjItem = $VBMUserObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName} 
+                    $ObjItem = $VBMUserObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName -and $_.OneDriveBackedUpTime -eq $obj.OneDriveBackedUpTime}
                     $action = Remove-VBOEntityData -Repository $VBMRepository -User $ObjItem -OneDrive -Confirm:$false
                     
                     #log result
@@ -917,7 +919,7 @@ if ($null -ne $VBMTeamsObjectsModification)
                     }
 
                     # Why on earth would we work with object ID's... Remove-vboentitydata command requires original and complete objectline from output get-vboentitydata -type user.
-                    $ObjItem = $VBMTeamsObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName}
+                    $ObjItem = $VBMTeamsObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName -and $_.BackedUpTime -eq $obj.BackedUpTime}
                     $action = Remove-VBOEntityData -Repository $VBMRepository -Team $ObjItem -Confirm:$false
                     
                     #log result
