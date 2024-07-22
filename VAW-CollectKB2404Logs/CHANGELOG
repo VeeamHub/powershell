@@ -12,3 +12,7 @@
 
   - changed method for collection installed software from Get-WmiObject to faster and more reliable one
   - added information about ciphers
+
+22.07 update:
+
+  - command "wevtutil" was fixed on line 603
