@@ -5,6 +5,7 @@
 ###[25.08.2023] v.2.0.5 - added dism to grab updates, whoami, fsutil
 ###[07.02.2024] v 2.0.6 - added additional checks for VAW installation, changed folder for logs from "Case_logs" -> Veeam_Case_logs
 ###[13.05.2024] v 2.0.7 - changed method for collection installed software from Get-WmiObject to faster and more reliable one, added information about ciphers
+###[22.07.2024] v 2.0.8 - command "wevtutil" was fixed on line 603
 
 Start-Sleep 1
 Write-Warning -Message "This script is provided as is as a courtesy for collecting logs from the Guest Machine. Please be aware that due to certain Microsoft Operations, there may be a short burst of high CPU activity, and that some 
@@ -599,7 +600,7 @@ $GetClusterEv = Get-WinEvent -listLog * | ? LogName -like "*failover*" -ErrorAct
 		}
 	else
 	{
-		$GetClusterEv.Logname | ForEach-Object -Begin $null -Process {wevtutil epl "$_" "$Events\$($_.replace("/", "_")).evtx" /q:"*[System[TimeCreated[timediff(@SystemTime) <= 1209600000 ]]]" /ow:true}, {wevutil al "$Events\$($_.replace("/", "_")).evtx"} -End $null
+		$GetClusterEv.Logname | ForEach-Object -Begin $null -Process {wevtutil epl "$_" "$Events\$($_.replace("/", "_")).evtx" /q:"*[System[TimeCreated[timediff(@SystemTime) <= 1209600000 ]]]" /ow:true}, {wevtutil al "$Events\$($_.replace("/", "_")).evtx"} -End $null
 	}
 		
 #Compress folder containing data
