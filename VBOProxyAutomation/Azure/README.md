@@ -27,14 +27,14 @@ None currently
   * Proxies must be part of a Proxy Pool that you designate in the script to be automated
 * Install Azure Powershell on the VB365 server
   * For Azure Powershell install:
-    Documentation:
+    * Documentation:
 	  * https://learn.microsoft.com/en-us/powershell/azure/install-azps-windows?view=azps-12.4.0&tabs=powershell&pivots=windows-psgallery
 * Create a Azure Managed Identity for the VB365 server
   * This MI will need permissions to get and set the power state for the proxy VMs
     * For testing, we used the "Virtual Machine Contributer" role
-    Documentation:
-    * https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/how-to-configure-managed-identities?pivots=qs-configure-portal-windows-vm
-    * https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/compute#classic-virtual-machine-contributor
+    	* Documentation:
+    		* https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/how-to-configure-managed-identities?pivots=qs-configure-portal-windows-vm
+    		* https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/compute#classic-virtual-machine-contributor
 
 ## Additional Information
 
