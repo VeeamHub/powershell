@@ -6,7 +6,7 @@ Tyson Fewins (tfewins)
 
 ## Function
 
-This script is designed to run as a scheduled task on the VB365 server and automate the power state and maintenance mode state of VB365 proxies running as VMware VMs. VMware was used in the lab to test this functionality with the ultimate goal of using the script in Azure and AWS to save on the cost of proxy VMs by dealocating the VMs when not needed. 
+This script is designed to run as a scheduled task on the VB365 server and automate the power state and maintenance mode state of VB365 proxies running as VMware VMs. VMware was used in the lab to test this functionality with the ultimate goal of using the script in Azure and AWS to save on the cost of proxy VMs by deallocating the VMs when not needed. 
 
 ***NOTE:*** Before executing this script in a production environment, I strongly recommend you:
 
