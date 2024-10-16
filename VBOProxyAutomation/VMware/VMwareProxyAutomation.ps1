@@ -80,10 +80,14 @@ $InitializationScript = {
         return New-Object System.Management.Automation.PSCredential($userName, $secpwd)
     }
 
-    function GetProxyCreds ($username, $password, $rootpass){
+    function GetLinuxProxyCreds ($username, $password, $rootpass){
         $secpwd = ConvertTo-SecureString $password -AsPlainText $true
         $secrootpass = ConvertTo-SecureString $rootpass -AsPlainText $true
         New-VBOLinuxCredential -Account $username -Password $secpwd -ElevateAccountToRoot -RootPassword $secrootpass
+    }
+
+    function GetWindowsProxyCreds ($username, $password){    
+        GetPSCreds -username $username -password $password
     }
 }
 
@@ -281,14 +285,8 @@ function StartVBOProxies ($ProxyPool) {
                     Start-Sleep -Seconds $ProxyBootTime
                 } 
 
-                if ($ProxyOS -eq "Linux"){
-                    $ProxyCreds = GetProxyCreds -username $ProxyUserName -password $ProxyUserPass -rootpass $ProxyRootPass
-                } elseif ($ProxyOS -eq "Windows"){
-                    $ProxyCreds = GetPSCreds -username $ProxyUserName -password $ProxyUserPass
-                }
-                $proxy = Get-VBOProxy -Hostname $proxyHostname
-
                 # Synchronize proxy
+                 $proxy = Get-VBOProxy -Hostname $proxyHostname
                 "[$((Get-Date -Format "MM/dd/yyyy HH:mm:ss").ToString())]`tInfo`t[ProxyJob ($($proxyHostname))] Synchronizing proxy" | Out-File -FilePath $OutputFile -Append -Force
                 try {
                     $SyncProxy = Sync-VBOProxy -Proxy $proxy
@@ -298,15 +296,21 @@ function StartVBOProxies ($ProxyPool) {
                     "[$((Get-Date -Format "MM/dd/yyyy HH:mm:ss").ToString())]`tError`t[ProxyJob ($($proxyHostname))] Synchronization error occurred" | Out-File -FilePath $OutputFile -Append -Force
                 }
 
-                # Disable MaintenanceMode
+                 # Disable MaintenanceMode
                 if ($proxy.MaintenanceModeState -like '*Enab*') {
                     "[$((Get-Date -Format "MM/dd/yyyy HH:mm:ss").ToString())]`tInfo`t[ProxyJob ($($proxyHostname))] Disabling MaintenanceMode" | Out-File -FilePath $OutputFile -Append -Force
                     try {
-                        $DisableMaintenanceMode = Set-VBOProxyMaintenance -Enable:$false -LinuxCredential $ProxyCreds -Proxy $proxy
-                        "[$((Get-Date -Format "MM/dd/yyyy HH:mm:ss").ToString())]`tInfo`t[ProxyJob ($($proxyHostname))] MaintenanceMode command completed" | Out-File -FilePath $OutputFile -Append -Force
+                        if ($ProxyOS -eq "Linux"){
+                            $ProxyCreds = GetLinuxProxyCreds -username $ProxyUserName -password $ProxyUserPass -rootpass $ProxyRootPass
+                            $DisableMaintenanceMode = Set-VBOProxyMaintenance -Enable:$false -LinuxCredential $ProxyCreds -Proxy $proxy
+                        } elseif ($ProxyOS -eq "Windows"){
+                            $ProxyCreds = GetWindowsProxyCreds -username $ProxyUserName -password $ProxyUserPass
+                            $DisableMaintenanceMode = Set-VBOProxyMaintenance -Enable:$false -WindowsCredential $ProxyCreds -Proxy $proxy
+                        }
+                        "[$((Get-Date -Format "MM/dd/yyyy HH:mm:ss").ToString())]`tInfo`t[ProxyJob ($($proxyHostname))] Disable MaintenanceMode command completed" | Out-File -FilePath $OutputFile -Append -Force
                     }
                     catch {
-                        "[$((Get-Date -Format "MM/dd/yyyy HH:mm:ss").ToString())]`tError`t[ProxyJob ($($proxyHostname))] MaintenanceMode command error occurred" | Out-File -FilePath $OutputFile -Append -Force
+                        "[$((Get-Date -Format "MM/dd/yyyy HH:mm:ss").ToString())]`tError`t[ProxyJob ($($proxyHostname))] Disable MaintenanceMode command error occurred" | Out-File -FilePath $OutputFile -Append -Force
                     }
                 }
             }
@@ -381,15 +385,8 @@ function StopVBOProxies ($ProxyPool) {
                     "[$((Get-Date -Format "MM/dd/yyyy HH:mm:ss").ToString())]`tError`t[ProxyJob ($($proxyHostname))] Connection to $($vCenterServer) failed" | Out-File -FilePath $OutputFile -Append -Force
                 }
 
-                # Proxy Creds
-                if ($ProxyOS -eq "Linux"){
-                    $ProxyCreds = GetProxyCreds -username $ProxyUserName -password $ProxyUserPass -rootpass $ProxyRootPass
-                } elseif ($ProxyOS -eq "Windows"){
-                    $ProxyCreds = GetPSCreds -username $ProxyUserName -password $ProxyUserPass
-                }
-                $proxy = Get-VBOProxy -Hostname $proxyHostname
-
                 # Enable MaintenanceMode
+                $proxy = Get-VBOProxy -Hostname $proxyHostname
                 if ($proxy.MaintenanceModeState -eq 'Disabled') {
 
                     # If proxy is offline with disabled maintenance mode, attempt to start the proxy to modify
@@ -420,11 +417,17 @@ function StopVBOProxies ($ProxyPool) {
                     # Enable maintenance mode
                     "[$((Get-Date -Format "MM/dd/yyyy HH:mm:ss").ToString())]`tInfo`t[ProxyJob ($($proxyHostname))] Enabling MaintenanceMode" | Out-File -FilePath $OutputFile -Append -Force
                     try {
-                        $EnableMaintenanceMode = Set-VBOProxyMaintenance -Enable -LinuxCredential $ProxyCreds -Proxy $proxy
-                        "[$((Get-Date -Format "MM/dd/yyyy HH:mm:ss").ToString())]`tInfo`t[ProxyJob ($($proxyHostname))] MaintenanceMode command completed" | Out-File -FilePath $OutputFile -Append -Force
+                        if ($ProxyOS -eq "Linux"){
+                            $ProxyCreds = GetLinuxProxyCreds -username $ProxyUserName -password $ProxyUserPass -rootpass $ProxyRootPass
+                            $EnableMaintenanceMode = Set-VBOProxyMaintenance -Enable -LinuxCredential $ProxyCreds -Proxy $proxy
+                        } elseif ($ProxyOS -eq "Windows"){
+                            $ProxyCreds = GetWindowsProxyCreds -username $ProxyUserName -password $ProxyUserPass
+                            $EnableMaintenanceMode = Set-VBOProxyMaintenance -Enable -WindowsCredential $ProxyCreds -Proxy $proxy
+                        }
+                        "[$((Get-Date -Format "MM/dd/yyyy HH:mm:ss").ToString())]`tInfo`t[ProxyJob ($($proxyHostname))] Enable MaintenanceMode command completed" | Out-File -FilePath $OutputFile -Append -Force
                     }
                     catch {
-                        "[$((Get-Date -Format "MM/dd/yyyy HH:mm:ss").ToString())]`tError`t[ProxyJob ($($proxyHostname))] MaintenanceMode command error occurred" | Out-File -FilePath $OutputFile -Append -Force
+                        "[$((Get-Date -Format "MM/dd/yyyy HH:mm:ss").ToString())]`tError`t[ProxyJob ($($proxyHostname))] Enable MaintenanceMode command error occurred" | Out-File -FilePath $OutputFile -Append -Force
                     }
                 }
 
