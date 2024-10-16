@@ -140,11 +140,16 @@ function CheckVBOProxies ($ProxyPool) {
         $proxy = Get-VBOProxy -Hostname $proxyHostname
         $ProxyVMName = $null
         $ProxyMode = $null
-        foreach ($ProxyVM in $ProxyVMList) {
+        
+        # Match VBO Proxy to Proxy VM
+        foreach ($ProxyVM in $VBOAutomatedProxies) {
+            $match = $false
             if ($proxy.Hostname -eq $ProxyVM.ProxyVMIPv4) {
-                $ProxyVMName = $ProxyVM.ProxyVMName
-                $ProxyMode = $ProxyVM.ProxyMode
+                $match = $true
             } elseif ($proxy.Hostname -eq $ProxyVM.ProxyVMName) {
+                $match = $true
+            }
+            if ($match) {
                 $ProxyVMName = $ProxyVM.ProxyVMName
                 $ProxyMode = $ProxyVM.ProxyMode
             }
