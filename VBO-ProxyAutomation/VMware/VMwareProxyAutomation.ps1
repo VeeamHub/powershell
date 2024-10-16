@@ -274,6 +274,7 @@ function StartVBOProxies ($ProxyPool) {
                 }
 
                 # PowerON proxy
+                $vm = Get-VM -Name $ProxyVMName
                 If ($vm.PowerState -eq 'PoweredOff') {
                     "[$((Get-Date -Format "MM/dd/yyyy HH:mm:ss").ToString())]`tInfo`t[ProxyJob ($($proxyHostname))] Starting $($vm.Name)" | Out-File -FilePath $OutputFile -Append -Force
                     try {
