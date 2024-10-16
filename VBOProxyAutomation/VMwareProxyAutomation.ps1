@@ -5,12 +5,6 @@ $vCenterServer = "<String:vCenterServer DNSName or IP>"
 $vCenterServerCredsUsername = "<String: username>"
 $vCenterServerCredsPassword = "<String: password>"
 
-# Proxy Creds. Needed to modify proxy MaintenanceModeState
-$ProxyUserName = "<String: username>"
-$ProxyUserPass = "<String: password>"
-# If ProxyOS is Linux and Root pass is required. Leave blank string if not required
-$ProxyRootPass = "<String: root password>"
-
 # Time, in minutes, to run GetVBOSession (will check for running jobs every 30 seconds for the duration specified)
 $CheckTime = 4
 
@@ -23,27 +17,42 @@ $OutputFile = "<String: Path\to\log\file>"
 # Name of proxy pool to be automated
 $ProxyPoolName = "<String: Proxy pool name>"
 
-# List of Proxy VM Names and IPs to match with VBO proxy. 
-# Also set which proxy is to stay online ('Primary') and which are to be stopped after jobs complete ('Auto')
-# Uncomment (#) the lines and replace values with your proxy information
-$ProxyVMList = @(
+<#
+List of Proxy VM attributes used to manage proxy power and maintenance mode operations 
+    ProxyVMName: 
+        Name of the VM in Azure
+    ProxyVMIPv4:
+        The local IPv4 address of the proxy (potentially used to add proxy to VBO)
+    ProxyMode:
+        Set which proxy is to stay online ('Primary') and which are to be stopped after jobs complete ('Auto')
+    ProxyBootTime:
+        Sets the wait time (in seconds) after starting the VM for the guest OS to be up before sending proxy commands
+    PoxyUserName:
+        Windows- Start a local account username with "`.\" The period must be escaped with a back tick character. Domain account can use "domain\username" format.
+        Linux - no domain needed
+    ProxyUserPass:
+        Password string
+    ProxyRootPass:
+        Root password string which may be required for Linux proxies.        
+#>
+$VBOAutomatedProxies = @(
     [PSCustomObject]@{
-        #ProxyVMName = "VB365Proxy01";
-        #ProxyVMIPv4 = "10.0.0.101";
-        #ProxyMode = "Primary";
-        #ProxyOS = "Linux"
+        ProxyVMName = "<String>";
+        ProxyVMIPv4 = "<String>";
+        ProxyMode = "Primay";
+        ProxyOS = "<Windows/Linux>";
+        ProxyBootTime = 120;
+        ProxyUserName = '<String>';
+        ProxyUserPass = '<String>'
     }
     [PSCustomObject]@{
-        #ProxyVMName = "VB365Proxy02";
-        #ProxyVMIPv4 = "10.0.0.102";
-        #ProxyMode = "Auto";
-        #ProxyOS = "Windows"
-    }
-    [PSCustomObject]@{
-        #ProxyVMName = "VB365Proxy03";
-        #ProxyVMIPv4 = "10.0.0.103"
-        #ProxyMode = "Auto";
-        #ProxyOS = "Linux"
+        ProxyVMName = "<String>";
+        ProxyVMIPv4 = "<String>";
+        ProxyMode = "Auto";
+        ProxyOS =  "<Windows/Linux>";
+        ProxyBootTime = 120;
+        ProxyUserName = '<String>';
+        ProxyUserPass = '<String>'
     }
 )
 
@@ -211,15 +220,23 @@ function StartVBOProxies ($ProxyPool) {
         $ProxyVMName = $null
 
         # Match VBO Proxy to Proxy VM
-        foreach ($ProxyVM in $ProxyVMList) {
+        foreach ($ProxyVM in $VBOAutomatedProxies) {
+            $match = $false
             if ($proxy.Hostname -eq $ProxyVM.ProxyVMIPv4) {
-                $ProxyVMName = $ProxyVM.ProxyVMName
-                $ProxyMode = $ProxyVM.ProxyMode
-                $ProxyOS = $ProxyVM.ProxyOS
+                $match = $true
             } elseif ($proxy.Hostname -eq $ProxyVM.ProxyVMName) {
+                $match = $true
+            }
+            if ($match) {
                 $ProxyVMName = $ProxyVM.ProxyVMName
                 $ProxyMode = $ProxyVM.ProxyMode
                 $ProxyOS = $ProxyVM.ProxyOS
+                $ProxyBootTime = $ProxyVM.ProxyBootTime
+                $ProxyUserName = $ProxyVM.ProxyUserName
+                $ProxyUserPass = $ProxyVM.ProxyUserPass
+                if (![string]::IsNullOrEmpty($ProxyVM.ProxyRootPass)) {
+                    $ProxyRootPass = $ProxyVM.ProxyRootPass
+                }
             }
         }
         if ($null -ne $ProxyVMName) {
@@ -232,6 +249,7 @@ function StartVBOProxies ($ProxyPool) {
                     $ProxyUserPass,
                     $ProxyRootPass,
                     $ProxyOS,
+                    $ProxyBootTime,
                     $vCenterServer,
                     $vCenterServerCredsUsername,
                     $vCenterServerCredsPassword
@@ -259,7 +277,8 @@ function StartVBOProxies ($ProxyPool) {
                     catch {
                         "[$((Get-Date -Format "MM/dd/yyyy HH:mm:ss").ToString())]`tError`t[ProxyJob ($($proxyHostname))] Start-VM command failed" | Out-File -FilePath $OutputFile -Append -Force
                     }
-                    Start-Sleep -Seconds 60
+                    "[$((Get-Date -Format "MM/dd/yyyy HH:mm:ss").ToString())]`tInfo`t[ProxyJob ($($proxyHostname))] Waiting for proxy guest OS ($($ProxyBootTime) seconds)" | Out-File -FilePath $OutputFile -Append -Force
+                    Start-Sleep -Seconds $ProxyBootTime
                 } 
 
                 if ($ProxyOS -eq "Linux"){
@@ -293,7 +312,7 @@ function StartVBOProxies ($ProxyPool) {
             }
 
             # Start background job to run proxy tasks
-            Start-Job -InitializationScript  $InitializationScript -Name $proxyHostname -ScriptBlock  $ScriptBlock -ArgumentList $OutputFile, $proxyHostname, $ProxyVMName, $ProxyUserName, $ProxyUserPass, $ProxyRootPass, $ProxyOS, $vCenterServer, $vCenterServerCredsUsername, $vCenterServerCredsPassword 
+            Start-Job -InitializationScript  $InitializationScript -Name $proxyHostname -ScriptBlock  $ScriptBlock -ArgumentList $OutputFile, $proxyHostname, $ProxyVMName, $ProxyUserName, $ProxyUserPass, $ProxyRootPass, $ProxyOS, $ProxyBootTime, $vCenterServer, $vCenterServerCredsUsername, $vCenterServerCredsPassword 
             if ($ProxyMode -eq 'Auto') {
                 $script:ProxiesRunning = $true 
             }
@@ -314,15 +333,22 @@ function StopVBOProxies ($ProxyPool) {
         $ProxyMode = $null
         
         # Match VBO Proxy to Proxy VM
-        foreach ($ProxyVM in $ProxyVMList) {
+        foreach ($ProxyVM in $VBOAutomatedProxies) {
+            $match = $false
             if ($proxy.Hostname -eq $ProxyVM.ProxyVMIPv4) {
-                $ProxyVMName = $ProxyVM.ProxyVMName
-                $ProxyMode = $ProxyVM.ProxyMode
-                $ProxyOS = $ProxyVM.ProxyOS
+                $match = $true
             } elseif ($proxy.Hostname -eq $ProxyVM.ProxyVMName) {
+                $match = $true
+            }
+            if ($match) {
                 $ProxyVMName = $ProxyVM.ProxyVMName
                 $ProxyMode = $ProxyVM.ProxyMode
                 $ProxyOS = $ProxyVM.ProxyOS
+                $ProxyUserName = $ProxyVM.ProxyUserName
+                $ProxyUserPass = $ProxyVM.ProxyUserPass
+                if (![string]::IsNullOrEmpty($ProxyVM.ProxyRootPass)) {
+                    $ProxyRootPass = $ProxyVM.ProxyRootPass
+                }
             }
         }
         if ($null -ne $ProxyVMName) {
