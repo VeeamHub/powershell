@@ -4,11 +4,11 @@
 
 Tyson Fewins (tfewins)
 
-Brad Barker 
+Brad Barker (bbark-veeam)
 
 ## Function
 
-This script is designed to run as a scheduled task on the VB365 server and automate the power state and maintenance mode state of VB365 proxies running as Azure VMs. The purposer of the script is to save on the cost of proxy VMs by dealocating the VMs when not needed. 
+This script is designed to run as a scheduled task on the VB365 server and automate the power state and maintenance mode state of VB365 proxies running as Azure VMs. The purpose of the script is to save on the cost of proxy VMs by deallocating the VMs when not needed. 
 
 ***NOTE:*** Before executing this script in a production environment, I strongly recommend you:
 
@@ -43,4 +43,4 @@ None currently
 
 * Create a Windows scheduled task on the VB365 server to run the script at intervals
   * Adjust the $CheckTime variable to fit within your scheduled task interval
-    * Ex. If the task runs every 5 minutes, then I can set $Checktime = 4 so that it checks for running job sessions for 4 minutes and then the script will complete and restart at the 5th minute unless a job is found and the automation kicks in. 
+    * Ex. If the task runs every 5 minutes, then I can set $Checktime = 4 so that it checks for running job sessions for 4 minutes and then the script will complete and restart at the next 5 minute interval (1 minute between) unless a job is found and the automation kicks in. 
