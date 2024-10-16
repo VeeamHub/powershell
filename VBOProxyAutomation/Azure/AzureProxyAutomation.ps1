@@ -42,7 +42,8 @@ $VBOAutomatedProxies = @(
         ProxyOS = "<Windows/Linux>";
         ProxyBootTime = 120;
         ProxyUserName = '<String>';
-        ProxyUserPass = '<String>'
+        ProxyUserPass = '<String>';
+        ProxyRootPass = '<String>'
     }
     [PSCustomObject]@{
         ProxyVMName = "<String>";
@@ -51,7 +52,8 @@ $VBOAutomatedProxies = @(
         ProxyOS =  "<Windows/Linux>";
         ProxyBootTime = 120;
         ProxyUserName = '<String>';
-        ProxyUserPass = '<String>'
+        ProxyUserPass = '<String>';
+        ProxyRootPass = '<String>'
     }
 )
 
