@@ -8,7 +8,7 @@ Brad Barker
 
 ## Function
 
-This script is designed to run as a scheduled task on the VB365 server and automate the power state and maintenance mode state of VB365 proxies running as Azure VMs. The purposer of the script is to save on the cost of proxy VMs by dealocating the VMs when not needed. 
+This script is designed to run as a scheduled task on the VB365 server and automate the power state and maintenance mode state of VB365 proxies running as Azure VMs. The purpose of the script is to save on the cost of proxy VMs by deallocating the VMs when not needed. 
 
 ***NOTE:*** Before executing this script in a production environment, I strongly recommend you:
 
@@ -31,11 +31,10 @@ None currently
 	  * https://learn.microsoft.com/en-us/powershell/azure/install-azps-windows?view=azps-12.4.0&tabs=powershell&pivots=windows-psgallery
 * Create a Azure Managed Identity for the VB365 server
   * This MI will need permissions to get and set the power state for the proxy VMs
-    * For testing, we used the "Virtual Machine Contributer" role
+    * For testing, we used the "Virtual Machine Contributor" role
     	* Documentation:
     		* https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/how-to-configure-managed-identities?pivots=qs-configure-portal-windows-vm
-    		* https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/compute#classic-virtual-machine-contributor
-
+    		* https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/compute#virtual-machine-contributor
 ## Additional Information
 
 * Modify the parameters found at the beginning of the script
