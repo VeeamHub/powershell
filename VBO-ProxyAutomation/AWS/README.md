@@ -1,4 +1,4 @@
-# Veeam Backup for Microsoft 365 Azure Proxy Automation
+# Veeam Backup for Microsoft 365 AWS Proxy Automation
 
 ## Author
 
