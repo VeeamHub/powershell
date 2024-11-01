@@ -45,7 +45,7 @@ None currently
 
 * Create a Windows scheduled task on the VB365 server to run the script at intervals
   * Adjust the $CheckTime variable to fit within your scheduled task interval
-    * Ex. If the task runs every 5 minutes, then I can set $Checktime = 4 so that it checks for running job sessions for 4 minutes and then the script will complete and restart at the 5th minute unless a job is found and the automation kicks in. 
+    * Ex. If the task runs every 5 minutes, then I can set $Checktime = 4 so that it checks for running job sessions for 4 minutes and then the script will complete and restart at the next 5 minute mark unless a job is found and the automation kicks in. 
 
 * The "Primary" proxy is designated to run all the time since the VB365 jobs and repository using the proxy pool will show as 'Disconnected' if all proxies are offline/unavailable and this will prevent jobs from running.
     * VB365 v8 allows you to deploy undersized proxies without error. To further reduce cloud spend, you can deploy the "Primary" proxy on a free-tier instance type (I used an instance type of t2.micro in my testing) and then have the full sized proxies set to "Auto" to bring them up and down when needed.  
