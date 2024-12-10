@@ -6,6 +6,7 @@
 ###[07.02.2024] v 2.0.6 - added additional checks for VAW installation, changed folder for logs from "Case_logs" -> Veeam_Case_logs
 ###[13.05.2024] v 2.0.7 - changed method for collection installed software from Get-WmiObject to faster and more reliable one, added information about ciphers
 ###[22.07.2024] v 2.0.8 - command "wevtutil" was fixed on line 603
+###[10.12.2024] v 2.0.9 - added additional files and folder to collect (C:\ProgramData\Veeam\Backup\BackupSearch) for FLR troubleshooting
 
 Start-Sleep 1
 Write-Warning -Message "This script is provided as is as a courtesy for collecting logs from the Guest Machine. Please be aware that due to certain Microsoft Operations, there may be a short burst of high CPU activity, and that some 
@@ -72,6 +73,11 @@ $SnapProv = "$directory\Backup" #<---- Collectiong snapshot logs
 $SnapProvDir = "C:\ProgramData\Veeam\Backup\"
 $SnapProvExists = Test-Path $SnapProvDir
 $SnapProvCopy = "C:\ProgramData\Veeam\Backup\*" #<---- End of the snapshot logs collection section
+#FLR for VCSP
+$VCSP_FLR = "C:\ProgramData\Veeam\Backup\BackupSearch" #<---- Collecting Setup logs for Cloud-based Agents
+$VCSP_FLR_FolExists = Test-Path "C:\ProgramData\Veeam\Backup\BackupSearch"
+$VCSP_FLR_FolLog = "$directory\Backup\BackupSearch"
+
 $ZipFolder = $function:ZipFolder
 
 #Logging everything
@@ -367,7 +373,7 @@ Write-Host 'Copying Veeam Agent for Windows Snapshot provider and Installer logs
 		}
 	else
 		{
-		Get-ChildItem -Path $SnapProvCopy -Include *.VssHwSnapshotProviderService.log, *.VssHwSnapshotProviderService.*.log,*.VssHwSnapshotProviderService.zip, *.VeeamInstaller.log, *.VeeamInstaller.*.log, *.VeeamInstallerDll.log, *.VeeamInstallerDll.*.log | Copy-Item -Destination $SnapProv -Recurse -Force -ErrorAction SilentlyContinue 
+		Get-ChildItem -Path $SnapProvCopy -Include *.VssHwSnapshotProviderService.log, *.VssHwSnapshotProviderService.*.log,*.VssHwSnapshotProviderService.zip, *.VeeamInstaller.log, *.VeeamInstaller.*.log, *.VeeamInstallerDll.log, *.VeeamInstallerDll.*.log, Driver.VeeamFLR.log | Copy-Item -Destination $SnapProv -Recurse -Force -ErrorAction SilentlyContinue 
 		Write-Host -ForegroundColor Yellow "Done"
 		Start-Sleep 1
 		}
@@ -381,6 +387,16 @@ if ($CloudFolExists -eq $False )
 		New-Item -ItemType Directory -Force -Path $CloudFolLog -ErrorAction SilentlyContinue > $null
 		Get-ChildItem -Path $CloudFol | Copy-Item -Destination $CloudFolLog -Recurse -Force -ErrorAction SilentlyContinue 
 		Get-ChildItem -Path $SnapProvCopy -Include Cli.VeeamTransport.log, Svc.VeeamTransport.log, VssProxy.log, *.Target.log | Copy-Item -Destination $SnapProv -Recurse -Force -ErrorAction SilentlyContinue
+		}
+
+if ($VCSP_FLR_FolExists -eq $False )
+		{
+		Write-Warning "Could not copy FLR logs." -ErrorAction SilentlyContinue
+		}
+	else
+		{
+		New-Item -ItemType Directory -Force -Path $VCSP_FLR_FolLog -ErrorAction SilentlyContinue > $null
+		Get-ChildItem -Path $VCSP_FLR | Copy-Item -Destination $VCSP_FLR_FolLog -Recurse -Force -ErrorAction SilentlyContinue 
 		}
 
 #export vss logs
