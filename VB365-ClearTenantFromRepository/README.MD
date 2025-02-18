@@ -13,11 +13,12 @@ Requires: Veeam Backup for Microsoft Office 365
 Tested against:    
 - V7.1.0.1401    
 - V7.1.0.1501    
+- V7.1.0.2701  
 
 Usage: Edit the script to your values. Run using VBM365-ClearTenantFromRepository.ps1.
 
 ## License
-Copyright (c) 2024 VeeamHub
+Copyright (c) 2025 VeeamHub
 
 - [MIT License](LICENSE)
 
@@ -25,3 +26,4 @@ Copyright (c) 2024 VeeamHub
 Date | Comments
 ---  | ---
 2024.01.31 | initial release 
+2025.02.18 | added usage of tasksessions instead of relying on remove-vboentity internal check if a task has completed. 
