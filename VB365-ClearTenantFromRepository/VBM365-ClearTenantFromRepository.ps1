@@ -2,6 +2,7 @@
 #### tested against: 
 # VBM365 7.1.0.1401 P20231218
 # VBM365 7.1.0.1501 P20240123
+# VBM365 7.1.0.2701 P20240730
 
 ## Import VBM365 Powershell Modules
 Import-Module "C:\Program Files\Veeam\Backup365\Veeam.Archiver.PowerShell\Veeam.Archiver.PowerShell.psd1"
