@@ -425,6 +425,7 @@ if ($RemovalConfirmation -eq "No")
 # Execution part
 ####################################################################################################################################################################################
 
+
 # Initialize Veeam task logging
 $VeeamTaskLog = @()
 
@@ -487,7 +488,15 @@ if ($null -ne $VBMUserObjectsModification)
                     
                     # Why on earth would we work with object ID's... Remove-vboentitydata command requires original and complete objectline from output get-vboentitydata -type user.
                     $ObjItem = $VBMUserObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName -and $_.MailboxBackedUpTime -eq $obj.MailboxBackedUpTime}
-                    $action = Remove-VBOEntityData -Repository $VBMRepository -User $ObjItem -Mailbox -Confirm:$false
+                    $action = Remove-VBOEntityData -Repository $VBMRepository -User $ObjItem -Mailbox -Confirm:$false -RunAsync
+                    
+                    #sleep untill task is completed
+                    do {
+                        Start-Sleep -Seconds 60
+                        $jobSManagementession = Get-VBODataManagementSession | Where-Object {$_.jobid -eq $action.jobid}
+                        $status = $jobSManagementession.Status
+                        #Logging  "Current status: $status"
+                    } while ($status -eq 'Running')
                     
                     #log result
                     $o.RemoveEmailTaskId = $action.Id
@@ -538,7 +547,15 @@ if ($null -ne $VBMUserObjectsModification)
 
                     # Why on earth would we work with object ID's... Remove-vboentitydata command requires original and complete objectline from output get-vboentitydata -type user.
                     $ObjItem = $VBMUserObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName} 
-                    $action = Remove-VBOEntityData -Repository $VBMRepository -User $ObjItem -ArchiveMailbox -Confirm:$false
+                    $action = Remove-VBOEntityData -Repository $VBMRepository -User $ObjItem -ArchiveMailbox -Confirm:$false -RunAsync
+
+                    #sleep untill task is completed
+                    do {
+                        Start-Sleep -Seconds 60
+                        $jobSManagementession = Get-VBODataManagementSession | Where-Object {$_.jobid -eq $action.jobid}
+                        $status = $jobSManagementession.Status
+                        #Logging  "Current status: $status"
+                    } while ($status -eq 'Running')
                     
                     #log result
                     $o.RemoveEmailArchiveTaskId = $action.Id
@@ -588,7 +605,15 @@ if ($null -ne $VBMUserObjectsModification)
 
                     # Why on earth would we work with object ID's... Remove-vboentitydata command requires original and complete objectline from output get-vboentitydata -type user.
                     $ObjItem = $VBMUserObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName -and $_.PersonalSiteBackedUpTime -eq $obj.PersonalSiteBackedUpTime}
-                    $action = Remove-VBOEntityData -Repository $VBMRepository -User $ObjItem -Sites -Confirm:$false
+                    $action = Remove-VBOEntityData -Repository $VBMRepository -User $ObjItem -Sites -Confirm:$false -RunAsync
+
+                    #sleep untill task is completed
+                    do {
+                        Start-Sleep -Seconds 60
+                        $jobSManagementession = Get-VBODataManagementSession | Where-Object {$_.jobid -eq $action.jobid}
+                        $status = $jobSManagementession.Status
+                        #Logging  "Current status: $status"
+                    } while ($status -eq 'Running')
                     
                     #log result
                     $o.RemovePersonalSharepointTaskId = $action.Id
@@ -638,7 +663,15 @@ if ($null -ne $VBMUserObjectsModification)
 
                     # Why on earth would we work with object ID's... Remove-vboentitydata command requires original and complete objectline from output get-vboentitydata -type user.
                     $ObjItem = $VBMUserObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName -and $_.OneDriveBackedUpTime -eq $obj.OneDriveBackedUpTime}
-                    $action = Remove-VBOEntityData -Repository $VBMRepository -User $ObjItem -OneDrive -Confirm:$false
+                    $action = Remove-VBOEntityData -Repository $VBMRepository -User $ObjItem -OneDrive -Confirm:$false -RunAsync
+
+                    #sleep untill task is completed
+                    do {
+                        Start-Sleep -Seconds 60
+                        $jobSManagementession = Get-VBODataManagementSession | Where-Object {$_.jobid -eq $action.jobid}
+                        $status = $jobSManagementession.Status
+                        #Logging  "Current status: $status"
+                    } while ($status -eq 'Running')
                     
                     #log result
                     $o.RemoveOneDriveTaskId = $action.Id
@@ -719,7 +752,15 @@ if ($null -ne $VBMGroupObjectsModification)
 
                     # Why on earth would we work with object ID's... Remove-vboentitydata command requires original and complete objectline from output get-vboentitydata -type user.
                     $ObjItem = $VBMGroupObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName -and $_.MailboxBackedUpTime -eq $obj.MailboxBackedUpTime} 
-                    $action = Remove-VBOEntityData -Repository $VBMRepository -Group $ObjItem -GroupMailbox -Confirm:$false
+                    $action = Remove-VBOEntityData -Repository $VBMRepository -Group $ObjItem -GroupMailbox -Confirm:$false -RunAsync
+                    
+                    #sleep untill task is completed
+                    do {
+                        Start-Sleep -Seconds 60
+                        $jobSManagementession = Get-VBODataManagementSession | Where-Object {$_.jobid -eq $action.jobid}
+                        $status = $jobSManagementession.Status
+                        #Logging  "Current status: $status"
+                    } while ($status -eq 'Running')
                     
                     #log result
                     $o.RemoveEmailTaskId = $action.Id
@@ -769,7 +810,15 @@ if ($null -ne $VBMGroupObjectsModification)
 
                     # Why on earth would we work with object ID's... Remove-vboentitydata command requires original and complete objectline from output get-vboentitydata -type user.
                     $ObjItem = $VBMGroupObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName -and $_.SiteBackedUpTime -eq $obj.SiteBackedUpTime} 
-                    $action = Remove-VBOEntityData -Repository $VBMRepository -Group $ObjItem -GroupSite -Confirm:$false
+                    $action = Remove-VBOEntityData -Repository $VBMRepository -Group $ObjItem -GroupSite -Confirm:$false -RunAsync
+
+                    #sleep untill task is completed
+                    do {
+                        Start-Sleep -Seconds 60
+                        $jobSManagementession = Get-VBODataManagementSession | Where-Object {$_.jobid -eq $action.jobid}
+                        $status = $jobSManagementession.Status
+                        #Logging  "Current status: $status"
+                    } while ($status -eq 'Running')
                     
                     #log result
                     $o.RemovePersonalSharepointTaskId = $action.Id
@@ -845,7 +894,15 @@ if ($null -ne $VBMSharepointObjectsModification)
 
                     # Why on earth would we work with object ID's... Remove-vboentitydata command requires original and complete objectline from output get-vboentitydata -type user.
                     $ObjItem = $VBMSharePointObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName -and $_.BackedUpTime -eq $obj.BackedUpTime} 
-                    $action = Remove-VBOEntityData -Repository $VBMRepository -Site $ObjItem -Confirm:$false
+                    $action = Remove-VBOEntityData -Repository $VBMRepository -Site $ObjItem -Confirm:$false -RunAsync
+
+                    #sleep untill task is completed
+                    do {
+                        Start-Sleep -Seconds 60
+                        $jobSManagementession = Get-VBODataManagementSession | Where-Object {$_.jobid -eq $action.jobid}
+                        $status = $jobSManagementession.Status
+                        #Logging  "Current status: $status"
+                    } while ($status -eq 'Running')
                     
                     #log result
                     $o.RemoveSharepointTaskId = $action.Id
@@ -921,7 +978,15 @@ if ($null -ne $VBMTeamsObjectsModification)
 
                     # Why on earth would we work with object ID's... Remove-vboentitydata command requires original and complete objectline from output get-vboentitydata -type user.
                     $ObjItem = $VBMTeamsObjects | Where-Object {$_.DisplayName -eq $obj.DisplayName -and $_.BackedUpTime -eq $obj.BackedUpTime}
-                    $action = Remove-VBOEntityData -Repository $VBMRepository -Team $ObjItem -Confirm:$false
+                    $action = Remove-VBOEntityData -Repository $VBMRepository -Team $ObjItem -Confirm:$false -RunAsync
+
+                    #sleep untill task is completed
+                    do {
+                        Start-Sleep -Seconds 60
+                        $jobSManagementession = Get-VBODataManagementSession | Where-Object {$_.jobid -eq $action.jobid}
+                        $status = $jobSManagementession.Status
+                        #Logging  "Current status: $status"
+                    } while ($status -eq 'Running')
                     
                     #log result
                     $o.RemoveTeamsTaskId = $action.Id
