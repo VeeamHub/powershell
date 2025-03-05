@@ -1,4 +1,8 @@
-07.02 update:
+10.12.2024 update:
+
+  - added the collection of the files from the additional folder C:\ProgramData\Veeam\Backup\BackupSearch
+
+07.02.2024 update:
 
   - additional checks for the presence of the Veeam Agent on the machine in question were added
   - confirmation to proceed with the logs collection if Veeam Agent is not installed was added
@@ -7,3 +11,12 @@
 
     - if Veeam Agent is installed -> the logs will be saved to C:\ProgramData\Veeam\Veeam_Case_Logs
     - if Veeam Agent is not installed and logs collection was confirmed -> the logs will be saved to C:\Veeam_Case_Logs
+
+13.05.2023 update:
+
+  - changed method for collection installed software from Get-WmiObject to faster and more reliable one
+  - added information about ciphers
+
+22.07.2023 update:
+
+  - command "wevtutil" was fixed on line 603
