@@ -11,7 +11,7 @@
     NAME: Collect_Veeam_Guest_Logs.ps1
     AUTHOR: Chris Evans, Veeam Software
     CONTACT: chris.evans@veeam.com
-    LASTEDIT: 2-27-2024
+    LASTEDIT: 31-March-2025
     KEYWORDS: Log collection, AAiP, Guest Processing
 #> 
 #Requires -Version 4.0
@@ -19,6 +19,8 @@
 $ErrorActionPreference = "SilentlyContinue"
 #Set default width of all invocations of Out-File and redirection operators to 2000 to prevent truncation of output.
 $PSDefaultParameterValues['Out-File:Width'] = 2000
+#Set remove enumeration limit to prevent a formatted collection of values from getting truncated
+$FormatEnumerationLimit = "-1"
 
 #Check if script running in PowerShell ISE. If so, instruct to call the script again from a normal PowerShell console. This is due to PS ISE loading additional modules that can cause issues with transcription.
 if ($psISE) {
@@ -54,11 +56,11 @@ function GetDBUserInfo (
                 #Get permissions for each user
                 $DBRoles = $User.EnumRoles()
                 foreach ($role in $DBRoles) {
-                    ("`t" + $role + " on " + $Database.Name)  | Out-File "$directory\SQL_Permissions.log" -Append
+                    ("`t" + $role + " on " + $Database.Name)  | Out-File "$directory\SQL_Permissions.log" -Append -Encoding utf8
                 } 
                 #Get any explicitily granted permissions
                 foreach ($Permission in $Database.EnumObjectPermissions($User.Name)) {
-                    ("`t" + $Permission.PermissionState + " " + $Permission.PermissionType + " on " + $Permission.ObjectName + " in " + $Database.Name)  | Out-File "$directory\SQL_Permissions.log" -Append
+                    ("`t" + $Permission.PermissionState + " " + $Permission.PermissionType + " on " + $Permission.ObjectName + " in " + $Database.Name)  | Out-File "$directory\SQL_Permissions.log" -Append -Encoding utf8
                 } 
             } 
         } 
@@ -71,50 +73,50 @@ function LogSQLPermissions (
 {
     foreach ($SQLServer in $SQLServerInstance) {
         $Server = New-Object ("Microsoft.SqlServer.Management.Smo.Server") $SQLServer
-         "=================================================================================" | Out-File "$directory\SQL_Permissions.log" -Append
-         ("SQL Instance: " + $Server.Name) | Out-File "$directory\SQL_Permissions.log" -Append 
-         ("SQL Version: " + $Server.VersionString) | Out-File "$directory\SQL_Permissions.log" -Append
-         ("Edition: " + $Server.Edition) | Out-File "$directory\SQL_Permissions.log" -Append 
-         ("Login Mode: " + $Server.LoginMode) | Out-File "$directory\SQL_Permissions.log" -Append
-         "=================================================================================" | Out-File "$directory\SQL_Permissions.log" -Append
+         "=================================================================================" | Out-File "$directory\SQL_Permissions.log" -Append -Encoding utf8
+         ("SQL Instance: " + $Server.Name) | Out-File "$directory\SQL_Permissions.log" -Append -Encoding utf8
+         ("SQL Version: " + $Server.VersionString) | Out-File "$directory\SQL_Permissions.log" -Append -Encoding utf8
+         ("Edition: " + $Server.Edition) | Out-File "$directory\SQL_Permissions.log" -Append -Encoding utf8
+         ("Login Mode: " + $Server.LoginMode) | Out-File "$directory\SQL_Permissions.log" -Append -Encoding utf8
+         "=================================================================================" | Out-File "$directory\SQL_Permissions.log" -Append -Encoding utf8
         $SQLLogins = $Server.Logins
         foreach ($SQLLogin in $SQLLogins) {
-             ("Login          : " + $SQLLogin.Name) | Out-File "$directory\SQL_Permissions.log" -Append
-             ("Login Type     : " + $SQLLogin.LoginType) | Out-File "$directory\SQL_Permissions.log" -Append
-             ("Created        : " + $SQLLogin.CreateDate) | Out-File "$directory\SQL_Permissions.log" -Append
-             ("Default DB     : " + $SQLLogin.DefaultDatabase) | Out-File "$directory\SQL_Permissions.log" -Append
-             ("Disabled       : " + $SQLLogin.IsDisabled) | Out-File "$directory\SQL_Permissions.log" -Append
+             ("Login          : " + $SQLLogin.Name) | Out-File "$directory\SQL_Permissions.log" -Append -Encoding utf8
+             ("Login Type     : " + $SQLLogin.LoginType) | Out-File "$directory\SQL_Permissions.log" -Append -Encoding utf8
+             ("Created        : " + $SQLLogin.CreateDate) | Out-File "$directory\SQL_Permissions.log" -Append -Encoding utf8
+             ("Default DB     : " + $SQLLogin.DefaultDatabase) | Out-File "$directory\SQL_Permissions.log" -Append -Encoding utf8
+             ("Disabled       : " + $SQLLogin.IsDisabled) | Out-File "$directory\SQL_Permissions.log" -Append -Encoding utf8
             $SQLRoles = $SQLLogin.ListMembers()
             if ($SQLRoles) {
-                ("Server Role    : " + $SQLRoles) | Out-File "$directory\SQL_Permissions.log" -Append
+                ("Server Role    : " + $SQLRoles) | Out-File "$directory\SQL_Permissions.log" -Append -Encoding utf8
             } 
             else { 
-                 "Server Role    :  Public" | Out-File "$directory\SQL_Permissions.log" -Append
+                 "Server Role    :  Public" | Out-File "$directory\SQL_Permissions.log" -Append -Encoding utf8
             } 
             #Get individuals in any Windows domain groups
             if ($SQLLogin.LoginType -eq "WindowsGroup") {   
-                 "Group Members: " | Out-File "$directory\SQL_Permissions.log" -Append
+                 "Group Members: " | Out-File "$directory\SQL_Permissions.log" -Append -Encoding utf8
                 try {
                     $ADGRoupMembers = Get-ADGroupMember  $SQLLogin.Name.Split("\")[1] -Recursive
                     foreach($Member in $ADGRoupMembers) {
-                         ("   Account: " + $Member.Name + "(" + $Member.SamAccountName + ")") | Out-File "$directory\SQL_Permissions.log" -Append
+                         ("   Account: " + $Member.Name + "(" + $Member.SamAccountName + ")") | Out-File "$directory\SQL_Permissions.log" -Append -Encoding utf8
                     } 
                 } catch {
                     #Sometimes there are 'ghost' groups left behind that are no longer in the domain. This highlights those still in SQL.
-                    ("Unable to locate group " + $SQLLogin.Name.Split("\")[1] + " in the AD Domain.") | Out-File "$directory\SQL_Permissions.log" -Append
+                    ("Unable to locate group " + $SQLLogin.Name.Split("\")[1] + " in the AD Domain.") | Out-File "$directory\SQL_Permissions.log" -Append -Encoding utf8
                 } 
             } 
             #Check the permissions in the DBs the Login is linked to. (Errors suppressed for all SQL logins that exist but are disabled)
             if ($SQLLogin.EnumDatabaseMappings()) { 
-                "Permissions: " | Out-File "$directory\SQL_Permissions.log" -Append
+                "Permissions: " | Out-File "$directory\SQL_Permissions.log" -Append -Encoding utf8
                 foreach ($DB in $Server.Databases) {
                     GetDBUserInfo($DB)
                 }
             } 
             else {
-                 "None." | Out-File "$directory\SQL_Permissions.log" -Append
+                 "None." | Out-File "$directory\SQL_Permissions.log" -Append -Encoding utf8
             }
-             "----------------------------------------------------------------------------" | Out-File "$directory\SQL_Permissions.log" -Append
+             "----------------------------------------------------------------------------" | Out-File "$directory\SQL_Permissions.log" -Append -Encoding utf8
         } 
     } 
 }
@@ -341,6 +343,7 @@ Write-Console "Copying VSS logs..." "White" 1
 vssadmin list providers > "$VSS\vss_providers.log"
 vssadmin list shadows > "$VSS\vss_shadows.log"
 vssadmin list shadowstorage > "$VSS\vss_shadow_storage.log"
+vssadmin list volumes > "$VSS\vss_volumes.log"
 
 #Handle vssadmin timeout taking more than 180 seconds
 $writersTimeout = 180;
@@ -360,6 +363,7 @@ Write-Console
 #Export systeminfo
 Write-Console "Exporting systeminfo..." "White" 1
 systeminfo > "$directory\systeminfo.log"
+if ($PSVersion -ge 5) { Get-ComputerInfo | Out-File "$directory\computerinfo.log" -Encoding utf8 }
 Write-Console
 
 #Export VBR reg key values (32-bit and 64-bit values)
@@ -440,10 +444,11 @@ Write-Console "Getting status of Windows Firewall profiles..." "White" 1
 Get-NetFirewallProfile | Format-List > "$directory\firewall_profiles.log"
 Write-Console
 
-#Get status of Services
+#Get list of Windows Services' names, status, and log on account
 Write-Console "Getting status of Windows Services..." "White" 1
-Get-Service | Select-Object DisplayName, Status | Sort-Object DisplayName | Format-Table -AutoSize > "$directory\services.log"
+Get-WmiObject Win32_Service | Select-Object DisplayName, @{Name="Status";Expression={$_.State}}, @{Name="Log On As";Expression={$_.StartName}} | Sort-Object DisplayName | Format-Table -AutoSize > "$directory\services.log"
 Write-Console
+
 
 #Get network security settings (This is where customizations such as disabling TLS 1.0/1.1 or key exchange algorithms are done)
 Write-Console "Checking for common network customizations (ie. Is TLS 1.0/1.1 disabled? Custom key exchange algorithms?)..." "White" 1
@@ -470,7 +475,7 @@ if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System')
     reg export "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" "$directory\System_Policies.log" | Out-Null
     $content = Get-Content "$directory\System_Policies.log"
     Write-Output "If 'LocalAccountTokenFilterPolicy' = 1 then 'RemoteUAC' has been disabled. If it does not exist or is set to '0' then it is still enabled.`r`n" > "$directory\System_Policies.log"
-    $content | Out-File "$directory\System_Policies.log" -Append
+    $content | Out-File "$directory\System_Policies.log" -Append -Encoding utf8
 }
 Write-Console
 
@@ -500,7 +505,7 @@ foreach ($evLog in $evLogNames) {
 }
 
 #Check to see if PowerShell version is 5.x or newer. Compress-Archive cmdlet did not exist prior to version 5.
-if ($PSVersionTable.PSVersion.Major -ge '5') {
+if ($PSVersion -ge '5') {
     Compress-Archive -Path $tempEVTXEvents\* -DestinationPath "$Events\Event_Logs_EVTX.zip"
     Compress-Archive -Path $tempCSVEvents\* -DestinationPath "$Events\Event_Logs_CSV.zip"
     Remove-Item $tempEVTXEvents -Recurse -Force
