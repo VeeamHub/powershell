@@ -5,7 +5,7 @@ Veeamhub projects are community driven projects, and are not created by Veeam R&
 ## Project Notes
 Author(s): David Bewernick / @d-works42
 
-Function: Example scripts to uread historical VM backup session data from Veeam Backup for Azure RestAPI
+Function: Example scripts to read historical VM backup session data from the Veeam Backup for Azure RestAPI
 Requires:
 - Veeam Backup for Azure v8.x
 - A system with connection to your Veeam Backup for Azure Appliance and permissions to run unsigned PowerShell Scripts.
