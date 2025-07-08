@@ -7,6 +7,7 @@
 ###[13.05.2024] v 2.0.7 - changed method for collection installed software from Get-WmiObject to faster and more reliable one, added information about ciphers
 ###[22.07.2024] v 2.0.8 - command "wevtutil" was fixed on line 603
 ###[10.12.2024] v 2.0.9 - added additional files and folder to collect (C:\ProgramData\Veeam\Backup\BackupSearch) for FLR troubleshooting
+###[08.07.2025] v 2.0.10 - workflow improvements
 
 Start-Sleep 1
 Write-Warning -Message "This script is provided as is as a courtesy for collecting logs from the Guest Machine. Please be aware that due to certain Microsoft Operations, there may be a short burst of high CPU activity, and that some 
@@ -432,7 +433,8 @@ mountvol /l > "$SysInfo\mountvol.log"
 whoami > "$SysInfo\whoami.log"  #<-- Adding whoami output
 dism /online /Get-Packages /Format:Table > "$SysInfo\dism_pack.log" #<-- Adding disk packages output
 fsutil fsinfo sectorinfo C: > "$SysInfo\fsutil_info.log" #<-- Adding fsutil command
-Get-ComputerInfo > "$SysInfo\SysInfo.log" #<-- Collecting list of the hardware
+if ($PSVersionTable.PSVersion -ge "5.1")
+    {Get-ComputerInfo > "$SysInfo\SysInfo.log"} #<-- Collecting list of the hardware  
 Get-WmiObject Win32_PnPSignedDriver| select devicename,drivername,infname,driverversion > "$SysInfo\drivers.log" #<-collecting list of drivers
 Start-Sleep 1
 Write-Host -ForegroundColor Yellow "Done"
@@ -534,7 +536,7 @@ Write-Host "Getting network information" -ForegroundColor White -BackgroundColor
 ipconfig /all > "$SysInfo\ipconfig.log"
 netstat -bona > "$SysInfo\netstat.log"
 route print > "$SysInfo\route.log"
-Get-TlsCipherSuite | Format-Table name | Out-File -FilePath "$SysInfo\ciphers.txt"
+try { Get-TlsCipherSuite | Format-Table name | Out-File -FilePath "$SysInfo\ciphers.txt" } catch { }
 Start-Sleep 1
 Write-Host -ForegroundColor Yellow "Done"
 
@@ -542,17 +544,14 @@ Write-Host -ForegroundColor Yellow "Done"
 
 Write-Host "Checking in which mode Veeam Agent operates and connection to Veeam B&R server" -ForegroundColor White -BackgroundColor Black -ErrorAction SilentlyContinue
 $ErrorActionPreference = 'SilentlyContinue'
-$VBRhostname = Get-ItemProperty -Path "HKLM:\SOFTWARE\Veeam\Veeam Endpoint Backup" -name BackupServerIPAddress
+$VBRhostname = Get-ItemProperty -Path "HKLM:\SOFTWARE\Veeam\Veeam Endpoint Backup" -Name BackupServerIPAddress -ErrorAction SilentlyContinue
 $IP = $VBRhostname.BackupServerIPAddress 
-$TrueIP = $IP.Split("|") | select -skiplast 1 
-if ($VBRhostname.BackupServerIPAddress -eq $null)
-{
-		Write-Host "" -ErrorAction SilentlyContinue -ErrorAction SilentlyContinue 
-		}
-	else
-	{
+if ($IP)
+{     $IPArray = $IP.Split("|")  
+$TrueIP = $IPArray | Select-Object -Last $IPArray.Length -Skip 1     
 $TrueIP | ForEach-Object -Begin $null -Process {Test-NetConnection $_ -port 10005 >> $SysInfo\test_netconnection.log -WarningAction SilentlyContinue}, {tracert /d /h 10 /w 1000 $_ >> $SysInfo\tracert.log} -End $null
-}
+}  
+
 Start-Sleep 1
 Write-Host -ForegroundColor Yellow "Done"
 
