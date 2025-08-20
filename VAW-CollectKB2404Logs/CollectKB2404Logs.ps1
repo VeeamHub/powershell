@@ -8,6 +8,7 @@
 ###[22.07.2024] v 2.0.8 - command "wevtutil" was fixed on line 603
 ###[10.12.2024] v 2.0.9 - added additional files and folder to collect (C:\ProgramData\Veeam\Backup\BackupSearch) for FLR troubleshooting
 ###[08.07.2025] v 2.0.10 - workflow improvements
+###[21.08.2025] v 2.0.11 - "wmic" was replaced with "Get-CimInstance" 
 
 Start-Sleep 1
 Write-Warning -Message "This script is provided as is as a courtesy for collecting logs from the Guest Machine. Please be aware that due to certain Microsoft Operations, there may be a short burst of high CPU activity, and that some 
@@ -439,10 +440,10 @@ Get-WmiObject Win32_PnPSignedDriver| select devicename,drivername,infname,driver
 Start-Sleep 1
 Write-Host -ForegroundColor Yellow "Done"
 
-#export output of 'wmic csproduct' 
+#export output of 'ComputerSystemProduct' 
 Start-Sleep 1
-Write-Host 'Gathering hardware info from wmic' -ForegroundColor White -BackgroundColor Black -ErrorAction SilentlyContinue 
-wmic csproduct > "$SysInfo\wmic_csproduct.log"
+Write-Host 'Gathering hardware information' -ForegroundColor White -BackgroundColor Black -ErrorAction SilentlyContinue 
+Get-CimInstance -ClassName Win32_ComputerSystemProduct | Select Name, IdentifyingNumber, Vendor, UUID  > "$SysInfo\csproduct.log"
 Start-Sleep 1
 Write-Host -ForegroundColor Yellow "Done"
 
@@ -479,15 +480,15 @@ Get-CimInstance -ClassName Win32_OperatingSystem | Select LastBootUpTime > "$Sys
 Start-Sleep 1
 Write-Host -ForegroundColor Yellow "Done"
 
-#Get Windows updates (it was decided to use both methods just to be sure we get all the info)
+#Get Windows updates 
 Start-Sleep 1
 Write-Host 'Collecting Windows updates information' -ForegroundColor White -BackgroundColor Black -ErrorAction SilentlyContinue 
-wmic qfe list > "$SysInfo\Windows_upd_wmic.log"
-get-wmiobject -class win32_quickfixengineering > "$SysInfo\Windows_upd_qfe.log"
+Get-CimInstance -ClassName Win32_QuickFixEngineering | Select Caption, CSName, Description, HotFixID, installDate, InstalledOn > "$SysInfo\Windows_updates.log"
+
 
 #Handling updates collection in case it hangs
 $updatesTimeout=30;
-$updatesProcs=Start-Process -FilePath powershell.exe -ArgumentList '-Command "wmic qfe list > "$SysInfo\Windows_upd_wmic.log' -PassThru -NoNewWindow
+$updatesProcs=Start-Process -FilePath powershell.exe -ArgumentList '-Command "Get-CimInstance -ClassName Win32_QuickFixEngineering | Select Caption, CSName, Description, HotFixID, installDate, InstalledOn > "$SysInfo\Windows_updates.log' -PassThru -NoNewWindow
 	try
 	{
 		$updatesProcs | Wait-Process -Timeout $updatesTimeout -ErrorAction Stop
@@ -497,21 +498,7 @@ $updatesProcs=Start-Process -FilePath powershell.exe -ArgumentList '-Command "wm
 		Write-Host 'Collecting OS updates information has taken more than expected. Skipping this step...' 
 		$updatesProcs | Stop-Process -Force
 	}
-if (Test-Path C:\Temp\Windows_upd_wmic.log) {Move-Item C:\Temp\Windows_upd_wmic.log -Destination  $SysInfo}
-
-$updatesTimeout2=30;
-$updatesProcs2=Start-Process -FilePath powershell.exe -ArgumentList '-Command "get-wmiobject -class win32_quickfixengineering > "$SysInfo\Windows_upd_qfe.log' -PassThru -NoNewWindow
-	try
-	{
-		$updatesProcs2 | Wait-Process -Timeout $updatesTimeout2 -ErrorAction Stop
-	}
-	catch
-	{
-		Write-Host 'Collecting OS updates information has taken more than expected. Skipping this step...' 
-		$updatesProcs2 | Stop-Process -Force
-	}
-if (Test-Path C:\Temp\Windows_upd_qfe.log) {Move-Item C:\Temp\Windows_upd_qfe.log -Destination  $SysInfo}
-
+if (Test-Path C:\Temp\Windows_updates.log) {Move-Item C:\Temp\Windows_updates.log -Destination  $SysInfo}
 
 Start-Sleep 1
 Write-Host -ForegroundColor Yellow "Done"
