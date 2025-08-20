@@ -1,3 +1,8 @@
+21.08 update:
+
+  -wmic commands were replaced by Get-CimInstance
+
+
 08.07.2025 update:
 
   - worlkflow improvements
