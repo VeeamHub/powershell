@@ -15,7 +15,7 @@ The purpose of the `Get-OrgInfo.ps1` script is to retrieve information that is r
 1. Organization UID
 2. Location UID
 3. Cloud Connect Tenant UID
-   * In a _hosted_ scenario where Cloud Connect is not involved, this field may be left undefined.
+   * In a _hosted_ scenario where Cloud Connect is not involved, this field is not required.
 
 _Note: There are 3 different types of organizations: Service Provider, Reseller, Company. This script does not return information for a reseller organization as a management agent cannot be assigned to a reseller._
 
