@@ -11,8 +11,14 @@ VSPC Server IP or FQDN
 .PARAMETER Port
 VSPC Rest API port
 
-.PARAMETER ApiKey
-VSPC API Key
+.PARAMETER User
+VSPC username
+
+.PARAMETER Pass
+VSPC password
+
+.PARAMETER Credential
+VSPC PowerShell Credential Object
 
 .PARAMETER AllowSelfSignedCerts
 Flag allowing self-signed certificates (insecure)
@@ -21,21 +27,35 @@ Flag allowing self-signed certificates (insecure)
 Get-OrgInfo.ps1 returns a PowerShell Object containing all data
 
 .EXAMPLE
-Get-OrgInfo.ps1 -Server "vspc.contoso.local" -ApiKey "3240bf0c-79e2-4654-894b-92d21c4f7bbe..."
+Get-OrgInfo.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password"
 
 Description
 -----------
-Connect to the specified VSPC server using the API key specified
+Connect to the specified VSPC server using the username/password specified
 
 .EXAMPLE
-Get-OrgInfo.ps1 -Server "vspc.contoso.local" -Port 9999 -ApiKey "3240bf0c-79e2-4654-894b-92d21c4f7bbe..."
+Get-OrgInfo.ps1 -Server "vspc.contoso.local" -Credential (Get-Credential)
+
+Description
+-----------
+PowerShell credentials object is supported
+
+.EXAMPLE
+Get-OrgInfo.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith"
+
+Description
+-----------
+When not using a credentials object, the password will be prompted for if not specified.
+
+.EXAMPLE
+Get-OrgInfo.ps1 -Server "vspc.contoso.local" -Port 9999 -Username "contoso\jsmith" -Password "password"
 
 Description
 -----------
 Connecting to a VSPC server using a non-standard API port
 
 .EXAMPLE
-Get-OrgInfo.ps1 -Server "vspc.contoso.local" -ApiKey "3240bf0c-79e2-4654-894b-92d21c4f7bbe..." -AllowSelfSignedCerts
+Get-OrgInfo.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password" -AllowSelfSignedCerts
 
 Description
 -----------
@@ -45,7 +65,6 @@ Connecting to a VSPC server that uses Self-Signed Certificates (insecure)
 NAME:  Get-OrgInfo.ps1
 VERSION: 1.0
 AUTHOR: Chris Arceneaux
-TWITTER: @chris_arceneaux
 GITHUB: https://github.com/carceneaux
 
 .LINK
@@ -56,14 +75,18 @@ https://helpcenter.veeam.com/docs/vac/provider_admin/api_keys.html?ver=9
 
 #>
 #Requires -Version 6.2
-[CmdletBinding()]
+[CmdletBinding(DefaultParametersetName = "UsePass")]
 param(
-	[Parameter(Mandatory = $true)]
+    [Parameter(Mandatory = $true)]
 	[string] $Server,
 	[Parameter(Mandatory = $false)]
-	[Int] $Port = 1280,
-	[Parameter(Mandatory = $true)]
-	[string]$ApiKey,
+	[ushort] $Port = 1280,
+    [Parameter(Mandatory = $true, ParameterSetName = "UsePass")]
+    [string] $User,
+    [Parameter(Mandatory = $false, ParameterSetName = "UsePass")]
+    [string] $Pass = $true,
+    [Parameter(Mandatory = $true, ParameterSetName = "UseCred")]
+    [System.Management.Automation.PSCredential]$Credential,
 	[Parameter(Mandatory = $false)]
 	[Switch] $AllowSelfSignedCerts
 )
@@ -193,21 +216,36 @@ Function Get-VspcApiResult {
 	}
 }
 
+# Processing credentials
+if ($Credential) {
+	$User = $Credential.GetNetworkCredential().Username
+	$Pass = $Credential.GetNetworkCredential().Password
+}
+else {
+	if ($Pass -eq $true) {
+		[securestring] $secureString = Read-Host "Enter password for '$($User)'" -AsSecureString
+		[string] $Pass = [System.Net.NetworkCredential]::new("", $secureString).Password
+	}
+}
+
 # Initializing global variables
 [string] $baseUrl = "https://" + $Server + ":" + $Port
 [string] $vspcApiVersion = "3.6"
 $output = [System.Collections.ArrayList]::new()
-$token = $ApiKey
 
-# Validating VSPC API authentication
-[string] $url = $baseUrl + "/api/v3/about"
-Write-Verbose "GET - $url"
+# Logging into VSPC API
+[string] $url = $baseUrl + "/api/v3/token"
+Write-Verbose "POST - $url"
+$headers = New-Object "System.Collections.Generic.Dictionary[[string],[string]]"
+$headers.Add("Content-Type", "application/x-www-form-urlencoded")
+$headers.Add("x-client-version", $vspcApiVersion)  # API versioning using for backwards compatibility
+$body = "grant_type=password&username=$User&password=$Pass"
 try {
-	$response = Get-VspcApiResult -URL $url -Type "Authentication Validation" -Token $token
-	Write-Verbose "Authorization Successful"
+	$response = Invoke-RestMethod $url -Method 'POST' -Headers $headers -Body $body -ErrorAction Stop -SkipCertificateCheck:$AllowSelfSignedCerts
+	[string] $token = $response.access_token
 }
 catch {
-	Write-Error "ERROR: Authorization Failed! Make sure the valid server, port, and API key were specified."
+	Write-Error "ERROR: Authorization Failed! Make sure the correct server and port were specified."
 	throw
 }
 
