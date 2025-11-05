@@ -27,7 +27,7 @@ A PowerShell script for interactively displaying currently running Veeam Backup 
 
 ## Requirements
 
-- Works only with **Windows-based** Veeam Backup & Replication servers (tested on v12.3.x)
+- Works only with **Windows-based** Veeam Backup & Replication servers (tested on v12.x)
 - **PowerShell 5.1+** or higher (GridView requires Windows PowerShell ISE or full console)
 - The script needs to be run **locally** on the VBR server, with **administrator rights**
 
