@@ -4,9 +4,11 @@
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 ![Veeam](https://img.shields.io/badge/Veeam-v12.x-green)
 
-![theVeeamReaper_header](theVeeamReaper_header.png)
-
 A PowerShell script for interactively displaying currently running Veeam Backup & Replication jobs and terminating them immediately in a forceful fashion (by killing the associated Veeam.Backup.Manager.exe processes).
+
+❓ **Why this script?** Every Veeam B&R job is managed by a `Veeam.Backup.Manager` process. Finding the one tied to the job you want to terminate can be tedious and/or error-prone.
+
+![theVeeamReaper_header](theVeeamReaper_header.png)
 
 🤖 This script was developed with the help of Artificial Intelligence (AI).
 
@@ -47,6 +49,6 @@ A PowerShell script for interactively displaying currently running Veeam Backup 
 ![theVeeamReaper_demo](theVeeamReaper_demo.gif)
 
 ## About
-- Author: Danilo Chiavari (@DChiavari)
+- Author: **Danilo Chiavari** (@DChiavari)
 - E-mail for feedback: (name -dot- surname -at- veeam.com)
 - Version: 1.0 (November 5th, 2025)
