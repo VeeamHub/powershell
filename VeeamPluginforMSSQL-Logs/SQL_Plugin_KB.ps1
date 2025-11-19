@@ -1,6 +1,7 @@
 ## Veeam SQL Plugin Script
 ###[26.04] - v 1.0 . Script for SQL Plugin logs collection
 ###[02.12.2024] - v 2.0 . Logs folder was changed from "Case_logs" to "Veeam_Case_logs". Added the collection of system info (mount vol, OS info, ipconfig, firewall settings, etc.)
+###[19.11.2025] - v 2.1 . Added "filters" output" and replaced "wmic" with "Get-CimInstance"
 
 Start-Sleep 1
 Write-Warning -Message "This script is provided as is as a courtesy for collecting logs from the Guest Machine. Please be aware that due to certain Microsoft Operations, there may be a short burst of high CPU activity, and that some 
@@ -313,10 +314,17 @@ Get-WmiObject Win32_PnPSignedDriver| select devicename,drivername,infname,driver
 Start-Sleep 1
 Write-Host -ForegroundColor Yellow "Done"
 
-#export output of 'wmic csproduct' 
+#export output of 'ComputerSystemProduct' 
 Start-Sleep 1
-Write-Host 'Gathering hardware info from wmic' -ForegroundColor White -BackgroundColor Black -ErrorAction SilentlyContinue 
-wmic csproduct > "$SysInfo\wmic_csproduct.log"
+Write-Host 'Gathering hardware information' -ForegroundColor White -BackgroundColor Black -ErrorAction SilentlyContinue 
+Get-CimInstance -ClassName Win32_ComputerSystemProduct | Select Name, IdentifyingNumber, Vendor, UUID  > "$SysInfo\csproduct.log"
+Start-Sleep 1
+Write-Host -ForegroundColor Yellow "Done"
+
+#export filters
+Start-Sleep 1
+Write-Host 'Copying File System Minifilter report' -ForegroundColor White -BackgroundColor Black -ErrorAction SilentlyContinue 
+fltmc instances > "$SysInfo\filter.log" 
 Start-Sleep 1
 Write-Host -ForegroundColor Yellow "Done"
 
