@@ -51,7 +51,7 @@ This script will collect the following information from the machine:
 - Boot configuration : bcdedit /v
 - Mounted volumes : mountvol /l
 - Drivers : Get-WmiObject Win32_PnPSignedDriver| select devicename,drivername,infname,driverversion
-- Hardware information : wmic csproduct
+- Hardware information : Get-CimInstance -ClassName Win32_ComputerSystemProduct 
 - .NET Framework setup : Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full"
 - Applied group policy settings : gpresult /z
 - Environment variables : Get-ItemProperty -Path "HKLM:SYSTEM\CurrentControlSet\Control\Session Manager\Environment" and Get-ItemProperty -Path "HKCU:\Environment"
@@ -63,6 +63,7 @@ This script will collect the following information from the machine:
 - Windows services status : gwmi win32_service | select displayname, name, startname,startmode,state
 - Network configuration settings: "Get-NetAdapterBinding | Where-Object { $_.DisplayName -match "File and Printer Sharing" } | Format-Table -AutoSize"
 - Network configuration: "ipconfig /all" , "netstat -bona" , "route print"
+- Filters output: "fltmc instances "
 
 # Feedback
 
