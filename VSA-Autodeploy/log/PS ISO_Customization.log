@@ -1,0 +1,128 @@
+﻿**********************
+Windows PowerShell transcript start
+Start time: 20251026224717
+Username: 
+RunAs User: 
+Configuration Name: 
+Machine: 
+Host Application: C:\Windows\System32\WindowsPowerShell\v1.0\powershell_ise.exe K:\autodeploy vsa\test\autodeployconf.ps1
+Process ID: 5168
+PSVersion: 5.1.22621.6060
+PSEdition: Desktop
+PSCompatibleVersions: 1.0, 2.0, 3.0, 4.0, 5.0, 5.1.22621.6060
+BuildVersion: 10.0.22621.6060
+CLRVersion: 4.0.30319.42000
+WSManStackVersion: 3.0
+PSRemotingProtocolVersion: 2.3
+SerializationVersion: 1.1.0.1
+**********************
+Transcript started, output file is ISO_Customization_20251026_224717.log
+[2025-10-26 22:47:17][INFO] ==================================================================================================
+[2025-10-26 22:47:17][INFO] Veeam ISO Customization Script - Version 2.3
+[2025-10-26 22:47:17][INFO] ==================================================================================================
+[2025-10-26 22:47:17][INFO] Loading configuration from: restore-config.json
+[2025-10-26 22:47:17][INFO] JSON configuration loaded successfully
+[2025-10-26 22:47:17][INFO] Applying JSON configuration...
+[2025-10-26 22:47:17][INFO] Applied 37 parameters from JSON configuration
+[2025-10-26 22:47:17][INFO] Configuration loaded from JSON file: restore-config.json
+[2025-10-26 22:47:17][INFO] Selected Appliance Type: VSA
+[2025-10-26 22:47:17][INFO] Invoking VSA (Veeam Software Appliance) workflow...
+[2025-10-26 22:47:17][INFO] ==================================================================================================
+[2025-10-26 22:47:17][INFO]                          VSA WORKFLOW - VEEAM SOFTWARE APPLIANCE
+[2025-10-26 22:47:17][INFO] ==================================================================================================
+[2025-10-26 22:47:17][INFO] Config only set to False
+[2025-10-26 22:47:17][INFO] Testing prerequisites...
+[2025-10-26 22:47:17][INFO] WSL is available
+[2025-10-26 22:47:18][INFO] xorriso is available at: /usr/bin/xorriso
+[2025-10-26 22:47:18][INFO] All prerequisites validated successfully
+[2025-10-26 22:47:18][INFO] Working in directory: K:\autodeploy vsa\test
+[2025-10-26 22:47:18][INFO] Out-of-place modification mode: creating VeeamSoftwareAppliance_13.0.0.4967_20250822_customized.iso
+[2025-10-26 22:47:45][INFO] Working copy created: VeeamSoftwareAppliance_13.0.0.4967_20250822_customized.iso
+
+==================================================================================================
+                                    ISO MODIFICATION SUMMARY
+==================================================================================================
+Appliance Type: VSA
+Source ISO: VeeamSoftwareAppliance_13.0.0.4967_20250822.iso
+Target ISO: VeeamSoftwareAppliance_13.0.0.4967_20250822_customized.iso
+Mode: Out-of-Place
+
+CONFIGURATION:
+  GRUB Timeout: 0 seconds
+  Keyboard: fr
+  Timezone: Europe/Paris
+  Hostname: VSA
+  Network: DHCP
+
+OPTIONAL FEATURES:
+  Node Exporter Local: Disabled
+  Node Exporter Online: Disabled
+  License Auto-Install: Enabled
+  VCSP Connection: Disabled
+  Restore Config: Enabled
+==================================================================================================
+
+Press Enter to continue or Ctrl+C to abort...
+[2025-10-26 22:50:26][INFO] Extracting configuration files from ISO...
+[2025-10-26 22:50:26][INFO] Executing: Extract configuration files
+[2025-10-26 22:50:26][INFO] Command: wsl xorriso -boot_image any keep -dev "VeeamSoftwareAppliance_13.0.0.4967_20250822_customized.iso" -osirrox on -extract vbr-ks.cfg vbr-ks.cfg
+[2025-10-26 22:50:26][INFO] Extract configuration files completed successfully
+[2025-10-26 22:50:26][INFO] Executing: Extract configuration files
+[2025-10-26 22:50:26][INFO] Command: wsl xorriso -boot_image any keep -dev "VeeamSoftwareAppliance_13.0.0.4967_20250822_customized.iso" -osirrox on -extract /EFI/BOOT/grub.cfg grub.cfg
+[2025-10-26 22:50:26][INFO] Extract configuration files completed successfully
+[2025-10-26 22:50:26][INFO] File extracted: vbr-ks.cfg
+[2025-10-26 22:50:26][INFO] File extracted: grub.cfg
+[2025-10-26 22:50:26][INFO] Configuring GRUB bootloader...
+[2025-10-26 22:50:26][INFO] Updated with ${1} inst.assumeyes in grub.cfg
+[2025-10-26 22:50:26][INFO] Updated with set default="Veeam Backup & Replication v13.0>Install - fresh install, wipes everything (including local backups)" in grub.cfg
+[2025-10-26 22:50:26][INFO] Updated with set timeout=0 in grub.cfg
+[2025-10-26 22:50:26][INFO] Configuring Kickstart file...
+[2025-10-26 22:50:26][INFO] Setting keyboard layout to fr
+[2025-10-26 22:50:26][INFO] Updated with keyboard --xlayouts='fr' in vbr-ks.cfg
+[2025-10-26 22:50:26][INFO] Setting timezone to Europe/Paris
+[2025-10-26 22:50:26][INFO] Updated with timezone Europe/Paris --utc in vbr-ks.cfg
+[2025-10-26 22:50:26][INFO] Configuring network settings
+[2025-10-26 22:50:26][INFO] Using DHCP configuration
+[2025-10-26 22:50:26][INFO] Network configuration applied
+[2025-10-26 22:50:26][INFO] Added content after line: mkdir -p /var/log/veeam/
+[2025-10-26 22:50:26][INFO] Added content after line: find /etc/yum.repos.d/ -type f -not -name "*veeam*" -delete
+[2025-10-26 22:50:26][INFO] Adding restore configuration...
+[2025-10-26 22:50:26][INFO] Added content after line: /usr/bin/cp -rv /tmp/*.* /mnt/sysimage/var/log/appliance-installation-logs/
+[2025-10-26 22:50:26][INFO] Added content after line: /opt/veeam/hostmanager/veeamhostmanager --apply_init_config /etc/veeam/vbr_init.cfg
+[2025-10-26 22:50:26][INFO] Added content after line: dnf install -y --nogpgcheck --disablerepo="*" /tmp/static-packages/*.rpm
+[2025-10-26 22:50:26][INFO] Executing: Add conf folder to ISO
+[2025-10-26 22:50:26][INFO] Command: wsl xorriso -boot_image any keep -dev "VeeamSoftwareAppliance_13.0.0.4967_20250822_customized.iso" -map conf /conf
+[2025-10-26 22:50:26][INFO] Add conf folder to ISO completed successfully
+[2025-10-26 22:50:26][INFO] Adding license configuration...
+[2025-10-26 22:50:26][INFO] Added content after line: /opt/veeam/hostmanager/veeamhostmanager --apply_init_config /etc/veeam/vbr_init.cfg
+[2025-10-26 22:50:26][INFO] Added content after line: /usr/bin/cp -rv /tmp/*.* /mnt/sysimage/var/log/appliance-installation-logs/
+[2025-10-26 22:50:26][INFO] Executing: Add license folder to ISO
+[2025-10-26 22:50:26][INFO] Command: wsl xorriso -boot_image any keep -dev "VeeamSoftwareAppliance_13.0.0.4967_20250822_customized.iso" -map license /license
+[2025-10-26 22:50:26][INFO] Add license folder to ISO completed successfully
+[2025-10-26 22:50:26][INFO] Normalizing line endings...
+[2025-10-26 22:50:26][INFO] Committing changes to ISO...
+[2025-10-26 22:50:26][INFO] Executing: Commit changes to ISO
+[2025-10-26 22:50:26][INFO] Command: wsl xorriso -boot_image any keep -dev "VeeamSoftwareAppliance_13.0.0.4967_20250822_customized.iso" -rm vbr-ks.cfg
+[2025-10-26 22:50:26][INFO] Commit changes to ISO completed successfully
+[2025-10-26 22:50:26][INFO] Executing: Commit changes to ISO
+[2025-10-26 22:50:26][INFO] Command: wsl xorriso -boot_image any keep -dev "VeeamSoftwareAppliance_13.0.0.4967_20250822_customized.iso" -map vbr-ks.cfg vbr-ks.cfg
+[2025-10-26 22:50:27][INFO] Commit changes to ISO completed successfully
+[2025-10-26 22:50:27][INFO] Executing: Commit changes to ISO
+[2025-10-26 22:50:27][INFO] Command: wsl xorriso -boot_image any keep -dev "VeeamSoftwareAppliance_13.0.0.4967_20250822_customized.iso" -rm /EFI/BOOT/grub.cfg
+[2025-10-26 22:50:27][INFO] Commit changes to ISO completed successfully
+[2025-10-26 22:50:27][INFO] Executing: Commit changes to ISO
+[2025-10-26 22:50:27][INFO] Command: wsl xorriso -boot_image any keep -dev "VeeamSoftwareAppliance_13.0.0.4967_20250822_customized.iso" -map grub.cfg /EFI/BOOT/grub.cfg
+[2025-10-26 22:50:27][INFO] Commit changes to ISO completed successfully
+[2025-10-26 22:50:27][INFO] ISO customization completed successfully!
+
+==================================================================================================
+                                        SUCCESS!
+==================================================================================================
+Customized ISO: VeeamSoftwareAppliance_13.0.0.4967_20250822_customized.iso
+Mode: Out-of-Place
+==================================================================================================
+[2025-10-26 22:50:27][INFO] Script execution completed successfully
+**********************
+Windows PowerShell transcript end
+End time: 20251026225027
+**********************
