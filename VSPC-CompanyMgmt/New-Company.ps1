@@ -3,7 +3,7 @@
 Veeam Service Provider Console (VSPC) Create new company
 
 .DESCRIPTION
-This script will create a new company and will link it to a new Cloud Connect tenant. Please note that this script only asks for required parameters to create a new company. Additional parameters can be added to the body of the POST request in order to customize the new company settings. See VSPC REST API documentation link below for more details.
+This script will create a new company and will link it to a new Cloud Connect tenant. Please note that this script only asks for required parameters to create a new company. Additional parameters can be added to the body of the POST request in order to customize the new company and tenant settings. See VSPC REST API documentation link below for more details.
 
 .PARAMETER Server
 VSPC Server IP or FQDN
@@ -24,16 +24,13 @@ VSPC PowerShell Credential Object
 Name of the new company to be created
 
 .PARAMETER OwnerUser
-Username of the owner for the new company
+Username of the owner for the new company. New Cloud Connect tenant will use this as name as well.
 
 .PARAMETER OwnerPass
 Password of the owner for the new company
 
 .PARAMETER OwnerCredential
 PowerShell Credential Object for the owner of the new company
-
-.PARAMETER Tenant
-Name of the Cloud Connect tenant to be created (only specify if different than company name)
 
 .PARAMETER SiteName
 Name of the Cloud Connect site where the tenant will be created (only required if multiple sites exist)
@@ -49,14 +46,7 @@ New-Company.ps1 -Server "vspc.contoso.local" -User "contoso\jsmith" -Password "p
 
 Description
 -----------
-Connect to the specified VSPC server using the username/password specified and create a new company with the specified owner credentials.
-
-.EXAMPLE
-New-Company.ps1 -Server "vspc.contoso.local" -User "contoso\jsmith" -Password "password" -Company "Fabrikam" -OwnerUser "owner" -OwnerPass "password" -Tenant "Contoso"
-
-Description
------------
-Create a new company and Cloud Connect tenant linked together.
+Connect to the specified VSPC server using the username/password specified, create a new company with the specified owner credentials, and create a new Cloud Connect tenant linked to the new company.
 
 .EXAMPLE
 New-Company.ps1 -Server "vspc.contoso.local" -Credential (Get-Credential) -Company "Fabrikam" -OwnerCredential (Get-Credential)
@@ -98,7 +88,7 @@ New-Company.ps1 -Server "vspc.contoso.local" -User "contoso\jsmith" -Password "p
 
 Description
 -----------
-Verbose output is supported
+Verbose output is supported for troubleshooting purposes
 
 .NOTES
 NAME:  New-Company.ps1
@@ -127,7 +117,6 @@ param(
     [Parameter(Mandatory = $true, ParameterSetName = "UseCred")]
     [System.Management.Automation.PSCredential]$Credential,
 	[Parameter(Mandatory = $true)]
-	[ValidatePattern("^[A-Za-z0-9!@#$&'()\-_^.{}]")]
 	[string] $Company,
 	[Parameter(Mandatory = $true, ParameterSetName = "UsePass")]
     [string] $OwnerUser,
@@ -136,13 +125,25 @@ param(
     [Parameter(Mandatory = $true, ParameterSetName = "UseCred")]
     [System.Management.Automation.PSCredential]$OwnerCredential,
 	[Parameter(Mandatory = $false)]
-	[ValidatePattern("^[A-Za-z0-9!@#$&'()\-_^.{}]")]
-	[string] $Tenant,
-	[Parameter(Mandatory = $false)]
 	[string] $SiteName = "",
 	[Parameter(Mandatory = $false)]
 	[Switch] $AllowSelfSignedCerts
 )
+
+Function Test-Parameter {
+	param(
+		[string] $ParamString,
+		[string] $ParamName
+	)
+
+	if ($ParamString -match "[^A-Za-z0-9!@#$&'()\-_^.{}]") {
+    	Write-Verbose "Unsupported character(s) found in '$ParamName': $($Matches[0])"
+		throw "'$ParamName' contains unsupported character(s). Only alphanumeric characters and the following special characters are allowed: ! @ # $ & ' ( ) - _ ^ . { }"
+	} else {
+		Write-Verbose "No unsupported characters found in '$ParamName'"
+		return
+	}
+}
 
 Function Get-AsyncAction {
 	param(
@@ -269,32 +270,6 @@ Function Get-VspcApiResult {
 	}
 }
 
-# Function Save-CsvReport {
-# 	param(
-# 		[string] $URL,
-# 		[string] $FilePath,
-# 		[string] $Token
-# 	)
-
-# 	try {
-# 		# Setting headers
-# 		$headers = New-Object "System.Collections.Generic.Dictionary[[string],[string]]"
-# 		$headers.Add("Authorization", "Bearer $Token")
-# 		$headers.Add("x-client-version", $vspcApiVersion)  # API versioning using for backwards compatibility
-# 		$headers.Add("accept", "application/octet-stream")
-
-# 		# Making API call to download CSV report
-# 		Write-Verbose "GET - $URL"
-# 		$response = Invoke-WebRequest -Uri $URL -Method 'GET' -Headers $headers -ErrorAction Stop -SkipCertificateCheck:$AllowSelfSignedCerts -OutFile $FilePath
-
-# 		return $response
-# 	}
-# 	catch {
-# 		Write-Error "ERROR: CSV Report Download Failed! $($_.Exception.Message)"
-# 		throw
-# 	}
-# }
-
 # Processing VSPC credentials
 if ($Credential) {
 	$User = $Credential.GetNetworkCredential().Username
@@ -319,10 +294,13 @@ else {
 	}
 }
 
+# Performing input validation
+Test-Parameter -ParamString $Company -ParamName "Company"
+Test-Parameter -ParamString $OwnerUser -ParamName "OwnerUser"
+
 # Initializing global variables
 [string] $baseUrl = "https://" + $Server + ":" + $Port
 [string] $vspcApiVersion = "3.6.1"
-# $output = [System.Collections.ArrayList]::new()
 
 # Logging into VSPC API
 [string] $url = $baseUrl + "/api/v3/token"
@@ -340,10 +318,13 @@ catch {
 	throw
 }
 
+### Validation Checks ###
+
 # Retrieve Cloud Connect Sites
 [string] $url = $baseUrl + "/api/v3/infrastructure/sites?limit=500"
 $sites = Get-VspcApiResult -URL $url -Type "Cloud Connect Sites" -Token $token
 
+# Determine which site to use
 switch ($sites.Count) {
 	0 {
 		throw "No Cloud Connect Sites were found on the specified VSPC server. A Cloud Connect Site is required to create a new Cloud Connect Tenant."
@@ -351,17 +332,18 @@ switch ($sites.Count) {
 	1 {
 		# Only one site found...using that site
 		$SiteName = $sites[0].siteName
+		$siteId = $sites[0].siteUid
 		Write-Verbose ("Using Cloud Connect Site: '{0}'" -f $SiteName)
 	}
 	Default {
 		# Multiple sites found...checking for specified site name
 		if ($SiteName) {
-			$site = $sites | Where-Object { $_.siteName -eq $SiteName }
-			if ($null -eq $site) {
+			$siteId = ($sites | Where-Object { $_.siteName -eq $SiteName }).siteUid
+			if ($null -eq $siteId) {
 				throw ("The specified Cloud Connect Site '{0}' was not found on the VSPC server." -f $SiteName)
 			}
 			else {
-				Write-Verbose ("Using Cloud Connect Site: '{0}'" -f $site.name)
+				Write-Verbose ("Using Cloud Connect Site: '{0} ({1})'" -f $SiteName, $siteId)
 			}
 		}
 		else {
@@ -370,58 +352,116 @@ switch ($sites.Count) {
 	}
 }
 
-# # Retrieve Organizations (all types: Service Provider/Reseller/Company)
-# [string] $url = $baseUrl + "/api/v3/organizations?limit=500"
-# $organizations = Get-VspcApiResult -URL $url -Type "Organizations" -Token $token
+# Retrieve Organizations (Service Provider/Reseller/Company)
+[string] $url = $baseUrl + "/api/v3/organizations?limit=500"
+$organizations = Get-VspcApiResult -URL $url -Type "Organizations" -Token $token
 
+# Ensure Company does not already exist
+$existing = $organizations | Where-Object { $_.name -eq $Company }
+if ($null -ne $existing) {
+	throw ("A Company with the name '{0}' already exists on the VSPC server. Please specify a new company name or use the 'Connect-Company.ps1' script to connect an already existing company to a Cloud Connect Tenant." -f $Company)
+}
+Clear-Variable -Name existing
 
+# Retrieve Cloud Connect Tenants
+[string] $url = $baseUrl + "/api/v3/infrastructure/sites/$siteId/tenants?limit=500"
+$tenants = Get-VspcApiResult -URL $url -Type "Cloud Connect Tenants" -Token $token
 
+# Ensure Tenant does not already exist
+$existing = $tenants | Where-Object { $_.name -eq $OwnerUser }
+if ($null -ne $existing) {
+	throw ("A Cloud Connect Tenant with the name '{0}' already exists on the specified Cloud Connect Site '{1}'." -f $OwnerUser, $SiteName)
+}
+Clear-Variable -Name existing
 
+### End Validation Checks ###
 
-# # Retrieve ID of latest license usage report (service provider & resellers)
-# [string] $url = $baseUrl + "/api/v3/licensing/reports/latest"
-# $reports = Get-VspcApiResult -URL $url -Type "License Usage Reports" -Token $token
+### Creating New Company ###
 
-### Download CSV License Usage Report(s) ###
+# Setting URL and Body for New Company
+[string] $url = $baseUrl + "/api/v3/organizations/companies"
+$body = @{
+    organizationInput = @{
+		name = $Company
+	}
+	ownerCredentials = @{
+		userName = $OwnerUser
+		password = $OwnerPass
+	}
+}
+$jsonBody = $body | ConvertTo-Json -Depth 10
 
-# Loop through each report
-# foreach ($report in $reports) {
-# 	# Chec
-# 	$org = $organizations | Where-Object { $_.instanceUid -eq $report.reportParameters.organizationUid }
-# 	Write-Verbose ("Processing Report for '{0}' ({1})" -f $report.reportParameters.organizationName, $org.type)
+# Setting headers
+$headers = New-Object "System.Collections.Generic.Dictionary[[string],[string]]"
+$headers.Add("Authorization", "Bearer $token")
+$guid = (New-Guid).Guid
+$headers.Add("x-request-id", $guid)
+$headers.Add("x-client-version", $vspcApiVersion)
+$headers.Add("Content-Type", "application/json")
 
-# 	if ($org.type -eq "Reseller") {
-# 		if ($IncludeResellers) {
-# 			[string] $fileName = New-FileName -BaseName "LicenseUsageReport-Reseller" -OrgName $report.reportParameters.organizationName -Date $report.reportParameters.generationDate -Extension "csv"
-# 		}
-# 		else {
-# 			Write-Verbose ("Skipping Reseller Report for '{0}'" -f $report.reportParameters.organizationName)
-# 			continue
-# 		}
-# 	}
-# 	else { # Service Provider
-# 		[string] $fileName = New-FileName -BaseName "LicenseUsageReport-Provider" -OrgName $report.reportParameters.organizationName -Date $report.reportParameters.generationDate -Extension "csv"
-# 	}
+# Making API call
+Write-Verbose "POST - $url"
+Write-Verbose "x-request-id: $guid"
+try {
+	$response = Invoke-RestMethod $url -Method 'POST' -Headers $headers -Body $jsonBody -ErrorAction Stop -SkipCertificateCheck:$AllowSelfSignedCerts -StatusCodeVariable responseCode
+}
+catch {
+	throw "An error occurred while creating the new Company." + $_
+}
+if (202 -eq $responseCode) {
+	# retrieve async action response
+	$response = Get-AsyncAction -ActionId $guid -Headers $headers
+}
+$newCompany = $response.data
+Write-Verbose ("New Company '{0}' created successfully." -f $newCompany.name)
 
+### End Creating New Company ###
 
-# 	[string] $filePath = Join-Path -Path $PSScriptRoot -ChildPath $fileName # File path of downloaded CSV report
-# 	Write-Verbose ("Downloading CSV License Usage Report for '{0}' to '{1}'" -f $report.reportParameters.organizationName, $filePath)
+### Creating New Cloud Connect Tenant ###
 
-# 	# Downloading CSV report
-# 	[string] $url = "{0}/api/v3/licensing/reports/{1}/csv" -f $baseUrl, $report.reportParameters.reportId
-# 	$response = Save-CsvReport -URL $url -FilePath $filePath -Token $token
+# Setting URL and Body for New Cloud Connect Tenant
+[string] $url = $baseUrl + "/api/v3/infrastructure/sites/$siteId/tenants"
+$body = @{
+	credentials = @{
+		userName = $OwnerUser
+		password = $OwnerPass
+	}
+	assignedForCompany = $newCompany.instanceUid
+}
+$jsonBody = $body | ConvertTo-Json -Depth 10
 
-# 	# Generating output object
-# 	$object = [PSCustomObject] @{
-# 		Name          = $report.reportParameters.organizationName
-# 		Type          = $org.type
-# 		OrgId         = $report.reportParameters.organizationUid
-# 		ReportPath    = $filePath
-# 	}
-# 	[ref] $null = $output.Add($object)
-# 	Clear-Variable -Name org, object
-# }
+# Setting headers
+$headers = New-Object "System.Collections.Generic.Dictionary[[string],[string]]"
+$headers.Add("Authorization", "Bearer $token")
+$guid = (New-Guid).Guid
+$headers.Add("x-request-id", $guid)
+$headers.Add("x-client-version", $vspcApiVersion)
+$headers.Add("Content-Type", "application/json")
 
-### End Script - Outputting CSV report file path(s) ###
+# Making API call
+Write-Verbose "POST - $url"
+Write-Verbose "x-request-id: $guid"
+try {
+	$response = Invoke-RestMethod $url -Method 'POST' -Headers $headers -Body $jsonBody -ErrorAction Stop -SkipCertificateCheck:$AllowSelfSignedCerts -StatusCodeVariable responseCode
+}
+catch {
+	throw "An error occurred while creating the new Cloud Connect Tenant." + $_
+}
+if (202 -eq $responseCode) {
+	# retrieve async action response
+	$response = Get-AsyncAction -ActionId $guid -Headers $headers
+}
+$newTenant = $response.data
+Write-Verbose ("New Company '{0}' created successfully." -f $newCompany.name)
 
-return $sites
+### End Creating New Cloud Connect Tenant ###
+
+### End Script - Outputting results ###
+
+return [PSCustomObject] @{
+	# Company Information
+	CompanyId         = $newCompany.instanceUid
+	CompanyName       = $newCompany.name
+	TenantId		  = $newTenant.instanceUid
+	TenantName        = $newTenant.name
+}
