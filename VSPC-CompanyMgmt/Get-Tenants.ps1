@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-Veeam Service Provider Console (VSPC) Retrieve Cloud Connect Sites
+Veeam Service Provider Console (VSPC) Retrieve Cloud Connect Tenants
 
 .DESCRIPTION
-This script will retrieve Cloud Connect sites information from VSPC.
+This script retrieves Cloud Connect Tenants from VSPC.
 
 .PARAMETER Server
 VSPC Server IP or FQDN
@@ -20,62 +20,75 @@ VSPC password
 .PARAMETER Credential
 VSPC PowerShell Credential Object
 
+.PARAMETER SiteName
+Name of the Cloud Connect site. If not specified, tenants from all sites will be retrieved.
+
 .PARAMETER AllowSelfSignedCerts
 Flag allowing self-signed certificates (insecure)
 
 .OUTPUTS
-Get-Sites.ps1 returns a PowerShell Object containing all data
+Get-Tenants.ps1 returns a PowerShell Object containing all data
 
 .EXAMPLE
-Get-Sites.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password"
+Get-Tenants.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password"
 
 Description
 -----------
 Connect to the specified VSPC server using the username/password specified
 
 .EXAMPLE
-Get-Sites.ps1 -Server "vspc.contoso.local" -Credential (Get-Credential)
+Get-Tenants.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password" -SiteName "SiteA"
+
+Description
+-----------
+Retrieve all tenants from a specific Cloud Connect site
+
+.EXAMPLE
+Get-Tenants.ps1 -Server "vspc.contoso.local" -Credential (Get-Credential)
 
 Description
 -----------
 PowerShell credentials object is supported
 
 .EXAMPLE
-Get-Sites.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith"
+Get-Tenants.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith"
 
 Description
 -----------
 When not using a credentials object, the password will be prompted for if not specified.
 
 .EXAMPLE
-Get-Sites.ps1 -Server "vspc.contoso.local" -Port 9999 -Username "contoso\jsmith" -Password "password"
+Get-Tenants.ps1 -Server "vspc.contoso.local" -Port 9999 -Username "contoso\jsmith" -Password "password"
 
 Description
 -----------
 Connecting to a VSPC server using a non-standard API port
 
 .EXAMPLE
-Get-Sites.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password" -AllowSelfSignedCerts
+Get-Tenants.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password" -AllowSelfSignedCerts
 
 Description
 -----------
 Connecting to a VSPC server that uses Self-Signed Certificates (insecure)
 
 .EXAMPLE
-Get-Sites.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password" -Verbose
+Get-Tenants.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password" -Verbose
 
 Description
 -----------
 Verbose output is supported for troubleshooting purposes
 
 .NOTES
-NAME:  Get-Sites.ps1
+NAME:  Get-Tenants.ps1
 VERSION: 1.0
 AUTHOR: Chris Arceneaux
 GITHUB: https://github.com/carceneaux
 
 .LINK
-https://helpcenter.veeam.com/references/vac/9.1/rest/tag/Cloud-Connect#operation/GetSites
+https://helpcenter.veeam.com/references/vac/9/rest/tag/Cloud-Connect#operation/GetTenants
+
+.LINK
+https://helpcenter.veeam.com/references/vac/9/rest/tag/Cloud-Connect#operation/GetTenantsBySite
 
 #>
 #Requires -Version 6.2
@@ -91,6 +104,8 @@ param(
     [string] $Pass = $true,
     [Parameter(Mandatory = $true, ParameterSetName = "UseCred")]
     [System.Management.Automation.PSCredential]$Credential,
+	[Parameter(Mandatory = $false)]
+    [string] $SiteName,
 	[Parameter(Mandatory = $false)]
 	[Switch] $AllowSelfSignedCerts
 )
@@ -250,10 +265,29 @@ catch {
 	throw
 }
 
-# Retrieve Cloud Connect Sites
-[string] $url = $baseUrl + "/api/v3/infrastructure/sites?limit=500"
-$sites = Get-VspcApiResult -URL $url -Type "Cloud Connect Sites" -Token $token
+if ($SiteName) {
+	# Retrieve Cloud Connect Sites
+	[string] $url = $baseUrl + "/api/v3/infrastructure/sites?limit=500"
+	$sites = Get-VspcApiResult -URL $url -Type "Cloud Connect Sites" -Token $token
+
+	$siteId = ($sites | Where-Object { $_.siteName -eq $SiteName }).siteUid
+	if ($null -eq $siteId) {
+		throw ("The specified Cloud Connect Site '{0}' was not found on the VSPC server." -f $SiteName)
+	}
+	else {
+		Write-Verbose ("Using Cloud Connect Site: '{0} ({1})'" -f $SiteName, $siteId)
+	}
+
+	# Retrieve Cloud Connect Tenants from specific site
+	[string] $url = $baseUrl + "/api/v3/infrastructure/sites/$siteId/tenants?limit=500"
+	$tenants = Get-VspcApiResult -URL $url -Type "Cloud Connect Tenants" -Token $token
+}
+else {
+	# Retrieve Cloud Connect Tenants from all sites
+	[string] $url = $baseUrl + "/api/v3/infrastructure/sites/tenants?limit=500"
+	$tenants = Get-VspcApiResult -URL $url -Type "Cloud Connect Tenants" -Token $token
+}
 
 ### End Script - Outputting results ###
 
-return $sites | Select-Object siteName, siteDescription
+return $tenants | Select-Object name, siteName, assignedForCompany

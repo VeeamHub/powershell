@@ -1,9 +1,9 @@
 <#
 .SYNOPSIS
-Veeam Service Provider Console (VSPC) Retrieve Cloud Connect Sites
+Veeam Service Provider Console (VSPC) Retrieve Companies
 
 .DESCRIPTION
-This script will retrieve Cloud Connect sites information from VSPC.
+This script retrieves all Companies from VSPC.
 
 .PARAMETER Server
 VSPC Server IP or FQDN
@@ -24,58 +24,58 @@ VSPC PowerShell Credential Object
 Flag allowing self-signed certificates (insecure)
 
 .OUTPUTS
-Get-Sites.ps1 returns a PowerShell Object containing all data
+Get-Companies.ps1 returns a PowerShell Object containing all data
 
 .EXAMPLE
-Get-Sites.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password"
+Get-Companies.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password"
 
 Description
 -----------
 Connect to the specified VSPC server using the username/password specified
 
 .EXAMPLE
-Get-Sites.ps1 -Server "vspc.contoso.local" -Credential (Get-Credential)
+Get-Companies.ps1 -Server "vspc.contoso.local" -Credential (Get-Credential)
 
 Description
 -----------
 PowerShell credentials object is supported
 
 .EXAMPLE
-Get-Sites.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith"
+Get-Companies.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith"
 
 Description
 -----------
 When not using a credentials object, the password will be prompted for if not specified.
 
 .EXAMPLE
-Get-Sites.ps1 -Server "vspc.contoso.local" -Port 9999 -Username "contoso\jsmith" -Password "password"
+Get-Companies.ps1 -Server "vspc.contoso.local" -Port 9999 -Username "contoso\jsmith" -Password "password"
 
 Description
 -----------
 Connecting to a VSPC server using a non-standard API port
 
 .EXAMPLE
-Get-Sites.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password" -AllowSelfSignedCerts
+Get-Companies.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password" -AllowSelfSignedCerts
 
 Description
 -----------
 Connecting to a VSPC server that uses Self-Signed Certificates (insecure)
 
 .EXAMPLE
-Get-Sites.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password" -Verbose
+Get-Companies.ps1 -Server "vspc.contoso.local" -Username "contoso\jsmith" -Password "password" -Verbose
 
 Description
 -----------
 Verbose output is supported for troubleshooting purposes
 
 .NOTES
-NAME:  Get-Sites.ps1
+NAME:  Get-Companies.ps1
 VERSION: 1.0
 AUTHOR: Chris Arceneaux
 GITHUB: https://github.com/carceneaux
 
 .LINK
-https://helpcenter.veeam.com/references/vac/9.1/rest/tag/Cloud-Connect#operation/GetSites
+https://helpcenter.veeam.com/references/vac/9.1/rest/tag/Companies#operation/GetCompanies
 
 #>
 #Requires -Version 6.2
@@ -250,10 +250,10 @@ catch {
 	throw
 }
 
-# Retrieve Cloud Connect Sites
-[string] $url = $baseUrl + "/api/v3/infrastructure/sites?limit=500"
-$sites = Get-VspcApiResult -URL $url -Type "Cloud Connect Sites" -Token $token
+# Retrieve Companies
+[string] $url = $baseUrl + "/api/v3/organizations/companies?limit=500"
+$companies = Get-VspcApiResult -URL $url -Type "Companies" -Token $token
 
 ### End Script - Outputting results ###
 
-return $sites | Select-Object siteName, siteDescription
+return $companies | Select-Object name, instanceUid
