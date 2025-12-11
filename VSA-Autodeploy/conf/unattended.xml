@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<unattendedConfigurationRestore mode="restore">
+	<properties>
+				<property name="CONFIGURATION_FILE" value="/var/lib/veeam/backup/conftoresto.bco" />
+				<property name="BACKUP_PASSWORD" value="123a123A123!123" hidden="1" />
+				<property name="OVERWRITE_EXISTING_DATABASE" value="1" />
+				<property name="STOP_PROCESSES" value="1" />
+				<property name="SWITCH_TO_RESTORE_MODE" value="1" />
+	</properties>
+</unattendedConfigurationRestore>
