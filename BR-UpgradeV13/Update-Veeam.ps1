@@ -29,6 +29,9 @@
 .PARAMETER AutoUpgrade
 	Boolean to automatically upgrade existing components in the backup infrastructure
 
+.PARAMETER Force
+	Flag to force upgrade answer file generation even if one already exists
+
 .OUTPUTS
 	Update-Veeam.ps1 returns exit code of 0 upon success
 
@@ -45,6 +48,20 @@
 	Description
 	-----------
 	Upgrades Veeam environment using the specified license file and uses the specified local ISO
+
+.EXAMPLE
+	Update-Veeam.ps1 -ISO "C:\VeeamBackup&Replication_13.0.1.180_20251114.iso" -License "C:\license.lic" -EntraIDDatabaseInstall $false -LicenseAutoupdate $false -ProactiveSupport $false
+
+	Description
+	-----------
+	Upgrades Veeam environment without installing PostgreSQL locally for EntraID and with license autoupdate and proactive support disabled.
+
+.EXAMPLE
+	Update-Veeam.ps1 -ISO "C:\VeeamBackup&Replication_13.0.1.180_20251114.iso" -License "C:\license.lic" -Force
+
+	Description
+	-----------
+	Upgrades Veeam environment forcing regeneration of upgrade answer files even if they already exist in the default log folder (C:\temp\veeam-upgrade).
 
 .NOTES
 	NAME:  Update-Veeam.ps1
@@ -79,7 +96,9 @@ param(
     [Parameter(Mandatory = $false)]
     [bool] $ProactiveSupport = $true,
     [Parameter(Mandatory = $false)]
-    [bool] $AutoUpgrade = $true
+    [bool] $AutoUpgrade = $true,
+    [Parameter(Mandatory = $false)]
+    [switch] $Force
 )
 
 # Setting Log Location
@@ -370,45 +389,45 @@ else {
     throw "Incorrect ISO detected! This script was designed to work with a Veeam Backup & Replication v13 ISO. Please correct and re-run this script."
 }
 
-# Validating 13 ISO
+# Validating v13 Silent Installer EXE
 try {
-    # Identifying Silent Install EXE
-    $file = Get-ChildItem -Recurse -Filter "Veeam.Silent.Install.exe" -File -Path $mountDrive
+    # Identifying Silent Installer EXE
+    $file = Get-ChildItem -Recurse -Filter "Veeam.Silent.Install.exe" -File -Path ("{0}\Setup\Silent" -f $mountDrive)
     $exe = $file.FullName
 
-    if ("1.0.0" -eq $file.VersionInfo.ProductVersion) {
-        Write-Log "ISO failed validation! Non-v13 ISO detected."
+    if ("2.0.2.75" -eq $file.VersionInfo.ProductVersion) {
+        Write-Log "Silent Installer validated as version 13"
+    } else {
+        Write-Log "Silent Installer failed validation!"
         Write-Log "Unmounting Veeam ISO"
         Dismount-DiskImage -ImagePath $iso
         throw
     }
-
-    Write-Log "ISO validated as version 13"
 }
 catch {
     Write-Log $_
-    Write-Log "Unable to validate ISO. Please investigate and resolve. Logs can be found here: $logFile"
+    Write-Log "Unable to validate Silent Installer. Please investigate and resolve. Logs can be found here: $logFile"
     Write-Log "Unmounting Veeam ISO"
     Dismount-DiskImage -ImagePath $iso
-    throw "Incorrect ISO detected! This script was designed to work with a Veeam Backup & Replication v13 ISO. Please correct and re-run this script."
+    throw
 }
 
 ### VBR PRE-UPGRADE ACTIONS
 if ($vbr) {
     try {
-        # Registering VeeamPSSnapin if necessary
-        Write-Log "Registering VeeamPSSnapin if necessary"
-        if (-Not (Get-Module -ListAvailable -Name Veeam.Backup.PowerShell)) {
-            Add-PSSnapin -PassThru VeeamPSSnapIn -ErrorAction Stop | Out-Null
-        }
+        # Checking for Cloud Connect environment
+        $state = Get-VBRCloudInfrastructureState # returns error not Cloud Connect
+        Write-Log "Cloud Connect instance found. Determining infrastructure state..."
+        $vcc = $true
+    }
+    catch {
+        Write-Log "No Cloud Connect instance found."
+        $vcc = $false
+    }
 
-        try {
-            # Checking for Cloud Connect environment
-            $state = Get-VBRCloudInfrastructureState # returns error not Cloud Connect
-            Write-Log "Cloud Connect instance found. Determining infrastructure state..."
-
+    try {
+        if ($vcc) {
             # Pre-upgrade actions for Cloud Connect environment
-            $vcc = $true
             if ($state -eq "Active") {
                 Write-Log "ACTIVE: Enabling maintenance mode and waiting for all active sessions to complete"
                 Enable-VBRCloudMaintenanceMode
@@ -419,7 +438,7 @@ if ($vbr) {
             $sw = [System.Diagnostics.Stopwatch]::StartNew()  #stopwatch
             # Forever loop until Cloud Connect active sessions complete or manual user interrupt
             while ($true) {
-                $sessions = ([Veeam.Backup.Core.CCloudSession]::GetAll() | Where-Object { $_.JobName -ne "Console" } | Where-Object { $_.State -eq "Working" }).Count
+                $sessions = ([Veeam.Backup.Core.CCloudSession]::GetRunning() | Where-Object { $_.JobName -ne "Console" } | Where-Object { $_.JobName -ne "Malware Detection" } | Where-Object { $_.JobName -ne "Infrastructure rescan" } | Where-Object { $_.State -eq "Working" }).Count
                 if ($sessions -eq 0) {
                     Write-Log "All active sessions have gracefully ended. Total time waiting: $([int]$sw.Elapsed.TotalMinutes) minutes"
                     $sw.Stop()
@@ -439,19 +458,11 @@ if ($vbr) {
                 }
                 Start-Sleep -Seconds 5
             }
-
-            # Performing Configuration Backup prior to upgrade
-            Write-Log "Performing Configuration Backup prior to upgrade"
-            Start-VBRConfigurationBackupJob
         }
-        catch {
-            # Pre-upgrade actions for Veeam Backup & Replication environment (no Cloud Connect)
-            $vcc = $false
 
-            # Performing Configuration Backup prior to upgrade
-            Write-Log "Performing Configuration Backup prior to upgrade"
-            Start-VBRConfigurationBackupJob
-        }
+        # Performing Configuration Backup prior to upgrade
+        Write-Log "Performing Configuration Backup prior to upgrade"
+        Start-VBRConfigurationBackupJob
     }
     catch {
         Write-Log "One of the pre-upgrade actions failed. Please investigate and resolve. Logs can be found here: $logFile"
@@ -470,18 +481,24 @@ if ($vbem) {
 
     # Stopping all Veeam services prior to upgrade
     Write-Log "Stopping all Veeam services"
-    Get-Service veeam* | Stop-Service
+    $service = Get-Service veeam* | Where-Object {"Running" -eq $_.Status}
+    if ($service) {$service | Stop-Service -Force -ErrorAction SilentlyContinue}
 
     try {
         # Generate upgrade answer file
         $answerFile = "$logFolder\EmAnswerFile_upgrade.xml"
 
         Write-Log "Checking if Enterprise Manager answer file already exists..."
-        if (Test-Path $answerFile) {
+        if (-not ($Force) -and (Test-Path $answerFile)) {
             Write-Log "Answer file: $answerFile"
         }
         else {
-            Write-Log "Answer file not found. Generating file now..."
+            if ($Force) {
+                Write-Log "Forcing regeneration of answer file as per user request"
+            }
+            else {
+                Write-Log "Answer file not found. Generating file now..."
+            }
             Add-Content $answerFile @"
 <?xml version="1.0" encoding="utf-8"?>
 <unattendedInstallationConfiguration bundle="Em" mode="upgrade" version="1.0">
@@ -590,18 +607,24 @@ if ($vbr) {
 
     # Stopping all Veeam services prior to upgrade
     Write-Log "Stopping all Veeam services"
-    Get-Service veeam* | Stop-Service
+    $service = Get-Service veeam* | Where-Object {"Running" -eq $_.Status}
+    if ($service) {$service | Stop-Service -Force -ErrorAction SilentlyContinue}
 
     try {
         # Generate upgrade answer file
         $answerFile = "$logFolder\VbrAnswerFile_upgrade.xml"
 
         Write-Log "Checking if Veeam Backup & Replication answer file already exists..."
-        if (Test-Path $answerFile) {
+        if (-not ($Force) -and (Test-Path $answerFile)) {
             Write-Log "Answer file: $answerFile"
         }
         else {
-            Write-Log "Answer file not found. Generating file now..."
+            if ($Force) {
+                Write-Log "Forcing regeneration of answer file as per user request"
+            }
+            else {
+                Write-Log "Answer file not found. Generating file now..."
+            }
             Add-Content $answerFile @"
 <?xml version="1.0" encoding="utf-8"?>
 <unattendedInstallationConfiguration bundle="Vbr" mode="upgrade" version="1.0">
@@ -732,12 +755,14 @@ if ($vbr) {
     try {
         if ($vcc) {
             Write-Log "Disabling Cloud Connect Maintenance Mode"
-            powershell.exe -NoLogo -ExecutionPolicy bypass -NoProfile -Command "Import-Module 'C:\Program Files\Veeam\Backup and Replication\Console\Veeam.Backup.PowerShell\Veeam.Backup.PowerShell.psd1'; Disable-VBRCloudMaintenanceMode"
+            pwsh.exe -NoLogo -ExecutionPolicy bypass -NoProfile -Command "Connect-VBRServer -Server localhost -ForceAcceptTlsCertificate; Disable-VBRCloudMaintenanceMode | Out-Null"
         }
 
         Write-Log "Shutting down Veeam prior to reboot. This may take a while as all Veeam Proxies & Repositories are currently being upgraded."
-        Get-Service veeam* | Where-Object {$_.Name -ne "VeeamBackupSvc"} | Stop-Service
-        Get-Service veeam* | Stop-Service
+        $service = Get-Service veeam* | Where-Object {("Running" -eq $_.Status) -and ($_.Name -ne "VeeamBackupSvc")}
+        if ($service) {$service | Stop-Service -Force -ErrorAction SilentlyContinue}
+        $service = Get-Service veeam* | Where-Object {"Running" -eq $_.Status}
+        if ($service) {$service | Stop-Service -Force -ErrorAction SilentlyContinue}
     }
     catch {
         Write-Log $_
