@@ -21,6 +21,7 @@ This script was written to work with standard Veeam Backup & Replication environ
 * If Veeam software other than Veeam Backup Enterprise Manager or Veeam Backup & Replication Server is installed on the same server, this software will be taken offline during the upgrade.
 * After the upgrade, any Veeam Agents (VAW/VAL/VAM/VAU) managed by Veeam Backup & Replication will need to be upgraded.
 * This script does NOT backup the Enterprise Manager database. Prior to upgrade, it's recommended to perform a DB backup.
+* For Cloud Connect environments, must disable maintenance mode after post-upgrade reboot.
 
 ## Requirements
 

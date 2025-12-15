@@ -753,11 +753,6 @@ if ($vbr) {
 ### VBR POST-UPGRADE ACTIONS
 if ($vbr) {
     try {
-        if ($vcc) {
-            Write-Log "Disabling Cloud Connect Maintenance Mode"
-            pwsh.exe -NoLogo -ExecutionPolicy bypass -NoProfile -Command "Connect-VBRServer -Server localhost -ForceAcceptTlsCertificate; Disable-VBRCloudMaintenanceMode | Out-Null"
-        }
-
         Write-Log "Shutting down Veeam prior to reboot. This may take a while as all Veeam Proxies & Repositories are currently being upgraded."
         $service = Get-Service veeam* | Where-Object {("Running" -eq $_.Status) -and ($_.Name -ne "VeeamBackupSvc")}
         if ($service) {$service | Stop-Service -Force -ErrorAction SilentlyContinue}
@@ -777,5 +772,8 @@ if ($vbr) {
 Write-Log "Unmounting Veeam ISO"
 Dismount-DiskImage -ImagePath $iso
 Write-Log "Script has completed successfully. Please reboot this server prior to using Veeam."
+if ($vcc) {
+    Write-Log "Don't forget to disable Cloud Connect maintenance mode after rebooting the server!"
+}
 Write-Host "This can be done easily in PowerShell as well: Restart-Computer -Force"
 return 0
