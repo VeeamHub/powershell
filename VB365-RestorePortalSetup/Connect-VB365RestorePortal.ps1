@@ -45,10 +45,7 @@ function Connect-VB365RestorePortal {
   https://helpcenter.veeam.com/docs/vbo365/guide/ssp_ad_application_permissions.html
 
 .LINK
-	https://learn.microsoft.com/en-us/graph/permissions-reference#externalconnectionreadwriteownedby
-
-.LINK
-  https://learn.microsoft.com/en-us/graph/permissions-reference#externalitemreadwriteownedby
+	https://learn.microsoft.com/en-us/powershell/module/microsoft.graph.identity.signins/new-mgoauth2permissiongrant?view=graph-powershell-1.0
 
 #>
 
@@ -86,14 +83,32 @@ function Connect-VB365RestorePortal {
     }
   }
 
-  # granting admin consent to the Service Provider Enterprise Application
-  # see LINK for reference documentation
-  $graphSpId = $(Get-MgServicePrincipal -Filter "appId eq '00000003-0000-0000-c000-000000000000'").Id
-  New-MgServicePrincipalAppRoleAssignment -ServicePrincipalId $sp.Id -PrincipalId $sp.Id -AppRoleId "f431331c-49a6-499f-be1c-62af19c34a9d" -ResourceId $graphSpId -ErrorAction Stop | Out-Null
-  New-MgServicePrincipalAppRoleAssignment -ServicePrincipalId $sp.Id -PrincipalId $sp.Id -AppRoleId "8116ae0f-55c2-452d-9944-d18420f5b2c8" -ResourceId $graphSpId -ErrorAction Stop | Out-Null
-  Write-Host "$($sp.DisplayName) ($($sp.AppId)) has been granted admin consent" -ForegroundColor Green
-  Write-Host "You can now login to the Service Provider's VB365 Restore Portal!" -ForegroundColor Green
-  Write-Warning "If you receive an error, wait 15 minutes and attempt login again."
+  try {
+    # Retrieving Microsoft Graph Service Principal
+    $graphSp = Get-MgServicePrincipal -Filter "appId eq '00000003-0000-0000-c000-000000000000'"
+
+    # granting admin consent to the Service Provider Enterprise Application
+    # see LINK for reference documentation
+    New-MgOauth2PermissionGrant `
+      -ClientId $sp.Id `
+      -ConsentType "AllPrincipals" `
+      -ResourceId $graphSp.Id `
+      -Scope "User.Read" `
+      -ErrorAction Stop | Out-Null
+    New-MgOauth2PermissionGrant `
+      -ClientId $sp.Id `
+      -ConsentType "AllPrincipals" `
+      -ResourceId $sp.Id `
+      -Scope "access_as_user" `
+      -ErrorAction Stop | Out-Null
+
+    Write-Host "$($sp.DisplayName) ($($sp.AppId)) has been granted admin consent" -ForegroundColor Green
+    Write-Host "You can now login to the Service Provider's VB365 Restore Portal!" -ForegroundColor Green
+    Write-Warning "If you receive an error, wait 15 minutes and attempt login again."
+  }
+  catch {
+    throw "An unexpected error occurred while granting admin consent to the Enterprise Application." + $_
+  }
 
   # logging out of remote sessions
   Write-Verbose "Logging out of Microsoft Graph API"
