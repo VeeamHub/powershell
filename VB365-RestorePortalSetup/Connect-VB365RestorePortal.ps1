@@ -58,7 +58,7 @@ function Connect-VB365RestorePortal {
   # connecting to all things Microsoft
   try {
     Write-Verbose "Connecting to Microsoft Graph API"
-    Connect-MgGraph -Scopes "Application.ReadWrite.All","Directory.ReadWrite.All" -NoWelcome
+    Connect-MgGraph -Scopes "Application.ReadWrite.All", "Directory.ReadWrite.All" -NoWelcome
   }
   catch {
     Write-Error "An issue occurred while logging into Microsoft. Please double-check your credentials and ensure you have sufficient permissions (Global Administrator OR Application Administrator)."
@@ -84,27 +84,36 @@ function Connect-VB365RestorePortal {
   }
 
   try {
-    # Retrieving Microsoft Graph Service Principal
-    $graphSp = Get-MgServicePrincipal -Filter "appId eq '00000003-0000-0000-c000-000000000000'"
+    # Do grants already exist?
+    $grants = Get-MgOauth2PermissionGrant -Filter "clientId eq '$($sp.Id)'"
 
-    # granting admin consent to the Service Provider Enterprise Application
-    # see LINK for reference documentation
-    New-MgOauth2PermissionGrant `
-      -ClientId $sp.Id `
-      -ConsentType "AllPrincipals" `
-      -ResourceId $graphSp.Id `
-      -Scope "User.Read" `
-      -ErrorAction Stop | Out-Null
-    New-MgOauth2PermissionGrant `
-      -ClientId $sp.Id `
-      -ConsentType "AllPrincipals" `
-      -ResourceId $sp.Id `
-      -Scope "access_as_user" `
-      -ErrorAction Stop | Out-Null
+    if ($grants.count -ne 2) {
+      # Retrieving Microsoft Graph Service Principal
+      $graphSp = Get-MgServicePrincipal -Filter "appId eq '00000003-0000-0000-c000-000000000000'"
 
-    Write-Host "$($sp.DisplayName) ($($sp.AppId)) has been granted admin consent" -ForegroundColor Green
-    Write-Host "You can now login to the Service Provider's VB365 Restore Portal!" -ForegroundColor Green
-    Write-Warning "If you receive an error, wait 15 minutes and attempt login again."
+      # granting admin consent to the Service Provider Enterprise Application
+      # see LINK for reference documentation
+      New-MgOauth2PermissionGrant `
+        -ClientId $sp.Id `
+        -ConsentType "AllPrincipals" `
+        -ResourceId $graphSp.Id `
+        -Scope "User.Read" `
+        -ErrorAction Stop | Out-Null
+      New-MgOauth2PermissionGrant `
+        -ClientId $sp.Id `
+        -ConsentType "AllPrincipals" `
+        -ResourceId $sp.Id `
+        -Scope "access_as_user" `
+        -ErrorAction Stop | Out-Null
+
+      Write-Host "$($sp.DisplayName) ($($sp.AppId)) has been granted admin consent" -ForegroundColor Green
+      Write-Host "You can now login to the Service Provider's VB365 Restore Portal!" -ForegroundColor Green
+      Write-Warning "If you receive an error, wait 15 minutes and attempt login again."
+    }
+    else {
+      Write-Host "$($sp.DisplayName) ($($sp.AppId)) is already present and trusted. Nothing else to do here..." -ForegroundColor Green
+      Write-Host "You can now login to the Service Provider's VB365 Restore Portal!" -ForegroundColor Green
+    }
   }
   catch {
     throw "An unexpected error occurred while granting admin consent to the Enterprise Application." + $_
@@ -119,10 +128,11 @@ Write-Host "Installing required PowerShell module...Microsoft.Graph"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 Find-PackageProvider -Name Nuget -ForceBootstrap -IncludeDependencies -Force | Out-Null
 # Determine if Microsoft.Graph module is already present
-if ( -not(Get-Module -ListAvailable -Name Microsoft.Graph)){
+if ( -not(Get-Module -ListAvailable -Name Microsoft.Graph)) {
   Install-Module -Name Microsoft.Graph -SkipPublisherCheck -Force -ErrorAction Stop
   Write-Host "Microsoft.Graph module installed successfully" -ForegroundColor Green
-} else {
+}
+else {
   Write-Host "Microsoft.Graph module already present" -ForegroundColor Green
 }
 
