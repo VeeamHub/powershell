@@ -147,7 +147,7 @@ Write-Verbose "Certificate has been added to the Application"
 # 3) Create/Update custom permission scope "access_as_user" + disable implicit grant
 # -------------------------------------------------------------------
 $permissionScope = @{
-  id                      = $scopeId
+  id                      = [Guid]::NewGuid()
   value                   = "access_as_user"
   type                    = "Admin"
   isEnabled               = $true
