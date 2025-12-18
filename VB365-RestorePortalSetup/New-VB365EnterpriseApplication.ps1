@@ -273,7 +273,7 @@ Write-Host "Use the following information when configuring the Restore Portal:`n
 Write-Host "Application ID: $($sp.AppId)" -ForegroundColor Green
 Write-Host "Cert Thumbprint: $($cert.Thumbprint)" -ForegroundColor Green
 Write-Host "Cert Friendly Name: $Name" -ForegroundColor Green
-Write-Host "Portal URI: $URL`n" -ForegroundColor Green
+Write-Host "Portal URL: $URL`n" -ForegroundColor Green
 
 # logging out of remote sessions
 Write-Verbose "Logging out of Microsoft Graph API"
