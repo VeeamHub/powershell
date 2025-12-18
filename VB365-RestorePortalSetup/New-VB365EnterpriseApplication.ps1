@@ -55,7 +55,6 @@
   https://www.powershellgallery.com/packages/Microsoft.Graph
 
 #>
-#Requires -Modules Microsoft.Graph
 
 [CmdletBinding()]
 param(
@@ -69,6 +68,18 @@ param(
 
 # Setting default PowerShell action to halt on error
 $ErrorActionPreference = "Stop"
+
+Write-Host "Installing required PowerShell module...Microsoft.Graph"
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+Find-PackageProvider -Name Nuget -ForceBootstrap -IncludeDependencies -Force | Out-Null
+# Determine if Microsoft.Graph module is already present
+if ( -not(Get-Module -ListAvailable -Name Microsoft.Graph)) {
+  Install-Module -Name Microsoft.Graph -SkipPublisherCheck -Force -ErrorAction Stop
+  Write-Host "Microsoft.Graph module installed successfully" -ForegroundColor Green
+}
+else {
+  Write-Host "Microsoft.Graph module already present" -ForegroundColor Green
+}
 
 try {
   Write-Verbose "Connecting to Microsoft Graph..."
