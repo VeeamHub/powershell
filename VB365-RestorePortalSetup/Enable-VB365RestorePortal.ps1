@@ -6,7 +6,6 @@
   The script automates the process of enabling the Veeam Backup for Microsoft 365 Restore Portal. This includes:
     - Enabling the RESTful API
     - Enabling Operator Authentication
-    - Enabling Tenant Authentication
     - Enabling the Restore Portal
 
   Requirement: The Azure Enterprise Application must have been already created. Check out the New-VB365EnterpriseApplication.ps1 PS script.
@@ -59,7 +58,7 @@
 
 .NOTES
 	NAME:  Enable-VB365RestorePortal.ps1
-	VERSION: 1.0
+	VERSION: 1.2
 	AUTHOR: Chris Arceneaux
 	TWITTER: @chris_arceneaux
 	GITHUB: https://github.com/carceneaux
