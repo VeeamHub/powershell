@@ -62,7 +62,9 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$Name,
   [Parameter(Mandatory = $true)]
-  [string]$URL
+  [string]$URL,
+  [Parameter(Mandatory = $false)]
+  [switch]$GrantAdminConsent
 )
 
 # Setting default PowerShell action to halt on error
@@ -235,20 +237,22 @@ Write-Host "Single Page Application has been created and assigned the following 
 # -------------------------------------------------------------------
 # 7) Grant Admin Consent (optional)
 # -------------------------------------------------------------------
-Write-Verbose "Granting admin consent to the Enterprise Application ($($sp.AppId))"
-New-MgOauth2PermissionGrant `
-  -ClientId $sp.Id `
-  -ConsentType "AllPrincipals" `
-  -ResourceId $graphSp.Id `
-  -Scope "User.Read" `
-  -ErrorAction Stop | Out-Null
-New-MgOauth2PermissionGrant `
-  -ClientId $sp.Id `
-  -ConsentType "AllPrincipals" `
-  -ResourceId $sp.Id `
-  -Scope "access_as_user" `
-  -ErrorAction Stop | Out-Null
-Write-Host "Admin consent has been granted to the Enterprise Application ($($sp.AppId))" -ForegroundColor Green
+if ($GrantAdminConsent) {
+  Write-Verbose "Granting admin consent to the Enterprise Application ($($sp.AppId))"
+  New-MgOauth2PermissionGrant `
+    -ClientId $sp.Id `
+    -ConsentType "AllPrincipals" `
+    -ResourceId $graphSp.Id `
+    -Scope "User.Read" `
+    -ErrorAction Stop | Out-Null
+  New-MgOauth2PermissionGrant `
+    -ClientId $sp.Id `
+    -ConsentType "AllPrincipals" `
+    -ResourceId $sp.Id `
+    -Scope "access_as_user" `
+    -ErrorAction Stop | Out-Null
+  Write-Host "Admin consent has been granted to the Enterprise Application ($($sp.AppId))" -ForegroundColor Green
+}
 
 # -------------------------------------------------------------------
 # Final Output and Cleanup
