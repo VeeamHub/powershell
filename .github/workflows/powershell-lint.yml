@@ -29,15 +29,27 @@ jobs:
         shell: pwsh
         run: |
           $results = @()
-          $files = Get-ChildItem -Path . -Recurse -Include *.ps1,*.psm1,*.psd1 | Where-Object { $_.FullName -notmatch '[\\/]\.git[\\/]' }
 
-          foreach ($file in $files) {
-            Write-Host "Analyzing: $($file.FullName)"
-            $analysis = Invoke-ScriptAnalyzer -Path $file.FullName -Severity Error,Warning
-            if ($analysis) {
-              $results += $analysis
-              foreach ($result in $analysis) {
-                Write-Host "::error file=$($file.Name),line=$($result.Line),col=$($result.Column)::$($result.Message)"
+          # Get list of changed PowerShell files in the PR
+          $changedFiles = git diff --name-only --diff-filter=d origin/${{ github.base_ref }}...HEAD | Where-Object { $_ -match '\.(ps1|psm1|psd1)$' }
+
+          if (-not $changedFiles) {
+            Write-Host "No PowerShell files changed in this PR"
+            exit 0
+          }
+
+          Write-Host "Found $($changedFiles.Count) changed PowerShell file(s)"
+
+          foreach ($file in $changedFiles) {
+            if (Test-Path $file) {
+              Write-Host "Analyzing: $file"
+              $analysis = Invoke-ScriptAnalyzer -Path $file -Severity Error,Warning
+              if ($analysis) {
+                $results += $analysis
+                foreach ($result in $analysis) {
+                  $fileName = Split-Path $file -Leaf
+                  Write-Host "::error file=$fileName,line=$($result.Line),col=$($result.Column)::$($result.Message)"
+                }
               }
             }
           }
