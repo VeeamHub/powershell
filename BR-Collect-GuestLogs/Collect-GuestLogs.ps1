@@ -11,7 +11,7 @@
     NAME: Collect_Veeam_Guest_Logs.ps1
     AUTHOR: Chris Evans, Veeam Software
     CONTACT: chris.evans@veeam.com
-    LASTEDIT: 31-March-2025
+    LASTEDIT: 9-February-2026
     KEYWORDS: Log collection, AAiP, Guest Processing
 #> 
 #Requires -Version 4.0
@@ -479,10 +479,25 @@ if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System')
 }
 Write-Console
 
-#Export event viewer logs in EVTX format excluding Security event logs (typically massive and not useful for 99.99% of cases) and any event logs with zero records.
+#Export event viewer logs in EVTX format, prompting user to include the Security event logs or not
+
+# Add the required assembly for the pop-up
+Add-Type -AssemblyName System.Windows.Forms
+
+# Prompt the user. Defaults to 'No' if dialog box is closed or 'No' is selected.
+$msgResult = [System.Windows.Forms.MessageBox]::Show(
+    "Do you want to include Security events? (Likely no, unless specifically requested by your Veeam support engineer.)",
+    "Include Security events?",
+    [System.Windows.Forms.MessageBoxButtons]::YesNo,
+    [System.Windows.Forms.MessageBoxIcon]::Question
+)
+
+# Set the flag based strictly on 'Yes'. Any other result (No, Close) results in $false.
+$includeSecurity = ($msgResult -eq [System.Windows.Forms.DialogResult]::Yes)
+
 Write-Console "Exporting Windows Event Viewer logs..." "White" 1
 Write-Console "This step can possibly take several minutes. Please do not cancel or exit the console." "Yellow" 1
-$evLogNames = (Get-WinEvent -ListLog * | Where-Object { $_.RecordCount -and $_.LogName -ne "Security" })
+$evLogNames = (Get-WinEvent -ListLog * | Where-Object { ($_.LogName -ne 'Security') -or $includeSecurity })
 foreach ($evLog in $evLogNames) {
 	$name = $evLog.LogName
 	$validName = $name -replace '/', '_'
@@ -494,7 +509,7 @@ Get-ChildItem -File -Path $tempEVTXEvents | ForEach-Object {
 	wevtutil al ($tempEVTXEvents + "\" + $_.Name)
 }
 
-#Export past 14 days of event viewer logs in CSV format excluding Security event logs (typically massive and not useful for 99.99% of cases) and any event logs with zero records.
+#Export past 14 days of event viewer logs in CSV format excluding any event logs with zero records.
 foreach ($evLog in $evLogNames) {
     $name = $evLog.LogName
 	$validName = $name -replace '/', '_'
