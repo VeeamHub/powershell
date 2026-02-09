@@ -10,3 +10,6 @@ February 27 2024 Update:
 - Removed copy of %ProgramData%\Veeam\Backup if the script was executed on the VBR server as this could potentially be a massive folder.
 - Added extensionless file to exported zip archive letting the engineer know if this script was ran on the VBR server as this is not the typical use case.
 - Redirected various output to null that wasn't intended to be sent to console.
+
+February 9 2026 Update:
+- Added user prompt for whether or not to include Security events in the log collection (defaults to no).
