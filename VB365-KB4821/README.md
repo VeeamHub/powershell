@@ -6,7 +6,7 @@ Chris Arceneaux (@chris_arceneaux)
 
 ## Function
 
-Per KB4821, each Organization should use a single backup application per Microsoft term's of use and product documentation. This script identifies Organizations that are using multiple backup applications.
+Per [KB4821](https://www.veeam.com/kb4821), each Organization should use a single backup application per Microsoft term's of use and product documentation. This script identifies Organizations that are using multiple backup applications.
 
 If the `-Fix` flag is specified, Organizations with 2+ backup applications will have all but 1 backup applications removed.
 
