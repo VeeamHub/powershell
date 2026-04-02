@@ -29,7 +29,7 @@
 
 .NOTES
 	NAME:  Start-RepositoryUpgrades.ps1
-	VERSION: 1.0
+	VERSION: 1.1
 	AUTHOR: Chris Arceneaux
 	GITHUB: https://github.com/carceneaux
 
@@ -49,6 +49,8 @@ param()
 
 # setting default PowerShell action to halt on error
 $ErrorActionPreference = "Stop"
+$success = 0
+$fail = 0
 
 # importing Veeam PowerShell module
 Import-Module "C:\Program Files\Veeam\Backup365\Veeam.Archiver.PowerShell\Veeam.Archiver.PowerShell.psd1"
@@ -97,8 +99,8 @@ if ($outdatedRepos.Count -eq 0) {
   exit
 }
 
-Write-Host "Found $($outdatedRepos.Count) outdated repository(ies) to upgrade." -ForegroundColor Yellow
-Write-Log -Message "Found $($outdatedRepos.Count) outdated repository(ies) to upgrade."
+Write-Host "Found $($outdatedRepos.Count) outdated repositories to upgrade." -ForegroundColor Yellow
+Write-Log -Message "Found $($outdatedRepos.Count) outdated repositories to upgrade."
 
 # loop through each outdated repository and upgrade one at a time
 foreach ($repo in $outdatedRepos) {
@@ -108,41 +110,69 @@ foreach ($repo in $outdatedRepos) {
 
   try {
     # start the upgrade session
-    Start-VBORepositoryUpgradeSession -Repository $repo
+    Start-VBORepositoryUpgradeSession -Repository $repo | Out-Null
 
     # wait for the upgrade session to complete
-    do {
+    $time = 0
+    while ($true) {
       Start-Sleep -Seconds 10
-      $session = Get-VBORepositoryUpgradeSession -Repository $repo
-      Write-Verbose "Repository: $($repo.Name) | Upgrade Status: $($session.Status)"
-    } while ($session.Status -notlike "Upgrading")
+      $time += 10
 
-    # check if the upgrade was successful
-    if ($session.Status -eq "Repository is already up to date.") {
-      Write-Host "Repository '$($repo.Name)' upgraded successfully." -ForegroundColor Green
-      Write-Log -Message "Repository '$($repo.Name)' upgraded successfully."
-    }
-    else {
-      $failMessage = "Repository '$($repo.Name)' upgrade failed with status '$($session.Status)'"
-      Write-Host $failMessage -ForegroundColor Red
-      Write-Log -Message $failMessage -Level "ERROR"
-      throw $failMessage
+      # checking to see if upgrade is complete
+      Write-Host "Elapsed time: $time seconds"
+
+      $command = {
+          param($repository)
+          $repo = Get-VBORepository -Name $repository
+          Get-VBORepositoryUpgradeSession -Repository $repo
+      }
+
+      $pInfo = New-Object System.Diagnostics.ProcessStartInfo
+      $pInfo.FileName = "powershell.exe"
+      $pInfo.RedirectStandardError = $true
+      $pInfo.RedirectStandardOutput = $true
+      $pInfo.UseShellExecute = $false
+      $pInfo.Arguments = "-Command & { $($command) } '$($repo.Name)'"
+      $p = New-Object System.Diagnostics.Process
+      $p.StartInfo = $pInfo
+      $p.Start() | Out-Null
+      $p.WaitForExit()
+      $stdout = $p.StandardOutput.ReadToEnd()
+      $stderr = $p.StandardError.ReadToEnd()
+      $exitcode = $p.ExitCode
+      Write-Verbose "stdout: $stdout"
+      Write-Verbose "stderr: $stderr"
+      Write-Verbose "exit code: $exitcode"
+
+      if ($stdout -like "*up to date*") {
+        $success++
+        Write-Host "Repository '$($repo.Name)' upgraded successfully." -ForegroundColor Green
+        Write-Log -Message "Complete time to upgrade repository '$($repo.Name)': $time seconds"
+        Write-Log -Message "Repository '$($repo.Name)' upgraded successfully."
+        break
+      }
+
+      if ($exitcode -ne 0) {
+        $fail++
+        Write-Log -Message "Upgrade error for repository '$($repo.Name)' failed at $time seconds" -Level "ERROR"
+        throw "An error occurred while checking the upgrade status for repository '$($repo.Name)': $stderr"
+      } else {
+        Write-Verbose "Repository: $($repo.Name) | Upgrade Status: $stdout"
+      }
     }
   }
   catch {
-    $errorMessage = "Repository '$($repo.Name)' upgrade encountered an error: $_"
+    $errorMessage = "REPOSITORY WAS NOT UPGRADED! ($($repo.Name)) $_"
     Write-Host $errorMessage -ForegroundColor Red
     Write-Log -Message $errorMessage -Level "ERROR"
-
-    # logging out of Veeam session before stopping
-    Disconnect-VBOServer
-
-    throw $_
   }
 }
 
 # logging out of Veeam session
 Disconnect-VBOServer
 
-Write-Host "All outdated repositories have been successfully upgraded." -ForegroundColor Green
-Write-Log -Message "All outdated repositories have been successfully upgraded."
+Write-Log -Message "Total successful upgrades: $success"
+Write-Log -Message "Total failed upgrades: $fail"
+Write-Host "All outdated repositories have been processed." -ForegroundColor Yellow
+Write-Host "Total successful upgrades: $success" -ForegroundColor Green
+Write-Host "Total failed upgrades: $fail" -ForegroundColor Red
