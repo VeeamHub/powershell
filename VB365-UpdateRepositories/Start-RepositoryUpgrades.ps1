@@ -6,8 +6,9 @@
 	This script retrieves all backup repositories configured in Veeam Backup for
 	Microsoft 365, filters those marked as outdated, and upgrades each one
 	sequentially using the Start-VBORepositoryUpgradeSession cmdlet. A log file is
-	written to the same directory as the script detailing upgrade results. If an
-	upgrade fails, the script stops and the failure is recorded in the log.
+	written to the same directory as the script detailing upgrade results.
+
+  If an upgrade fails, the script does not stop but logs the failure — including the error message received — and continues on to the next repository. All logs are written to a log file located in the same folder as the script.
 
 .OUTPUTS
 	Start-RepositoryUpgrades.ps1 writes upgrade results to a timestamped log file

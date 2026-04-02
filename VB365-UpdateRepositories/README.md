@@ -8,7 +8,7 @@ Chris Arceneaux (@chris_arceneaux)
 
 This script retrieves all backup repositories configured in Veeam Backup for Microsoft 365, filters those marked as outdated, and upgrades each one sequentially. A timestamped log file is written to the same directory as the script detailing upgrade results.
 
-If an upgrade fails, the script stops immediately and the failure — including the error message received — is recorded in the log file.
+If an upgrade fails, the script does not stop but logs the failure — including the error message received — and continues on to the next repository. All logs are written to a log file located in the same folder as the script.
 
 ## Known Issues
 
