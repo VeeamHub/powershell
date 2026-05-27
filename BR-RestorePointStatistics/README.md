@@ -16,12 +16,16 @@ Mandatory parameters:
 - `vbrServer` = Veeam backup server name or IP to connect to
 
 Optional parameters:
+- `JobFilterFile` = text file with job-names to look at (one per line), jobs not in this file will be ignored
 - `suppressGridDisplay` = switch to not show GridViews after processing
 - `outputDir` = where to write the output files (folder must exist, otherwise defaulting to script folder)
 
 > **Note:** Running the script will take some time depending on the number of existing restore points in your environment. Expect a processing rate of ~500 restore points per minute (just my average experience; you might get totally different results!).
 
 Requires [Veeam Powershell module].
+
+[Back to overview](README.md)
+
 
 <!-- referenced links -->
 [Veeam PowerShell module]: https://helpcenter.veeam.com/docs/backup/powershell/getting_started.html
