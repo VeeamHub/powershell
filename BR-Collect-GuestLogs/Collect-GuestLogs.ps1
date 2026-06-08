@@ -11,7 +11,7 @@
     NAME: Collect_Veeam_Guest_Logs.ps1
     AUTHOR: Chris Evans, Veeam Software
     CONTACT: chris.evans@veeam.com
-    LASTEDIT: 9-February-2026
+    LASTEDIT: 8-June-2026
     KEYWORDS: Log collection, AAiP, Guest Processing
 #> 
 #Requires -Version 4.0
@@ -364,6 +364,11 @@ Write-Console
 Write-Console "Exporting systeminfo..." "White" 1
 systeminfo > "$directory\systeminfo.log"
 if ($PSVersion -ge 5) { Get-ComputerInfo | Out-File "$directory\computerinfo.log" -Encoding utf8 }
+Write-Console
+
+#Export FLTMC (Filter Manager) minifilter driver list
+Write-Console "Exporting FLTMC minifilter driver list..." "White" 1
+fltmc > "$directory\FLTMC.txt"
 Write-Console
 
 #Export VBR reg key values (32-bit and 64-bit values)
