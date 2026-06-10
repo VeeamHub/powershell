@@ -37,6 +37,7 @@ Unblock-File .\Collect-GuestLogs.ps1
 | --- | --- |
 | `-IncludeSecurityEvents` | Includes the Security event log in the exported Windows Event Logs. If omitted in an interactive session, a prompt is shown (defaults to No). In a non-interactive session, the Security log is excluded unless this switch is passed. |
 | `-Force` | Suppresses the confirmation normally shown when the script detects it is running on a Veeam Backup & Replication server. Required for unattended runs on a VBR server. |
+| `-OutputDirectory <path>` | Directory where the collected log bundle is created. Useful when the default location (a _Case_Logs_ folder on the same volume as the Veeam log directory) is low on disk space. The directory is created if it does not exist. |
 
 ### **Remote execution** <br>
 The script can be executed against a remote guest OS using PowerShell Remoting. All interactive prompts are automatically skipped in remote sessions, so use the parameters above to control behavior:
@@ -51,6 +52,8 @@ This script will collect the following information from the machine:
 * Collects output of various VSSAdmin commands: Writers/Shadows/ShadowStorage/Providers
 * Collects output of SystemInfo.exe
 * Collects output of FLTMC.exe (list of registered Filter Manager minifilter drivers)
+* Detects the hypervisor and collects guest tools information (VMware Tools / Hyper-V Integration Services / Nutanix Guest Tools version and service status)
+* Collects list of installed Windows updates/hotfixes
 * Collects various registry values (_Veeam Backup and Replication_, _SCHANNEL_ and _System_ hives specifically) to check for various settings that affect In-Guest Processing
 * Checks for Veeam registry values which may have leading or trailing whitespace which would cause them not to work as intended
 * Collects list of installed software (read from the registry uninstall keys — avoids the Windows Installer consistency checks and repair operations that querying _Win32\_Product_ would trigger)

@@ -9,6 +9,10 @@
    .Parameter Force
     Suppresses the confirmation normally shown when the script is detected to be running on a
     Veeam Backup & Replication server. Required for unattended runs on a VBR server.
+   .Parameter OutputDirectory
+    Directory where the collected log bundle is created. Useful when the default location (a
+    "Case_Logs" folder on the same volume as the Veeam log directory) is low on disk space.
+    The directory is created if it does not exist.
    .Example
     Execute on guest OS server locally (run with Administrator privileges):
         .\Collect_Veeam_Guest_Logs.ps1
@@ -16,6 +20,7 @@
         Invoke-Command -FilePath <PATH_TO_THIS_SCRIPT> -ComputerName <GUEST_OS_SERVERNAME> -Credential (Get-Credential)
    .Notes
     NAME: Collect_Veeam_Guest_Logs.ps1
+    VERSION: 2.0
     AUTHOR: Chris Evans, Veeam Software
     CONTACT: chris.evans@veeam.com
     LASTEDIT: 10-June-2026
@@ -28,8 +33,11 @@
 #Requires -RunAsAdministrator
 param (
     [switch] $IncludeSecurityEvents,
-    [switch] $Force
+    [switch] $Force,
+    [string] $OutputDirectory
 )
+
+$scriptVersion = "2.0"
 
 #Set default width of all invocations of Out-File and redirection operators to 2000 to prevent truncation of output.
 $PSDefaultParameterValues['Out-File:Width'] = 2000
@@ -235,8 +243,19 @@ if ((Test-Path $veeamRegPath) -and ((Get-Item -Path $veeamRegPath).Property -con
 $date = Get-Date -f yyyy-MM-ddTHHmmss_
 $temp = Join-Path $env:SystemDrive "temp"
 $hostname = $env:COMPUTERNAME
-$logVolume = Split-Path -Path $veeamDir -Parent
-$logDir = Join-Path -Path $logVolume -ChildPath "Case_Logs"
+if ($OutputDirectory) {
+    #Validate the custom output directory early so the user gets a clear error instead of a failed collection.
+    New-Dir $OutputDirectory
+    if (!(Test-Path -Path $OutputDirectory)) {
+        Write-Console "Unable to create or access the specified output directory: $OutputDirectory. Please verify the path and try again." "Red" 3
+        Exit
+    }
+    $logDir = $OutputDirectory
+}
+else {
+    $logVolume = Split-Path -Path $veeamDir -Parent
+    $logDir = Join-Path -Path $logVolume -ChildPath "Case_Logs"
+}
 $directory = Join-Path -Path $logDir -ChildPath $date$hostname
 $VBR = "$directory\Backup"
 $tempEVTXEvents = "$temp\EVTXEvents"
@@ -266,6 +285,8 @@ Write-Console
 
 # Transcript all workflow
 Start-Transcript -Path "$temp\Execution.log" > $null
+#Stamp the script version into the console output and transcript so support knows which revision produced this bundle.
+Write-Console "Collect-GuestLogs.ps1 -- script version $scriptVersion" "White"
 
 #Copy backup folder unless being ran on VBR server. Backup folder can potentially be massive if this is ran on the VBR server.
 if (!($isVBR)) {
@@ -305,6 +326,64 @@ Invoke-Step "Exporting systeminfo..." {
     if ($PSVersion -ge 5) {
         Get-ComputerInfo | Out-File "$directory\computerinfo.log" -Encoding utf8
     }
+}
+
+#Detect the hypervisor and collect guest tools information. Outdated/missing guest tools are a common cause of guest processing failures.
+Invoke-Step "Collecting hypervisor and guest tools information..." {
+    $hvReport = New-Object System.Collections.Generic.List[string]
+    $computerSystem = Get-CimInstance Win32_ComputerSystem
+    $hvReport.Add("Manufacturer : " + $computerSystem.Manufacturer)
+    $hvReport.Add("Model        : " + $computerSystem.Model)
+    $hvReport.Add("")
+
+    $uninstallKeys = @(
+        'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+        'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+    )
+
+    if (($computerSystem.Manufacturer -match "VMware") -or ($computerSystem.Model -match "VMware")) {
+        $hvReport.Add("Detected hypervisor: VMware")
+        $vmwareTools = Get-ItemProperty -Path $uninstallKeys -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq "VMware Tools" }
+        if ($vmwareTools) {
+            $hvReport.Add("VMware Tools version: " + $vmwareTools.DisplayVersion)
+        }
+        else {
+            $hvReport.Add("VMware Tools do not appear to be installed.")
+        }
+        $toolsService = Get-Service -Name "VMTools" -ErrorAction SilentlyContinue
+        if ($toolsService) {
+            $hvReport.Add("VMware Tools service status: " + $toolsService.Status)
+        }
+    }
+    elseif (($computerSystem.Manufacturer -match "Microsoft") -and ($computerSystem.Model -match "Virtual Machine")) {
+        $hvReport.Add("Detected hypervisor: Microsoft Hyper-V")
+        $icVersion = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Virtual Machine\Auto' -ErrorAction SilentlyContinue).IntegrationServicesVersion
+        if ($icVersion) {
+            $hvReport.Add("Integration Services version: " + $icVersion)
+        }
+        else {
+            $hvReport.Add("Integration Services version not present in registry. (On modern guest OSes the Integration Services are serviced with the OS via Windows Update.)")
+        }
+        $hvReport.Add("")
+        $hvReport.Add("Hyper-V Integration Services (vmic*) status:")
+        Get-Service -Name "vmic*" | ForEach-Object {
+            $hvReport.Add(("  {0,-55} {1}" -f $_.DisplayName, $_.Status))
+        }
+    }
+    elseif ($computerSystem.Manufacturer -match "Nutanix") {
+        $hvReport.Add("Detected hypervisor: Nutanix AHV")
+        $ngt = Get-ItemProperty -Path $uninstallKeys -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match "Nutanix Guest Tools" }
+        if ($ngt) {
+            $hvReport.Add("Nutanix Guest Tools version: " + $ngt.DisplayVersion)
+        }
+        else {
+            $hvReport.Add("Nutanix Guest Tools do not appear to be installed.")
+        }
+    }
+    else {
+        $hvReport.Add("Detected hypervisor: None recognized (physical machine or unrecognized hypervisor).")
+    }
+    $hvReport | Out-File "$directory\hypervisor_info.log" -Encoding utf8
 }
 
 #Export FLTMC (Filter Manager) minifilter driver list
@@ -359,6 +438,11 @@ Invoke-Step "Getting list of installed software..." {
         Select-Object DisplayName, DisplayVersion, Publisher, InstallDate, @{Name = "ProductCode"; Expression = { $_.PSChildName } } |
         Sort-Object DisplayName |
         Format-Table -AutoSize | Out-File "$directory\installed_software.log" -Encoding utf8
+}
+
+#Get list of installed Windows updates/hotfixes (useful for cross-referencing known-bad patches affecting VSS or application writers)
+Invoke-Step "Getting list of installed Windows updates/hotfixes..." {
+    Get-HotFix | Sort-Object -Property InstalledOn -Descending | Select-Object HotFixID, Description, InstalledOn, InstalledBy | Format-Table -AutoSize | Out-File "$directory\installed_hotfixes.log" -Encoding utf8
 }
 
 #Check if this server is running any SQL instances and if so, enumerate permissions for each database

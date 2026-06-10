@@ -30,3 +30,7 @@ June 10 2026 Update:
 - The collected log folder is only deleted after verifying the zip archive was created successfully.
 - Removed cosmetic Start-Sleep delays (saves ~30 seconds per run).
 - Miscellaneous cleanup: temp path derived from SystemDrive, $env:COMPUTERNAME instead of hostname.exe, directories created before transcription starts.
+- Introduced script versioning (2.0). The version is printed at startup and recorded in the Execution.log transcript inside the archive so support can identify which script revision produced a bundle.
+- Added -OutputDirectory parameter to redirect the collected bundle to an alternate location (e.g. when the default volume is low on disk space).
+- Added hypervisor detection and guest tools collection (hypervisor_info.log): VMware Tools version and service status, Hyper-V Integration Services version and vmic* service status, or Nutanix Guest Tools version.
+- Added collection of installed Windows updates/hotfixes (installed_hotfixes.log).
