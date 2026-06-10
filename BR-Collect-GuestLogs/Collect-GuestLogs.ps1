@@ -435,9 +435,9 @@ Invoke-Step "Getting list of installed software..." {
     )
     Get-ItemProperty -Path $uninstallKeys -ErrorAction SilentlyContinue |
         Where-Object { $_.DisplayName } |
-        Select-Object DisplayName, DisplayVersion, Publisher, InstallDate, @{Name = "ProductCode"; Expression = { $_.PSChildName } } |
+        Select-Object DisplayName, DisplayVersion, Publisher, InstallDate, InstallLocation, @{Name = "ProductCode"; Expression = { $_.PSChildName } } |
         Sort-Object DisplayName |
-        Format-Table -AutoSize | Out-File "$directory\installed_software.log" -Encoding utf8
+        Export-Csv -Path "$directory\installed_software.csv" -NoTypeInformation -Encoding UTF8
 }
 
 #Get list of installed Windows updates/hotfixes (useful for cross-referencing known-bad patches affecting VSS or application writers)
@@ -476,17 +476,18 @@ Invoke-Step "Checking for running SQL instances..." {
 
 #Get volume information (Get-Volume requires Server 2012/Windows 8 or later; fall back to CIM on older OSes)
 Invoke-Step "Getting volume information..." {
+    #Numeric columns are left as plain numbers (not pre-formatted strings) so they sort correctly in a spreadsheet.
     if (Get-Command Get-Volume -ErrorAction SilentlyContinue) {
-        Get-Volume | Select-Object DriveLetter, FriendlyName, FileSystemType, DriveType, HealthStatus, OperationalStatus, SizeRemaining, Size, @{n = "% Free"; e = { ($_.SizeRemaining / $_.Size).ToString("P") } } | Sort-Object DriveLetter | Format-Table -AutoSize | Out-File "$directory\volume_info.log" -Encoding utf8
+        Get-Volume | Select-Object DriveLetter, FriendlyName, FileSystemType, DriveType, HealthStatus, OperationalStatus, @{n = "SizeGB"; e = { [math]::Round($_.Size / 1GB, 2) } }, @{n = "FreeGB"; e = { [math]::Round($_.SizeRemaining / 1GB, 2) } }, @{n = "PercentFree"; e = { if ($_.Size) { [math]::Round(($_.SizeRemaining / $_.Size) * 100, 1) } } } | Sort-Object DriveLetter | Export-Csv -Path "$directory\volume_info.csv" -NoTypeInformation -Encoding UTF8
     }
     else {
-        Get-CimInstance Win32_Volume | Select-Object DriveLetter, Label, FileSystem, DriveType, @{n = "Size(GB)"; e = { [math]::Round($_.Capacity / 1GB, 2) } }, @{n = "FreeSpace(GB)"; e = { [math]::Round($_.FreeSpace / 1GB, 2) } }, @{n = "% Free"; e = { if ($_.Capacity) { ($_.FreeSpace / $_.Capacity).ToString("P") } } } | Sort-Object DriveLetter | Format-Table -AutoSize | Out-File "$directory\volume_info.log" -Encoding utf8
+        Get-CimInstance Win32_Volume | Select-Object DriveLetter, Label, FileSystem, DriveType, @{n = "SizeGB"; e = { [math]::Round($_.Capacity / 1GB, 2) } }, @{n = "FreeGB"; e = { [math]::Round($_.FreeSpace / 1GB, 2) } }, @{n = "PercentFree"; e = { if ($_.Capacity) { [math]::Round(($_.FreeSpace / $_.Capacity) * 100, 1) } } } | Sort-Object DriveLetter | Export-Csv -Path "$directory\volume_info.csv" -NoTypeInformation -Encoding UTF8
     }
 }
 
 #Get local accounts
 Invoke-Step "Getting list of local accounts..." {
-    Get-CimInstance Win32_UserAccount | Select-Object AccountType, Caption, LocalAccount, SID, Domain | Format-Table -AutoSize | Out-File "$directory\local_accounts.log" -Encoding utf8
+    Get-CimInstance Win32_UserAccount | Select-Object AccountType, Caption, LocalAccount, SID, Domain | Export-Csv -Path "$directory\local_accounts.csv" -NoTypeInformation -Encoding UTF8
 }
 
 #Get Windows Firewall profile (Get-NetFirewallProfile requires Server 2012/Windows 8 or later; fall back to netsh)
@@ -501,7 +502,8 @@ Invoke-Step "Getting status of Windows Firewall profiles..." {
 
 #Get list of Windows Services' names, status, and log on account
 Invoke-Step "Getting status of Windows Services..." {
-    Get-CimInstance Win32_Service | Select-Object DisplayName, @{Name = "Status"; Expression = { $_.State } }, @{Name = "Log On As"; Expression = { $_.StartName } } | Sort-Object DisplayName | Format-Table -AutoSize | Out-File "$directory\services.log" -Encoding utf8
+    #PathName is included to help spot unquoted service paths and identify AV/filter products by install location.
+    Get-CimInstance Win32_Service | Select-Object Name, DisplayName, State, StartMode, @{Name = "LogOnAs"; Expression = { $_.StartName } }, PathName | Sort-Object DisplayName | Export-Csv -Path "$directory\services.csv" -NoTypeInformation -Encoding UTF8
 }
 
 #Get network security settings (This is where customizations such as disabling TLS 1.0/1.1 or key exchange algorithms are done)
@@ -515,10 +517,10 @@ Invoke-Step "Checking for common network customizations (ie. Is TLS 1.0/1.1 disa
 #Get status of 'File and Printer Sharing'
 Invoke-Step "Checking if 'File and Printer Sharing' is enabled..." {
     if (Get-Command Get-NetAdapterBinding -ErrorAction SilentlyContinue) {
-        Get-NetAdapterBinding | Where-Object { $_.DisplayName -match "File and Printer Sharing" } | Format-Table -AutoSize | Out-File "$directory\file_and_printer_sharing.log" -Encoding utf8
+        Get-NetAdapterBinding | Where-Object { $_.DisplayName -match "File and Printer Sharing" } | Select-Object Name, InterfaceDescription, DisplayName, ComponentID, Enabled | Export-Csv -Path "$directory\file_and_printer_sharing.csv" -NoTypeInformation -Encoding UTF8
     }
     else {
-        Write-Output "Get-NetAdapterBinding is not available on this OS version (requires Windows 8/Server 2012 or later). Unable to collect 'File and Printer Sharing' binding state." | Out-File "$directory\file_and_printer_sharing.log" -Encoding utf8
+        Write-Output "Get-NetAdapterBinding is not available on this OS version (requires Windows 8/Server 2012 or later). Unable to collect 'File and Printer Sharing' binding state." | Out-File "$directory\file_and_printer_sharing.csv" -Encoding utf8
     }
 }
 

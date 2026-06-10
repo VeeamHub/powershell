@@ -34,3 +34,4 @@ June 10 2026 Update:
 - Added -OutputDirectory parameter to redirect the collected bundle to an alternate location (e.g. when the default volume is low on disk space).
 - Added hypervisor detection and guest tools collection (hypervisor_info.log): VMware Tools version and service status, Hyper-V Integration Services version and vmic* service status, or Nutanix Guest Tools version.
 - Added collection of installed Windows updates/hotfixes (installed_hotfixes.log).
+- Tabular outputs (installed software, services, volume info, local accounts, 'File and Printer Sharing' status) are now exported as CSV instead of fixed-width text so they can be sorted and filtered in a spreadsheet. Additional columns were added now that width is no longer a constraint (e.g. service short name, start mode and binary path; software install location).

@@ -46,7 +46,7 @@ Invoke-Command -FilePath .\Collect-GuestLogs.ps1 -ComputerName <GUEST_OS_SERVERN
 ```
 
 ## **Features** <br>
-This script will collect the following information from the machine:
+This script will collect the following information from the machine. Tabular data (installed software, services, volumes, local accounts, '_File and Printer Sharing_' status) is exported in CSV format so it can be sorted and filtered in a spreadsheet application.
 
 * Collects _GuestHelper_, _GuestIndexer_ and other logs located in _%ProgramData%\Veeam\Backup\_ (or alternate configured directory)
 * Collects output of various VSSAdmin commands: Writers/Shadows/ShadowStorage/Providers
