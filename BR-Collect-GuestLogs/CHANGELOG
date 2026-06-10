@@ -13,3 +13,20 @@ February 27 2024 Update:
 
 February 9 2026 Update:
 - Added user prompt for whether or not to include Security events in the log collection (defaults to no).
+
+June 10 2026 Update:
+- Added collection of FLTMC.exe output (registered Filter Manager minifilter drivers) to FLTMC.txt.
+- Added -IncludeSecurityEvents and -Force parameters so the script can run unattended/remotely (via Invoke-Command). GUI prompts are now only shown in interactive sessions; non-interactive sessions are driven entirely by parameters.
+- Replaced Win32_Product query for installed software with registry uninstall key enumeration. Querying Win32_Product forces Windows Installer consistency checks on every installed MSI package which can trigger spontaneous repairs, high CPU usage, and floods the Application event log being collected.
+- Replaced Get-WmiObject with Get-CimInstance throughout (WMI cmdlets are removed in PowerShell 7).
+- Added fallbacks for cmdlets not available before Windows Server 2012 / Windows 8: Win32_Volume (CIM) for Get-Volume, 'netsh advfirewall' for Get-NetFirewallProfile, and an explanatory note when Get-NetAdapterBinding is unavailable.
+- Each collection step is now individually error-handled and failures are recorded to CollectionErrors.log inside the archive, replacing the global suppression of all errors.
+- Replaced legacy Shell.Application COM zip fallback (~140 lines) with .NET ZipFile compression, which is available on all supported PowerShell versions and has no file size limitations. This also fixes exported event logs not being included in the archive on PowerShell 4.0.
+- Fixed Write-Console being called before it was defined in the PowerShell ISE check.
+- Fixed only the last named SQL instance being collected when multiple named instances are running.
+- Fixed invalid registry value name detection flagging any name containing a space instead of only leading/trailing whitespace.
+- SQL permissions report is now buffered and written once instead of re-opening the log file for every line.
+- Event log CSV export now streams directly to disk to reduce memory usage.
+- The collected log folder is only deleted after verifying the zip archive was created successfully.
+- Removed cosmetic Start-Sleep delays (saves ~30 seconds per run).
+- Miscellaneous cleanup: temp path derived from SystemDrive, $env:COMPUTERNAME instead of hostname.exe, directories created before transcription starts.
