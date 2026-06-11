@@ -150,8 +150,13 @@ function LogSQLPermissions (
                         $script:sqlReport.Add("   Account: " + $Member.Name + "(" + $Member.SamAccountName + ")")
                     }
                 } catch {
-                    #Sometimes there are 'ghost' groups left behind that are no longer in the domain. This highlights those still in SQL.
-                    $script:sqlReport.Add("Unable to locate group " + $SQLLogin.Name.Split("\")[1] + " in the AD Domain.")
+                    if (Get-Command Get-ADGroupMember -ErrorAction SilentlyContinue) {
+                        #Sometimes there are 'ghost' groups left behind that are no longer in the domain. This highlights those still in SQL.
+                        $script:sqlReport.Add("Unable to locate group " + $SQLLogin.Name.Split("\")[1] + " in the AD Domain.")
+                    }
+                    else {
+                        $script:sqlReport.Add("Unable to enumerate members of group '" + $SQLLogin.Name + "': the ActiveDirectory PowerShell module is not installed on this server.")
+                    }
                 }
             }
             #Check the permissions in the DBs the Login is linked to. (Errors suppressed for all SQL logins that exist but are disabled)
@@ -203,6 +208,31 @@ function Add-FileToZip (
             $zip.Dispose()
         }
     }
+}
+
+#Restricts a collected file/folder to Administrators, SYSTEM, and the invoking user. The collected data
+#is sensitive (accounts, SQL permissions, event logs) and the default output location may otherwise
+#inherit ACLs that grant all local users read access (e.g. under %ProgramData%). SIDs are used instead
+#of account names so this works on non-English systems.
+function Protect-Path (
+    [string] $path
+)
+{
+    $inheritance = "None"
+    if (Test-Path -LiteralPath $path -PathType Container) {
+        $inheritance = "ContainerInherit,ObjectInherit"
+    }
+    $acl = Get-Acl -LiteralPath $path
+    #Disable inheritance and discard inherited entries, then grant explicit full control only.
+    $acl.SetAccessRuleProtection($true, $false)
+    $adminsSid = New-Object System.Security.Principal.SecurityIdentifier([System.Security.Principal.WellKnownSidType]::BuiltinAdministratorsSid, $null)
+    $systemSid = New-Object System.Security.Principal.SecurityIdentifier([System.Security.Principal.WellKnownSidType]::LocalSystemSid, $null)
+    $currentUserSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+    foreach ($sid in @($adminsSid, $systemSid, $currentUserSid)) {
+        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($sid, "FullControl", $inheritance, "None", "Allow")
+        $acl.AddAccessRule($rule)
+    }
+    Set-Acl -LiteralPath $path -AclObject $acl
 }
 
 #Builds !_SUMMARY.txt -- a triage summary of facts extracted from the data collected in this bundle.
@@ -455,7 +485,7 @@ function New-SummaryFile (
             $knownMicrosoftFilters = @('bindflt', 'wcifs', 'cldflt', 'fileinfo', 'filecrypt', 'luafv', 'npsvctrig', 'wof',
                 'storqosflt', 'wdfilter', 'filetrace', 'peauth', 'applockerfltr', 'datascrn', 'quota', 'dfsrro',
                 'fsdepends', 'iorate', 'prjflt', 'resumekeyfilter', 'sisraw', 'unionfs', 'mssecflt', 'bfs',
-                'easeflt', 'dedup', 'rsfilt', 'wimmount', 'msseccore', 'fileinfo', 'ntfs')
+                'easeflt', 'dedup', 'rsfilt', 'wimmount', 'msseccore')
             $filters = @()
             foreach ($line in (Get-Content $fltFile | Where-Object { $_.Trim() })) {
                 $tokens = $line.Trim() -split '\s+'
@@ -607,7 +637,10 @@ if ((Test-Path $veeamRegPath) -and ((Get-Item -Path $veeamRegPath).Property -con
 }
 
 $date = Get-Date -f yyyy-MM-ddTHHmmss_
-$temp = Join-Path $env:SystemDrive "temp"
+#Unique per-run working directory under %windir%\Temp (writable only by Administrators/SYSTEM). Using a
+#randomized name in a protected location prevents pre-planted file/junction attacks against this elevated
+#script, avoids clobbering pre-existing files (e.g. C:\temp\Execution.log), and allows concurrent runs.
+$temp = Join-Path $env:windir ("Temp\VeeamGuestLogs_" + [guid]::NewGuid().ToString("N"))
 $hostname = $env:COMPUTERNAME
 if ($OutputDirectory) {
     #Validate the custom output directory early so the user gets a clear error instead of a failed collection.
@@ -649,8 +682,19 @@ if (!($isVBR)) {
 }
 Write-Console
 
-# Transcript all workflow
-Start-Transcript -Path "$temp\Execution.log" > $null
+#Restrict the output folder before any data is written into it. The archive itself is protected
+#separately after compression (it is created in the parent folder and does not inherit this ACL).
+Invoke-Step "Restricting permissions on the output folder..." {
+    Protect-Path -path $directory
+}
+
+# Transcript all workflow (guarded: a transcript may already be running in the calling host)
+try {
+    Start-Transcript -Path "$temp\Execution.log" > $null
+}
+catch {
+    Write-Console "Unable to start transcript: $($_.Exception.Message). Continuing without transcription." "Yellow"
+}
 #Stamp the script version into the console output and transcript so support knows which revision produced this bundle.
 Write-Console "Collect-GuestLogs.ps1 -- script version $scriptVersion" "White"
 
@@ -674,7 +718,7 @@ Invoke-Step "Copying VSS logs..." {
     #Handle vssadmin timeout taking more than 180 seconds
     $writersTimeout = 180
     $script:vssWritersTimedOut = $false
-    $writersProcs = Start-Process -FilePath PowerShell.exe -ArgumentList "-Command `"vssadmin list writers > '$temp\vss_writers.log'`"" -PassThru -NoNewWindow
+    $writersProcs = Start-Process -FilePath PowerShell.exe -ArgumentList "-NoProfile -Command `"vssadmin list writers > '$temp\vss_writers.log'`"" -PassThru -NoNewWindow
     try {
         $writersProcs | Wait-Process -Timeout $writersTimeout -ErrorAction Stop
     }
@@ -826,8 +870,10 @@ Invoke-Step "Getting list of installed Windows updates/hotfixes..." {
 #Check if this server is running any SQL instances and if so, enumerate permissions for each database
 Invoke-Step "Checking for running SQL instances..." {
     $script:sqlReport = New-Object System.Collections.Generic.List[string]
-    $hasSQLDefaultInstance = Get-Service -Name "MSSQL*" | Where-Object { $_.Status -eq "Running" -and $_.Name -eq "MSSQLSERVER" }
-    $hasSQL = Get-Service -Name "MSSQL*" | Where-Object { $_.Status -eq "Running" -and ($_.Name -ne "MSSQLFDLauncher" -and $_.Name -ne "MSSQLSERVER") }
+    #Named SQL instance services are 'MSSQL$<instance>'. Matching on 'MSSQL*' alone would also pick up
+    #auxiliary services (MSSQLFDLauncher$X, MSSQLLaunchpad$X, MSSQLServerADHelper...) and misread them as instances.
+    $hasSQLDefaultInstance = Get-Service -Name "MSSQLSERVER" -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq "Running" }
+    $hasSQL = Get-Service -Name 'MSSQL$*' -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq "Running" }
     $hasSMO = [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Smo")
     $script:sqlDetected = [bool]($hasSQLDefaultInstance -or $hasSQL)
     if (!($hasSQLDefaultInstance) -and !($hasSQL)) {
@@ -1020,13 +1066,17 @@ else {
 #Compress folder containing data
 Invoke-Step "Compressing and zipping collected logs..." {
     Compress-Directory -sourcePath $directory -zipPath "$directory.zip" -includeBaseDirectory $true
+    #The zip is created in the parent folder and does not inherit the restricted ACL of the data folder.
+    Protect-Path -path "$directory.zip"
 }
 
 #Remove temporary log folder, but only if the zip was successfully created.
-if (Test-Path -Path "$directory.zip") {
+#(-LiteralPath is used on paths that can be user-influenced via -OutputDirectory so that wildcard
+#characters such as '[' are never glob-expanded by file cmdlets.)
+if (Test-Path -LiteralPath "$directory.zip") {
     Write-Console "Removing temporary log folder..." "White"
-    Remove-Item "$directory" -Recurse -Force -Confirm:$false
-    if (Test-Path -Path $directory) {
+    Remove-Item -LiteralPath "$directory" -Recurse -Force -Confirm:$false
+    if (Test-Path -LiteralPath $directory) {
         Write-Console "Problem encountered cleaning up temporary log folder. Manual cleanup may be necessary. Location: $directory" "Yellow" 3
     }
 }
@@ -1043,24 +1093,38 @@ else {
     Write-Console "Log collection finished. Please find the collected logs at $logDir" "Green" 3
 }
 
+Write-Console "NOTE: The collected archive contains sensitive configuration data (accounts, permissions, event logs). `
+Archives are not removed automatically -- please delete previous collections under $logDir once your support case is closed." "Yellow"
+
 #Remove custom Out-File width setting just in case.
 $PSDefaultParameterValues.Remove('Out-File:Width')
 
-#Stop transcript, copy Execution.log into the .zip archive, then cleanup Execution.log from the temp directory.
+#Stop transcript and copy Execution.log into the .zip archive.
 try { Stop-Transcript > $null } catch { }
 Start-Sleep -Seconds 1
-if (Test-Path -Path "$directory.zip") {
-    Add-FileToZip -FileToAdd "$temp\Execution.log" -ZipName ($directory + ".zip")
-    Remove-Item "$temp\Execution.log" -Force
+if (Test-Path -LiteralPath "$temp\Execution.log") {
+    if (Test-Path -LiteralPath "$directory.zip") {
+        Add-FileToZip -FileToAdd "$temp\Execution.log" -ZipName ($directory + ".zip")
+    }
+    else {
+        #Zip was not created -- preserve the transcript alongside the uncompressed log folder instead.
+        Move-Item -LiteralPath "$temp\Execution.log" -Destination $directory -Force
+    }
 }
-else {
-    #Zip was not created -- preserve the transcript alongside the uncompressed log folder instead.
-    Move-Item "$temp\Execution.log" -Destination $directory -Force
-}
+
+#Remove the per-run working directory.
+Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
 
 #Open Windows Explorer to the location of the created .zip file (interactive sessions only)
 if ($isInteractive) {
     Explorer $logDir
     Start-Sleep 2
 }
-Exit
+
+#Exit non-zero if the archive is missing or any collection step failed, so unattended callers
+#(e.g. Invoke-Command) can detect problems programmatically.
+$exitCode = 0
+if (($script:stepErrors.Count -gt 0) -or !(Test-Path -LiteralPath "$directory.zip")) {
+    $exitCode = 1
+}
+Exit $exitCode

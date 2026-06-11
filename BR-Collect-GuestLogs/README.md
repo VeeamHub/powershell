@@ -70,6 +70,15 @@ This script will collect the following information from the machine. Tabular dat
 * Writes a _CollectionErrors.log_ into the archive listing any collection steps that failed, so it is possible to distinguish "collection failed" from "not present on this system"
 * Generates a triage summary (_!_SUMMARY.txt_) at the root of the archive surfacing facts an engineer typically checks first: VSS writer states, non-default VSS providers, key service states, low disk space, minifilter drivers not shipped in-box with Windows, pending reboot indicators, SCHANNEL protocol customizations, and any collection failures. The summary is advisory only (facts, not a diagnosis) — any check that cannot be parsed (e.g. localized vssadmin output on non-English OSes) is flagged for manual review instead of reporting an all-clear
 
+## **Data handling** <br>
+The collected archive contains sensitive configuration data (local/domain account listings, SQL permissions, event logs, registry exports, network configuration). To protect it:
+
+* The output folder and the resulting .zip archive have their permissions restricted to **Administrators**, **SYSTEM**, and **the user who ran the collection**.
+* The script's temporary working files are kept in a uniquely-named per-run folder under `%windir%\Temp` and are removed when the run completes.
+* Archives are **not** removed automatically — please delete previous collections from the output location once your support case is closed.
+
+The script makes no changes to system state: it only reads (services, registry, VSS, event logs are exported, never modified). The script exits with code `1` if the archive could not be created or any collection step failed, so unattended/remote callers can detect problems.
+
 ## Project Notes
 **Author:** Chris Evans <br>
 
