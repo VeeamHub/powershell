@@ -65,6 +65,7 @@ This script will collect the following information from the machine. Tabular dat
 * Collects Event Viewer logs
 * Collects status of Windows Firewall profiles
 * Collects settings of attached NICs
+* Collects a point-in-time netstat snapshot (with an embedded disclaimer noting that Veeam data transport ports are only bound during active jobs; deliberately excluded from the triage summary)
 * Collects list of installed features/roles
 * Writes a _CollectionErrors.log_ into the archive listing any collection steps that failed, so it is possible to distinguish "collection failed" from "not present on this system"
 * Generates a triage summary (_!_SUMMARY.txt_) at the root of the archive surfacing facts an engineer typically checks first: VSS writer states, non-default VSS providers, key service states, low disk space, minifilter drivers not shipped in-box with Windows, pending reboot indicators, SCHANNEL protocol customizations, and any collection failures. The summary is advisory only (facts, not a diagnosis) — any check that cannot be parsed (e.g. localized vssadmin output on non-English OSes) is flagged for manual review instead of reporting an all-clear

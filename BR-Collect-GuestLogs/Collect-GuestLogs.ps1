@@ -912,6 +912,24 @@ Invoke-Step "Getting settings of attached NICs..." {
     ipconfig /all > "$directory\ipconfig.log"
 }
 
+#Get point-in-time snapshot of TCP/UDP endpoints. Raw artifact only -- deliberately NOT referenced by
+#the summary file, to avoid misinterpretation. The disclaimer is written into the file itself so it
+#cannot be separated from the data.
+Invoke-Step "Collecting netstat snapshot..." {
+    $disclaimer = @(
+        "============================================================================",
+        " POINT-IN-TIME SNAPSHOT taken at collection time, outside of any backup job.",
+        " Veeam data transport ports (2500-3300) are bound only while a job is",
+        " actively running -- their absence here is EXPECTED and is not evidence of",
+        " a connectivity problem. Inbound reachability from the backup server/proxy",
+        " cannot be determined from this guest-side snapshot.",
+        "============================================================================",
+        ""
+    )
+    $netstatOutput = netstat -ano
+    ($disclaimer + $netstatOutput) | Out-File "$directory\netstat.log" -Encoding utf8
+}
+
 #Check if 'LocalAccountTokenFilterPolicy' registry value is enabled
 Invoke-Step "Checking if 'Remote UAC' is disabled..." {
     #Must test to see if registry hive exists, otherwise would cause a stack overflow error.
