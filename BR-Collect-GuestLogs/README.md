@@ -37,7 +37,7 @@ Unblock-File .\Collect-GuestLogs.ps1
 | --- | --- |
 | `-IncludeSecurityEvents` | Includes the Security event log in the exported Windows Event Logs. If omitted in an interactive session, a prompt is shown (defaults to No). In a non-interactive session, the Security log is excluded unless this switch is passed. |
 | `-Force` | Suppresses the confirmation normally shown when the script detects it is running on a Veeam Backup & Replication server. Required for unattended runs on a VBR server. |
-| `-OutputDirectory <path>` | Directory where the collected log bundle is created. Useful when the default location (a _Case_Logs_ folder on the same volume as the Veeam log directory) is low on disk space. The directory is created if it does not exist. |
+| `-OutputDirectory <path>` | Directory where the collected log bundle is created. Useful when the default location (a _Case_Logs_ folder on the same volume as the Veeam log directory) is low on disk space. The directory is created if it does not exist. Paths containing wildcard characters (`[`, `]`, `*`, `?`) are not supported and are rejected at startup. |
 
 ### **Remote execution** <br>
 The script can be executed against a remote guest OS using PowerShell Remoting. All interactive prompts are automatically skipped in remote sessions, so use the parameters above to control behavior:

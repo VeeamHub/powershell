@@ -12,7 +12,8 @@
    .Parameter OutputDirectory
     Directory where the collected log bundle is created. Useful when the default location (a
     "Case_Logs" folder on the same volume as the Veeam log directory) is low on disk space.
-    The directory is created if it does not exist.
+    The directory is created if it does not exist. Paths containing wildcard characters
+    ('[', ']', '*', '?') are not supported and are rejected at startup.
    .Example
     Execute on guest OS server locally (run with Administrator privileges):
         .\Collect_Veeam_Guest_Logs.ps1
@@ -630,7 +631,7 @@ function New-SummaryFile (
 #Check if script running in PowerShell ISE. If so, instruct to call the script again from a normal PowerShell console. This is due to PS ISE loading additional modules that can cause issues with transcription.
 if ($psISE) {
     Write-Console "PowerShell ISE is not supported for this script. Please call the script from a PowerShell console (launched with Administrator privileges)." "Red" 5
-    Exit
+    Exit 1
 }
 
 #Determine whether we can show GUI prompts. Remote sessions (Invoke-Command) and other non-interactive
@@ -671,17 +672,27 @@ $date = Get-Date -f yyyy-MM-ddTHHmmss_
 $temp = Join-Path $env:windir ("Temp\VeeamGuestLogs_" + [guid]::NewGuid().ToString("N"))
 $hostname = $env:COMPUTERNAME
 if ($OutputDirectory) {
-    #Validate the custom output directory early so the user gets a clear error instead of a failed collection.
-    New-Dir $OutputDirectory
-    if (!(Test-Path -Path $OutputDirectory)) {
-        Write-Console "Unable to create or access the specified output directory: $OutputDirectory. Please verify the path and try again." "Red" 3
-        Exit
-    }
     $logDir = $OutputDirectory
 }
 else {
     $logVolume = Split-Path -Path $veeamDir -Parent
     $logDir = Join-Path -Path $logVolume -ChildPath "Case_Logs"
+}
+#Paths containing wildcard characters are rejected up front: several cmdlets used downstream treat
+#'[', ']', '*' and '?' in -Path arguments as wildcard patterns (with version-dependent quirks), and
+#declining to run is safer than risking a file operation resolving to an unintended location.
+#(Checked on the resolved path so a wildcard in a registry-derived Veeam log directory is caught too.)
+if ($logDir -match '[\[\]\*\?]') {
+    Write-Console "The output directory path contains wildcard characters ('[', ']', '*' or '?') which are not supported: $logDir. Please specify a different path with -OutputDirectory." "Red" 3
+    Exit 1
+}
+if ($OutputDirectory) {
+    #Validate the custom output directory early so the user gets a clear error instead of a failed collection.
+    New-Dir $OutputDirectory
+    if (!(Test-Path -LiteralPath $OutputDirectory)) {
+        Write-Console "Unable to create or access the specified output directory: $OutputDirectory. Please verify the path and try again." "Red" 3
+        Exit 1
+    }
 }
 $directory = Join-Path -Path $logDir -ChildPath $date$hostname
 $VBR = "$directory\Backup"
