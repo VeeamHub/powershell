@@ -31,6 +31,8 @@
 #>
 #Requires -Version 4.0
 #Requires -RunAsAdministrator
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification = 'Interactive console tool: colored console output is the intended UI and must not pollute the success stream, which would corrupt collected data written via redirection.')]
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Internal helper functions in a linear, non-destructive collection script; -WhatIf/-Confirm semantics are not applicable.')]
 param (
     [switch] $IncludeSecurityEvents,
     [switch] $Force,
@@ -161,7 +163,7 @@ function LogSQLPermissions (
             }
             #Check the permissions in the DBs the Login is linked to. (Errors suppressed for all SQL logins that exist but are disabled)
             $hasMappings = $false
-            try { $hasMappings = [bool]$SQLLogin.EnumDatabaseMappings() } catch { }
+            try { $hasMappings = [bool]$SQLLogin.EnumDatabaseMappings() } catch { $hasMappings = $false }
             if ($hasMappings) {
                 $script:sqlReport.Add("Permissions: ")
                 foreach ($DB in $Server.Databases) {
@@ -512,13 +514,13 @@ function New-SummaryFile (
                             if ($_.Name -and $_.PathName) { $driverIndex[$_.Name.ToLower()] = $_.PathName }
                         }
                     }
-                    catch { }
+                    catch { Write-Verbose "Driver service index could not be built: $($_.Exception.Message)" }
                     foreach ($f in $candidates) {
                         $company = $null
                         $driverPath = $driverIndex[$f.Name.ToLower()]
                         if ($driverPath) {
                             $driverPath = $driverPath -replace '^\\\?\?\\', ''
-                            try { $company = (Get-Item -LiteralPath $driverPath -ErrorAction Stop).VersionInfo.CompanyName } catch { }
+                            try { $company = (Get-Item -LiteralPath $driverPath -ErrorAction Stop).VersionInfo.CompanyName } catch { $company = $null }
                         }
                         if ($company -notmatch '^Microsoft') {
                             $unknownFilters += $f
@@ -1126,7 +1128,7 @@ Archives are not removed automatically -- please delete previous collections und
 $PSDefaultParameterValues.Remove('Out-File:Width')
 
 #Stop transcript and copy Execution.log into the .zip archive.
-try { Stop-Transcript > $null } catch { }
+try { Stop-Transcript > $null } catch { Write-Verbose "No active transcript to stop." }
 Start-Sleep -Seconds 1
 if (Test-Path -LiteralPath "$temp\Execution.log") {
     if (Test-Path -LiteralPath "$directory.zip") {
