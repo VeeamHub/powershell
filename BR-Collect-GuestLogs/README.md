@@ -37,6 +37,7 @@ Unblock-File .\Collect-GuestLogs.ps1
 | --- | --- |
 | `-IncludeSecurityEvents` | Includes the Security event log in the exported Windows Event Logs. If omitted in an interactive session, a prompt is shown (defaults to No). In a non-interactive session, the Security log is excluded unless this switch is passed. |
 | `-Force` | Suppresses the confirmation normally shown when the script detects it is running on a Veeam Backup & Replication server. Required for unattended runs on a VBR server. |
+| `-OutputDirectory <path>` | Directory where the collected log bundle is created. Useful when the default location (a _Case_Logs_ folder on the same volume as the Veeam log directory) is low on disk space. The directory is created if it does not exist. Paths containing wildcard characters (`[`, `]`, `*`, `?`) are not supported and are rejected at startup. |
 
 ### **Remote execution** <br>
 The script can be executed against a remote guest OS using PowerShell Remoting. All interactive prompts are automatically skipped in remote sessions, so use the parameters above to control behavior:
@@ -45,12 +46,14 @@ Invoke-Command -FilePath .\Collect-GuestLogs.ps1 -ComputerName <GUEST_OS_SERVERN
 ```
 
 ## **Features** <br>
-This script will collect the following information from the machine:
+This script will collect the following information from the machine. Tabular data (installed software, services, volumes, local accounts, '_File and Printer Sharing_' status) is exported in CSV format so it can be sorted and filtered in a spreadsheet application.
 
 * Collects _GuestHelper_, _GuestIndexer_ and other logs located in _%ProgramData%\Veeam\Backup\_ (or alternate configured directory)
 * Collects output of various VSSAdmin commands: Writers/Shadows/ShadowStorage/Providers
 * Collects output of SystemInfo.exe
 * Collects output of FLTMC.exe (list of registered Filter Manager minifilter drivers)
+* Detects the hypervisor and collects guest tools information (VMware Tools / Hyper-V Integration Services / Nutanix Guest Tools version and service status)
+* Collects list of installed Windows updates/hotfixes
 * Collects various registry values (_Veeam Backup and Replication_, _SCHANNEL_ and _System_ hives specifically) to check for various settings that affect In-Guest Processing
 * Checks for Veeam registry values which may have leading or trailing whitespace which would cause them not to work as intended
 * Collects list of installed software (read from the registry uninstall keys — avoids the Windows Installer consistency checks and repair operations that querying _Win32\_Product_ would trigger)
@@ -62,8 +65,19 @@ This script will collect the following information from the machine:
 * Collects Event Viewer logs
 * Collects status of Windows Firewall profiles
 * Collects settings of attached NICs
+* Collects a point-in-time netstat snapshot (with an embedded disclaimer noting that many Veeam ports are only bound during active jobs/operations; deliberately excluded from the triage summary)
 * Collects list of installed features/roles
 * Writes a _CollectionErrors.log_ into the archive listing any collection steps that failed, so it is possible to distinguish "collection failed" from "not present on this system"
+* Generates a triage summary (_!_SUMMARY.txt_) at the root of the archive surfacing facts an engineer typically checks first: VSS writer states, non-default VSS providers, key service states, low disk space, minifilter drivers not shipped in-box with Windows, pending reboot indicators, SCHANNEL protocol customizations, and any collection failures. The summary is advisory only (facts, not a diagnosis) — any check that cannot be parsed (e.g. localized vssadmin output on non-English OSes) is flagged for manual review instead of reporting an all-clear
+
+## **Data handling** <br>
+The collected archive contains sensitive configuration data (local/domain account listings, SQL permissions, event logs, registry exports, network configuration). To protect it:
+
+* The output folder and the resulting .zip archive have their permissions restricted to **Administrators**, **SYSTEM**, and **the user who ran the collection**.
+* The script's temporary working files are kept in a uniquely-named per-run folder under `%windir%\Temp` and are removed when the run completes.
+* Archives are **not** removed automatically — please delete previous collections from the output location once your support case is closed.
+
+The script makes no changes to system state: it only reads (services, registry, VSS, event logs are exported, never modified). The script exits with code `1` if the archive could not be created or any collection step failed, so unattended/remote callers can detect problems.
 
 ## Project Notes
 **Author:** Chris Evans <br>

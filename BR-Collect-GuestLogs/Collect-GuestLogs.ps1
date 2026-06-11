@@ -9,6 +9,11 @@
    .Parameter Force
     Suppresses the confirmation normally shown when the script is detected to be running on a
     Veeam Backup & Replication server. Required for unattended runs on a VBR server.
+   .Parameter OutputDirectory
+    Directory where the collected log bundle is created. Useful when the default location (a
+    "Case_Logs" folder on the same volume as the Veeam log directory) is low on disk space.
+    The directory is created if it does not exist. Paths containing wildcard characters
+    ('[', ']', '*', '?') are not supported and are rejected at startup.
    .Example
     Execute on guest OS server locally (run with Administrator privileges):
         .\Collect_Veeam_Guest_Logs.ps1
@@ -16,6 +21,7 @@
         Invoke-Command -FilePath <PATH_TO_THIS_SCRIPT> -ComputerName <GUEST_OS_SERVERNAME> -Credential (Get-Credential)
    .Notes
     NAME: Collect_Veeam_Guest_Logs.ps1
+    VERSION: 2.0
     AUTHOR: Chris Evans, Veeam Software
     CONTACT: chris.evans@veeam.com
     LASTEDIT: 10-June-2026
@@ -26,10 +32,17 @@
 #>
 #Requires -Version 4.0
 #Requires -RunAsAdministrator
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidUsingWriteHost', '', Justification = 'Interactive console tool: colored console output is the intended UI and must not pollute the success stream, which would corrupt collected data written via redirection.')]
+[Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '', Justification = 'Internal helper functions in a linear, non-destructive collection script; -WhatIf/-Confirm semantics are not applicable.')]
 param (
     [switch] $IncludeSecurityEvents,
-    [switch] $Force
+    [switch] $Force,
+    [string] $OutputDirectory
 )
+
+$scriptVersion = "2.0"
+#Capture bound parameters at script level for the summary file ($PSBoundParameters is scoped per function).
+$scriptParameters = ($PSBoundParameters.Keys | ForEach-Object { "-$_" }) -join " "
 
 #Set default width of all invocations of Out-File and redirection operators to 2000 to prevent truncation of output.
 $PSDefaultParameterValues['Out-File:Width'] = 2000
@@ -140,13 +153,18 @@ function LogSQLPermissions (
                         $script:sqlReport.Add("   Account: " + $Member.Name + "(" + $Member.SamAccountName + ")")
                     }
                 } catch {
-                    #Sometimes there are 'ghost' groups left behind that are no longer in the domain. This highlights those still in SQL.
-                    $script:sqlReport.Add("Unable to locate group " + $SQLLogin.Name.Split("\")[1] + " in the AD Domain.")
+                    if (Get-Command Get-ADGroupMember -ErrorAction SilentlyContinue) {
+                        #Sometimes there are 'ghost' groups left behind that are no longer in the domain. This highlights those still in SQL.
+                        $script:sqlReport.Add("Unable to locate group " + $SQLLogin.Name.Split("\")[1] + " in the AD Domain.")
+                    }
+                    else {
+                        $script:sqlReport.Add("Unable to enumerate members of group '" + $SQLLogin.Name + "': the ActiveDirectory PowerShell module is not installed on this server.")
+                    }
                 }
             }
             #Check the permissions in the DBs the Login is linked to. (Errors suppressed for all SQL logins that exist but are disabled)
             $hasMappings = $false
-            try { $hasMappings = [bool]$SQLLogin.EnumDatabaseMappings() } catch { }
+            try { $hasMappings = [bool]$SQLLogin.EnumDatabaseMappings() } catch { $hasMappings = $false }
             if ($hasMappings) {
                 $script:sqlReport.Add("Permissions: ")
                 foreach ($DB in $Server.Databases) {
@@ -195,10 +213,425 @@ function Add-FileToZip (
     }
 }
 
+#Restricts a collected file/folder to Administrators, SYSTEM, and the invoking user. The collected data
+#is sensitive (accounts, SQL permissions, event logs) and the default output location may otherwise
+#inherit ACLs that grant all local users read access (e.g. under %ProgramData%). SIDs are used instead
+#of account names so this works on non-English systems.
+function Protect-Path (
+    [string] $path
+)
+{
+    $inheritance = "None"
+    if (Test-Path -LiteralPath $path -PathType Container) {
+        $inheritance = "ContainerInherit,ObjectInherit"
+    }
+    $acl = Get-Acl -LiteralPath $path
+    #Disable inheritance and discard inherited entries, then grant explicit full control only.
+    $acl.SetAccessRuleProtection($true, $false)
+    $adminsSid = New-Object System.Security.Principal.SecurityIdentifier([System.Security.Principal.WellKnownSidType]::BuiltinAdministratorsSid, $null)
+    $systemSid = New-Object System.Security.Principal.SecurityIdentifier([System.Security.Principal.WellKnownSidType]::LocalSystemSid, $null)
+    $currentUserSid = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+    foreach ($sid in @($adminsSid, $systemSid, $currentUserSid)) {
+        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($sid, "FullControl", $inheritance, "None", "Allow")
+        $acl.AddAccessRule($rule)
+    }
+    Set-Acl -LiteralPath $path -AclObject $acl
+}
+
+#Builds !_SUMMARY.txt -- a triage summary of facts extracted from the data collected in this bundle.
+#Advisory only: facts, not verdicts. Any section that cannot be parsed (e.g. localized vssadmin output
+#on a non-English OS) degrades to an [INFO] pointing at the raw file rather than a false "all clear".
+#Each section is individually try/catch wrapped so one bad parse cannot prevent the rest of the summary.
+function New-SummaryFile (
+    [string] $summaryPath
+)
+{
+    $s = New-Object System.Collections.Generic.List[string]
+    $rule = "=========================================================================="
+
+    #--- Header ---
+    $s.Add($rule)
+    $s.Add(" VEEAM GUEST OS LOG COLLECTION SUMMARY")
+    $s.Add($rule)
+    $s.Add(" Script version    : $scriptVersion")
+    $utcOffset = [System.TimeZoneInfo]::Local.GetUtcOffset((Get-Date))
+    $offsetSign = "+"
+    if ($utcOffset.Ticks -lt 0) { $offsetSign = "-" }
+    $s.Add((" Collected         : {0} (UTC{1}{2:hh\:mm})" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'), $offsetSign, $utcOffset))
+    if ($scriptParameters) {
+        $s.Add(" Parameters        : $scriptParameters")
+    } else {
+        $s.Add(" Parameters        : (none)")
+    }
+    if ($isInteractive) {
+        $s.Add(" Session type      : Interactive")
+    } else {
+        $s.Add(" Session type      : Non-interactive (remote or scheduled)")
+    }
+    $s.Add("")
+    $s.Add(" Hostname          : $hostname")
+    try {
+        $os = Get-CimInstance Win32_OperatingSystem
+        $s.Add(" Operating System  : $($os.Caption) (Build $($os.BuildNumber))")
+        $s.Add(" PowerShell        : $($PSVersionTable.PSVersion)")
+        $uptimeDays = [math]::Round(((Get-Date) - $os.LastBootUpTime).TotalDays, 0)
+        $s.Add((" Last boot         : {0:yyyy-MM-dd HH:mm:ss} ({1} days ago)" -f $os.LastBootUpTime, $uptimeDays))
+    }
+    catch {
+        $s.Add(" [INFO] Operating system details could not be read: $($_.Exception.Message)")
+    }
+    if ($script:hypervisor) {
+        $s.Add(" Hypervisor        : $($script:hypervisor)")
+        if ($script:guestToolsInfo) {
+            $s.Add(" Guest tools       : $($script:guestToolsInfo)")
+        }
+    }
+    if ($isVBR) {
+        $s.Add("")
+        $s.Add(" [WARN] This script was executed on a Veeam Backup & Replication server.")
+    }
+    $s.Add($rule)
+
+    #--- VSS writers ---
+    $s.Add("")
+    $s.Add("--- VSS WRITER STATE (VSS\vss_writers.log) -------------------------------")
+    try {
+        $writersFile = Join-Path $VSS "vss_writers.log"
+        if ($script:vssWritersTimedOut) {
+            $s.Add(" [WARN] VSS Writers collection timed out after 180 seconds; vss_writers.log is missing or may be incomplete.")
+        }
+        if (Test-Path $writersFile) {
+            $writers = @()
+            $currentWriter = $null
+            foreach ($line in (Get-Content $writersFile)) {
+                if ($line -match "^Writer name:\s+'(.+)'") {
+                    if ($currentWriter) { $writers += $currentWriter }
+                    $currentWriter = [PSCustomObject]@{ Name = $matches[1]; StateNum = -1; StateText = ""; LastError = "" }
+                }
+                elseif ($currentWriter -and ($line -match "^\s+State:\s+\[(\d+)\]\s*(.*)$")) {
+                    $currentWriter.StateNum = [int]$matches[1]
+                    $currentWriter.StateText = $matches[2].Trim()
+                }
+                elseif ($currentWriter -and ($line -match "^\s+Last error:\s+(.*)$")) {
+                    $currentWriter.LastError = $matches[1].Trim()
+                }
+            }
+            if ($currentWriter) { $writers += $currentWriter }
+
+            if ($writers.Count -eq 0) {
+                $s.Add(" [INFO] Could not parse VSS writer states from vss_writers.log (non-English OS or unexpected format?). Review the file manually.")
+            }
+            else {
+                #State [1] = Stable. Writers in any other state, or reporting a last error, are listed.
+                $unhealthy = @($writers | Where-Object { ($_.StateNum -ne 1) -or ($_.LastError -ne 'No error') })
+                if ($unhealthy.Count -gt 0) {
+                    $s.Add(" [WARN] $($unhealthy.Count) of $($writers.Count) writers are not in a stable state with no errors:")
+                    foreach ($w in $unhealthy) {
+                        $s.Add(("        - {0,-38} State: [{1}] {2,-24} Last error: {3}" -f $w.Name, $w.StateNum, $w.StateText, $w.LastError))
+                    }
+                }
+                else {
+                    $s.Add(" [OK]   All $($writers.Count) writers stable with no errors.")
+                }
+            }
+        }
+        elseif (-not $script:vssWritersTimedOut) {
+            $s.Add(" [INFO] vss_writers.log was not collected.")
+        }
+    }
+    catch {
+        $s.Add(" [INFO] VSS writer check could not be completed: $($_.Exception.Message)")
+    }
+
+    #--- VSS providers ---
+    $s.Add("")
+    $s.Add("--- VSS PROVIDERS (VSS\vss_providers.log) --------------------------------")
+    try {
+        $providersFile = Join-Path $VSS "vss_providers.log"
+        if (Test-Path $providersFile) {
+            #Provider IDs are locale-independent. These are the in-box Microsoft software/file share providers.
+            $defaultProviderIds = @('{b5946137-7b9f-4925-af80-51abd60b20d5}', '{89300202-3cec-4981-9171-19f59559e0f2}')
+            $providerContent = Get-Content $providersFile
+            $providers = @()
+            $currentProvider = $null
+            foreach ($line in $providerContent) {
+                if ($line -match "^Provider name:\s+'(.+)'") {
+                    if ($currentProvider) { $providers += $currentProvider }
+                    $currentProvider = [PSCustomObject]@{ Name = $matches[1]; Id = "" }
+                }
+                elseif ($currentProvider -and (-not $currentProvider.Id) -and ($line -match "(\{[0-9a-fA-F\-]{36}\})")) {
+                    $currentProvider.Id = $matches[1].ToLower()
+                }
+            }
+            if ($currentProvider) { $providers += $currentProvider }
+
+            if ($providers.Count -gt 0) {
+                $thirdParty = @($providers | Where-Object { $defaultProviderIds -notcontains $_.Id })
+                if ($thirdParty.Count -gt 0) {
+                    $s.Add(" [WARN] $($thirdParty.Count) non-default VSS provider(s) registered:")
+                    foreach ($p in $thirdParty) {
+                        $s.Add("        - '$($p.Name)' $($p.Id)")
+                    }
+                    $s.Add("        Third-party providers are a common cause of snapshot creation failures.")
+                }
+                else {
+                    $s.Add(" [OK]   Only in-box Microsoft VSS provider(s) registered ($($providers.Count)).")
+                }
+            }
+            else {
+                #Names could not be parsed (non-English OS?) -- fall back to the locale-independent provider IDs.
+                $allIds = @()
+                foreach ($line in $providerContent) {
+                    if ($line -match "(\{[0-9a-fA-F\-]{36}\})") { $allIds += $matches[1].ToLower() }
+                }
+                if ($allIds.Count -eq 0) {
+                    $s.Add(" [INFO] Could not parse vss_providers.log (non-English OS or unexpected format?). Review the file manually.")
+                }
+                else {
+                    $unknownIds = @($allIds | Where-Object { $defaultProviderIds -notcontains $_ })
+                    if ($unknownIds.Count -gt 0) {
+                        $s.Add(" [WARN] $($unknownIds.Count) non-default VSS provider ID(s) registered (provider names could not be parsed; non-English OS?):")
+                        foreach ($id in $unknownIds) { $s.Add("        - $id") }
+                        $s.Add("        Review vss_providers.log manually.")
+                    }
+                    else {
+                        $s.Add(" [OK]   Only in-box Microsoft VSS provider ID(s) found ($($allIds.Count)).")
+                    }
+                }
+            }
+        }
+        else {
+            $s.Add(" [INFO] vss_providers.log was not collected.")
+        }
+    }
+    catch {
+        $s.Add(" [INFO] VSS provider check could not be completed: $($_.Exception.Message)")
+    }
+
+    #--- Key services ---
+    $s.Add("")
+    $s.Add("--- KEY SERVICES (services.csv) -------------------------------------------")
+    try {
+        if ($script:serviceData) {
+            $keyServiceNames = @('VSS', 'swprv', 'EventSystem', 'COMSysApp', 'CryptSvc', 'Winmgmt')
+            if ($script:sqlDetected) { $keyServiceNames += 'SQLWriter' }
+            foreach ($svcName in $keyServiceNames) {
+                $svc = $script:serviceData | Where-Object { $_.Name -eq $svcName } | Select-Object -First 1
+                if (-not $svc) {
+                    if ($svcName -eq 'SQLWriter') {
+                        $s.Add(" [WARN] SQL Server VSS Writer (SQLWriter) service not found, but running SQL instance(s) were detected.")
+                    }
+                    continue
+                }
+                $flag = "[OK]  "
+                if (($svc.StartMode -eq 'Disabled') -or (($svc.StartMode -eq 'Auto') -and ($svc.State -ne 'Running'))) {
+                    $flag = "[WARN]"
+                }
+                $s.Add((" {0} {1,-48} State: {2,-9} StartMode: {3}" -f $flag, "$($svc.DisplayName) ($($svc.Name))", $svc.State, $svc.StartMode))
+            }
+            foreach ($svc in @($script:serviceData | Where-Object { $_.Name -like 'Veeam*' })) {
+                $flag = "[OK]  "
+                if (($svc.StartMode -eq 'Disabled') -or (($svc.StartMode -eq 'Auto') -and ($svc.State -ne 'Running'))) {
+                    $flag = "[WARN]"
+                }
+                $s.Add((" {0} {1,-48} State: {2,-9} StartMode: {3}" -f $flag, "$($svc.DisplayName) ($($svc.Name))", $svc.State, $svc.StartMode))
+            }
+            $s.Add("        (VSS and swprv are demand-start; 'Stopped' with StartMode Manual is normal for them.)")
+        }
+        else {
+            $s.Add(" [INFO] Service data was not collected; see CollectionErrors.log.")
+        }
+    }
+    catch {
+        $s.Add(" [INFO] Key services check could not be completed: $($_.Exception.Message)")
+    }
+
+    #--- Disk space ---
+    $s.Add("")
+    $s.Add("--- DISK SPACE (volume_info.csv) -------------------------------------------")
+    try {
+        if ($script:volumeData) {
+            $checkedVolumes = @($script:volumeData | Where-Object { $_.DriveLetter -and ($_.SizeGB -gt 0) })
+            $lowVolumes = 0
+            foreach ($v in $checkedVolumes) {
+                if (($v.PercentFree -lt 10) -or ($v.FreeGB -lt 5)) {
+                    $lowVolumes++
+                    $s.Add((" [WARN] {0}  {1} GB free of {2} GB ({3}%) -- below free space threshold (10% / 5 GB)" -f $v.DriveLetter, $v.FreeGB, $v.SizeGB, $v.PercentFree))
+                }
+            }
+            if ($checkedVolumes.Count -eq 0) {
+                $s.Add(" [INFO] No lettered volumes with size information found in collected volume data.")
+            }
+            elseif ($lowVolumes -eq 0) {
+                $s.Add(" [OK]   All $($checkedVolumes.Count) lettered volume(s) above free space thresholds (10% / 5 GB).")
+            }
+            else {
+                $s.Add(" [OK]   $($checkedVolumes.Count - $lowVolumes) other volume(s) above thresholds.")
+                $s.Add("        Low free space can prevent shadow copy creation and growth.")
+            }
+        }
+        else {
+            $s.Add(" [INFO] Volume data was not collected; see CollectionErrors.log.")
+        }
+    }
+    catch {
+        $s.Add(" [INFO] Disk space check could not be completed: $($_.Exception.Message)")
+    }
+
+    #--- Filter drivers ---
+    $s.Add("")
+    $s.Add("--- FILTER DRIVERS (FLTMC.txt) ---------------------------------------------")
+    try {
+        $fltFile = "$directory\FLTMC.txt"
+        if (Test-Path $fltFile) {
+            #Minifilters confidently known to ship in-box with Windows. This list is a fast path only:
+            #any filter NOT in it has its driver binary's publisher metadata checked before being flagged,
+            #so newly introduced in-box Microsoft filters (e.g. UCPD) are not misreported as third-party.
+            $knownMicrosoftFilters = @('bindflt', 'wcifs', 'cldflt', 'cimfs', 'fileinfo', 'filecrypt', 'luafv', 'npsvctrig',
+                'wof', 'storqosflt', 'wdfilter', 'wddevflt', 'applockerfltr', 'datascrn', 'quota', 'dfsrro',
+                'fsdepends', 'iorate', 'prjflt', 'resumekeyfilter', 'sisraw', 'mssecflt', 'msseccore', 'bfs',
+                'wcnfs', 'dedup', 'wimmount', 'peauth', 'ucpd')
+            $filters = @()
+            foreach ($line in (Get-Content $fltFile | Where-Object { $_.Trim() })) {
+                $tokens = $line.Trim() -split '\s+'
+                #Data rows: FilterName NumInstances Altitude Frame. Header/separator rows will not match this shape.
+                if (($tokens.Count -ge 3) -and ($tokens[1] -match '^\d+$') -and ($tokens[2] -match '^\d+(\.\d+)?$')) {
+                    $filters += [PSCustomObject]@{ Name = $tokens[0]; Altitude = $tokens[2] }
+                }
+            }
+            if ($filters.Count -eq 0) {
+                $s.Add(" [INFO] Could not parse FLTMC.txt. Review the file manually.")
+            }
+            else {
+                $candidates = @($filters | Where-Object { $knownMicrosoftFilters -notcontains $_.Name.ToLower() })
+                $unknownFilters = @()
+                if ($candidates.Count -gt 0) {
+                    #Fallback check: minifilter names normally match their driver service name, so resolve the
+                    #driver binary and read its publisher. Publisher metadata is self-declared (not a signature
+                    #check), but is sufficient for an advisory triage hint; FLTMC.txt remains the source of truth.
+                    $driverIndex = @{}
+                    try {
+                        Get-CimInstance Win32_SystemDriver | ForEach-Object {
+                            if ($_.Name -and $_.PathName) { $driverIndex[$_.Name.ToLower()] = $_.PathName }
+                        }
+                    }
+                    catch { Write-Verbose "Driver service index could not be built: $($_.Exception.Message)" }
+                    foreach ($f in $candidates) {
+                        $company = $null
+                        $driverPath = $driverIndex[$f.Name.ToLower()]
+                        if ($driverPath) {
+                            $driverPath = $driverPath -replace '^\\\?\?\\', ''
+                            try { $company = (Get-Item -LiteralPath $driverPath -ErrorAction Stop).VersionInfo.CompanyName } catch { $company = $null }
+                        }
+                        if ($company -notmatch '^Microsoft') {
+                            $unknownFilters += $f
+                        }
+                    }
+                }
+                if ($unknownFilters.Count -gt 0) {
+                    $s.Add(" [INFO] $($unknownFilters.Count) of $($filters.Count) registered minifilter driver(s) are not known in-box Windows filters -- review:")
+                    foreach ($f in $unknownFilters) {
+                        $s.Add("        - $($f.Name) (Altitude $($f.Altitude))")
+                    }
+                    $s.Add("        AV/EDR/encryption filters can interfere with VSS snapshots and guest interaction.")
+                }
+                else {
+                    $s.Add(" [OK]   All $($filters.Count) registered minifilter driver(s) are in-box Windows filters or report Microsoft as the driver publisher.")
+                }
+            }
+        }
+        else {
+            $s.Add(" [INFO] FLTMC.txt was not collected.")
+        }
+    }
+    catch {
+        $s.Add(" [INFO] Filter driver check could not be completed: $($_.Exception.Message)")
+    }
+
+    #--- System state ---
+    $s.Add("")
+    $s.Add("--- SYSTEM STATE ------------------------------------------------------------")
+    try {
+        $rebootReasons = @()
+        if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') {
+            $rebootReasons += "Component Based Servicing: RebootPending key present"
+        }
+        if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired') {
+            $rebootReasons += "Windows Update: RebootRequired key present"
+        }
+        $pfro = (Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager' -ErrorAction SilentlyContinue).PendingFileRenameOperations
+        $pfroCount = @($pfro | Where-Object { $_ }).Count
+        if ($rebootReasons.Count -gt 0) {
+            $s.Add(" [WARN] A system reboot is pending:")
+            foreach ($r in $rebootReasons) { $s.Add("        - $r") }
+            if ($pfroCount -gt 0) { $s.Add("        - PendingFileRenameOperations: $pfroCount entries") }
+            $s.Add("        Pending servicing operations are a known cause of VSS writer instability.")
+        }
+        elseif ($pfroCount -gt 0) {
+            $s.Add(" [INFO] PendingFileRenameOperations: $pfroCount entries (common and often benign; no servicing reboot flags are set).")
+        }
+        else {
+            $s.Add(" [OK]   No pending reboot indicators found.")
+        }
+    }
+    catch {
+        $s.Add(" [INFO] Pending reboot check could not be completed: $($_.Exception.Message)")
+    }
+    try {
+        $schannelOverrides = @()
+        $protocolsPath = 'HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols'
+        if (Test-Path $protocolsPath) {
+            foreach ($proto in (Get-ChildItem $protocolsPath)) {
+                foreach ($side in (Get-ChildItem $proto.PSPath)) {
+                    $sideProps = Get-ItemProperty $side.PSPath
+                    $settings = @()
+                    if ($null -ne $sideProps.Enabled) { $settings += "Enabled=$($sideProps.Enabled)" }
+                    if ($null -ne $sideProps.DisabledByDefault) { $settings += "DisabledByDefault=$($sideProps.DisabledByDefault)" }
+                    if ($settings.Count -gt 0) {
+                        $schannelOverrides += ("{0} {1}: {2}" -f $proto.PSChildName, $side.PSChildName, ($settings -join ", "))
+                    }
+                }
+            }
+        }
+        if ($schannelOverrides.Count -gt 0) {
+            $s.Add(" [INFO] SCHANNEL protocol customizations present (see network_customizations.log):")
+            foreach ($o in $schannelOverrides) { $s.Add("        - $o") }
+        }
+        else {
+            $s.Add(" [OK]   No SCHANNEL protocol overrides found.")
+        }
+    }
+    catch {
+        $s.Add(" [INFO] SCHANNEL check could not be completed: $($_.Exception.Message)")
+    }
+
+    #--- Collection health ---
+    $s.Add("")
+    $s.Add("--- COLLECTION HEALTH -------------------------------------------------------")
+    if ($script:vssWritersTimedOut) {
+        $s.Add(" [WARN] VSS Writers collection timed out after 180 seconds; vss_writers.log may be missing or incomplete.")
+    }
+    if ($script:stepErrors.Count -gt 0) {
+        $s.Add(" [WARN] $($script:stepErrors.Count) collection step(s) failed -- see CollectionErrors.log:")
+        foreach ($e in $script:stepErrors) { $s.Add("        - $e") }
+    }
+    else {
+        $s.Add(" [OK]   All collection steps completed without recorded errors.")
+    }
+
+    $s.Add("")
+    $s.Add($rule)
+    $s.Add(" This summary is advisory and generated by parsing the data in this")
+    $s.Add(" bundle. It is not a diagnosis. Always verify against the raw logs.")
+    $s.Add($rule)
+
+    $s | Out-File $summaryPath -Encoding utf8
+}
+
 #Check if script running in PowerShell ISE. If so, instruct to call the script again from a normal PowerShell console. This is due to PS ISE loading additional modules that can cause issues with transcription.
 if ($psISE) {
     Write-Console "PowerShell ISE is not supported for this script. Please call the script from a PowerShell console (launched with Administrator privileges)." "Red" 5
-    Exit
+    Exit 1
 }
 
 #Determine whether we can show GUI prompts. Remote sessions (Invoke-Command) and other non-interactive
@@ -233,10 +666,34 @@ if ((Test-Path $veeamRegPath) -and ((Get-Item -Path $veeamRegPath).Property -con
 }
 
 $date = Get-Date -f yyyy-MM-ddTHHmmss_
-$temp = Join-Path $env:SystemDrive "temp"
+#Unique per-run working directory under %windir%\Temp (writable only by Administrators/SYSTEM). Using a
+#randomized name in a protected location prevents pre-planted file/junction attacks against this elevated
+#script, avoids clobbering pre-existing files (e.g. C:\temp\Execution.log), and allows concurrent runs.
+$temp = Join-Path $env:windir ("Temp\VeeamGuestLogs_" + [guid]::NewGuid().ToString("N"))
 $hostname = $env:COMPUTERNAME
-$logVolume = Split-Path -Path $veeamDir -Parent
-$logDir = Join-Path -Path $logVolume -ChildPath "Case_Logs"
+if ($OutputDirectory) {
+    $logDir = $OutputDirectory
+}
+else {
+    $logVolume = Split-Path -Path $veeamDir -Parent
+    $logDir = Join-Path -Path $logVolume -ChildPath "Case_Logs"
+}
+#Paths containing wildcard characters are rejected up front: several cmdlets used downstream treat
+#'[', ']', '*' and '?' in -Path arguments as wildcard patterns (with version-dependent quirks), and
+#declining to run is safer than risking a file operation resolving to an unintended location.
+#(Checked on the resolved path so a wildcard in a registry-derived Veeam log directory is caught too.)
+if ($logDir -match '[\[\]\*\?]') {
+    Write-Console "The output directory path contains wildcard characters ('[', ']', '*' or '?') which are not supported: $logDir. Please specify a different path with -OutputDirectory." "Red" 3
+    Exit 1
+}
+if ($OutputDirectory) {
+    #Validate the custom output directory early so the user gets a clear error instead of a failed collection.
+    New-Dir $OutputDirectory
+    if (!(Test-Path -LiteralPath $OutputDirectory)) {
+        Write-Console "Unable to create or access the specified output directory: $OutputDirectory. Please verify the path and try again." "Red" 3
+        Exit 1
+    }
+}
 $directory = Join-Path -Path $logDir -ChildPath $date$hostname
 $VBR = "$directory\Backup"
 $tempEVTXEvents = "$temp\EVTXEvents"
@@ -264,8 +721,21 @@ if (!($isVBR)) {
 }
 Write-Console
 
-# Transcript all workflow
-Start-Transcript -Path "$temp\Execution.log" > $null
+#Restrict the output folder before any data is written into it. The archive itself is protected
+#separately after compression (it is created in the parent folder and does not inherit this ACL).
+Invoke-Step "Restricting permissions on the output folder..." {
+    Protect-Path -path $directory
+}
+
+# Transcript all workflow (guarded: a transcript may already be running in the calling host)
+try {
+    Start-Transcript -Path "$temp\Execution.log" > $null
+}
+catch {
+    Write-Console "Unable to start transcript: $($_.Exception.Message). Continuing without transcription." "Yellow"
+}
+#Stamp the script version into the console output and transcript so support knows which revision produced this bundle.
+Write-Console "Collect-GuestLogs.ps1 -- script version $scriptVersion" "White"
 
 #Copy backup folder unless being ran on VBR server. Backup folder can potentially be massive if this is ran on the VBR server.
 if (!($isVBR)) {
@@ -286,12 +756,14 @@ Invoke-Step "Copying VSS logs..." {
 
     #Handle vssadmin timeout taking more than 180 seconds
     $writersTimeout = 180
-    $writersProcs = Start-Process -FilePath PowerShell.exe -ArgumentList "-Command `"vssadmin list writers > '$temp\vss_writers.log'`"" -PassThru -NoNewWindow
+    $script:vssWritersTimedOut = $false
+    $writersProcs = Start-Process -FilePath PowerShell.exe -ArgumentList "-NoProfile -Command `"vssadmin list writers > '$temp\vss_writers.log'`"" -PassThru -NoNewWindow
     try {
         $writersProcs | Wait-Process -Timeout $writersTimeout -ErrorAction Stop
     }
     catch {
         Write-Console "Collecting VSS Writers data has taken longer than expected. Skipping VSS Writers collection." "Yellow"
+        $script:vssWritersTimedOut = $true
         $writersProcs | Stop-Process -Force
     }
     if (Test-Path "$temp\vss_writers.log") {
@@ -305,6 +777,74 @@ Invoke-Step "Exporting systeminfo..." {
     if ($PSVersion -ge 5) {
         Get-ComputerInfo | Out-File "$directory\computerinfo.log" -Encoding utf8
     }
+}
+
+#Detect the hypervisor and collect guest tools information. Outdated/missing guest tools are a common cause of guest processing failures.
+Invoke-Step "Collecting hypervisor and guest tools information..." {
+    $hvReport = New-Object System.Collections.Generic.List[string]
+    $computerSystem = Get-CimInstance Win32_ComputerSystem
+    $hvReport.Add("Manufacturer : " + $computerSystem.Manufacturer)
+    $hvReport.Add("Model        : " + $computerSystem.Model)
+    $hvReport.Add("")
+
+    $uninstallKeys = @(
+        'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\*',
+        'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\*'
+    )
+
+    if (($computerSystem.Manufacturer -match "VMware") -or ($computerSystem.Model -match "VMware")) {
+        $hvReport.Add("Detected hypervisor: VMware")
+        $script:hypervisor = "VMware"
+        $vmwareTools = Get-ItemProperty -Path $uninstallKeys -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -eq "VMware Tools" }
+        if ($vmwareTools) {
+            $hvReport.Add("VMware Tools version: " + $vmwareTools.DisplayVersion)
+            $script:guestToolsInfo = "VMware Tools " + $vmwareTools.DisplayVersion
+        }
+        else {
+            $hvReport.Add("VMware Tools do not appear to be installed.")
+            $script:guestToolsInfo = "VMware Tools not detected"
+        }
+        $toolsService = Get-Service -Name "VMTools" -ErrorAction SilentlyContinue
+        if ($toolsService) {
+            $hvReport.Add("VMware Tools service status: " + $toolsService.Status)
+        }
+    }
+    elseif (($computerSystem.Manufacturer -match "Microsoft") -and ($computerSystem.Model -match "Virtual Machine")) {
+        $hvReport.Add("Detected hypervisor: Microsoft Hyper-V")
+        $script:hypervisor = "Microsoft Hyper-V"
+        $icVersion = (Get-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Virtual Machine\Auto' -ErrorAction SilentlyContinue).IntegrationServicesVersion
+        if ($icVersion) {
+            $hvReport.Add("Integration Services version: " + $icVersion)
+            $script:guestToolsInfo = "Integration Services " + $icVersion
+        }
+        else {
+            $hvReport.Add("Integration Services version not present in registry. (On modern guest OSes the Integration Services are serviced with the OS via Windows Update.)")
+            $script:guestToolsInfo = "Integration Services serviced with the OS (no registry version)"
+        }
+        $hvReport.Add("")
+        $hvReport.Add("Hyper-V Integration Services (vmic*) status:")
+        Get-Service -Name "vmic*" | ForEach-Object {
+            $hvReport.Add(("  {0,-55} {1}" -f $_.DisplayName, $_.Status))
+        }
+    }
+    elseif ($computerSystem.Manufacturer -match "Nutanix") {
+        $hvReport.Add("Detected hypervisor: Nutanix AHV")
+        $script:hypervisor = "Nutanix AHV"
+        $ngt = Get-ItemProperty -Path $uninstallKeys -ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -match "Nutanix Guest Tools" }
+        if ($ngt) {
+            $hvReport.Add("Nutanix Guest Tools version: " + $ngt.DisplayVersion)
+            $script:guestToolsInfo = "Nutanix Guest Tools " + $ngt.DisplayVersion
+        }
+        else {
+            $hvReport.Add("Nutanix Guest Tools do not appear to be installed.")
+            $script:guestToolsInfo = "Nutanix Guest Tools not detected"
+        }
+    }
+    else {
+        $hvReport.Add("Detected hypervisor: None recognized (physical machine or unrecognized hypervisor).")
+        $script:hypervisor = "None recognized (physical machine or unrecognized hypervisor)"
+    }
+    $hvReport | Out-File "$directory\hypervisor_info.log" -Encoding utf8
 }
 
 #Export FLTMC (Filter Manager) minifilter driver list
@@ -356,17 +896,25 @@ Invoke-Step "Getting list of installed software..." {
     )
     Get-ItemProperty -Path $uninstallKeys -ErrorAction SilentlyContinue |
         Where-Object { $_.DisplayName } |
-        Select-Object DisplayName, DisplayVersion, Publisher, InstallDate, @{Name = "ProductCode"; Expression = { $_.PSChildName } } |
+        Select-Object DisplayName, DisplayVersion, Publisher, InstallDate, InstallLocation, @{Name = "ProductCode"; Expression = { $_.PSChildName } } |
         Sort-Object DisplayName |
-        Format-Table -AutoSize | Out-File "$directory\installed_software.log" -Encoding utf8
+        Export-Csv -Path "$directory\installed_software.csv" -NoTypeInformation -Encoding UTF8
+}
+
+#Get list of installed Windows updates/hotfixes (useful for cross-referencing known-bad patches affecting VSS or application writers)
+Invoke-Step "Getting list of installed Windows updates/hotfixes..." {
+    Get-HotFix | Sort-Object -Property InstalledOn -Descending | Select-Object HotFixID, Description, InstalledOn, InstalledBy | Format-Table -AutoSize | Out-File "$directory\installed_hotfixes.log" -Encoding utf8
 }
 
 #Check if this server is running any SQL instances and if so, enumerate permissions for each database
 Invoke-Step "Checking for running SQL instances..." {
     $script:sqlReport = New-Object System.Collections.Generic.List[string]
-    $hasSQLDefaultInstance = Get-Service -Name "MSSQL*" | Where-Object { $_.Status -eq "Running" -and $_.Name -eq "MSSQLSERVER" }
-    $hasSQL = Get-Service -Name "MSSQL*" | Where-Object { $_.Status -eq "Running" -and ($_.Name -ne "MSSQLFDLauncher" -and $_.Name -ne "MSSQLSERVER") }
+    #Named SQL instance services are 'MSSQL$<instance>'. Matching on 'MSSQL*' alone would also pick up
+    #auxiliary services (MSSQLFDLauncher$X, MSSQLLaunchpad$X, MSSQLServerADHelper...) and misread them as instances.
+    $hasSQLDefaultInstance = Get-Service -Name "MSSQLSERVER" -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq "Running" }
+    $hasSQL = Get-Service -Name 'MSSQL$*' -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq "Running" }
     $hasSMO = [Reflection.Assembly]::LoadWithPartialName("Microsoft.SqlServer.Smo")
+    $script:sqlDetected = [bool]($hasSQLDefaultInstance -or $hasSQL)
     if (!($hasSQLDefaultInstance) -and !($hasSQL)) {
         $script:sqlReport.Add("No running SQL instances were detected. If you suspect this is in error, please report it to this script's maintainer.")
         Write-Host "No running SQL instances detected. Continuing..." -ForegroundColor White
@@ -392,17 +940,20 @@ Invoke-Step "Checking for running SQL instances..." {
 
 #Get volume information (Get-Volume requires Server 2012/Windows 8 or later; fall back to CIM on older OSes)
 Invoke-Step "Getting volume information..." {
+    #Numeric columns are left as plain numbers (not pre-formatted strings) so they sort correctly in a spreadsheet.
+    #Volume data is kept in script scope so the summary file can reuse it.
     if (Get-Command Get-Volume -ErrorAction SilentlyContinue) {
-        Get-Volume | Select-Object DriveLetter, FriendlyName, FileSystemType, DriveType, HealthStatus, OperationalStatus, SizeRemaining, Size, @{n = "% Free"; e = { ($_.SizeRemaining / $_.Size).ToString("P") } } | Sort-Object DriveLetter | Format-Table -AutoSize | Out-File "$directory\volume_info.log" -Encoding utf8
+        $script:volumeData = Get-Volume | Select-Object DriveLetter, FriendlyName, FileSystemType, DriveType, HealthStatus, OperationalStatus, @{n = "SizeGB"; e = { [math]::Round($_.Size / 1GB, 2) } }, @{n = "FreeGB"; e = { [math]::Round($_.SizeRemaining / 1GB, 2) } }, @{n = "PercentFree"; e = { if ($_.Size) { [math]::Round(($_.SizeRemaining / $_.Size) * 100, 1) } } } | Sort-Object DriveLetter
     }
     else {
-        Get-CimInstance Win32_Volume | Select-Object DriveLetter, Label, FileSystem, DriveType, @{n = "Size(GB)"; e = { [math]::Round($_.Capacity / 1GB, 2) } }, @{n = "FreeSpace(GB)"; e = { [math]::Round($_.FreeSpace / 1GB, 2) } }, @{n = "% Free"; e = { if ($_.Capacity) { ($_.FreeSpace / $_.Capacity).ToString("P") } } } | Sort-Object DriveLetter | Format-Table -AutoSize | Out-File "$directory\volume_info.log" -Encoding utf8
+        $script:volumeData = Get-CimInstance Win32_Volume | Select-Object DriveLetter, Label, FileSystem, DriveType, @{n = "SizeGB"; e = { [math]::Round($_.Capacity / 1GB, 2) } }, @{n = "FreeGB"; e = { [math]::Round($_.FreeSpace / 1GB, 2) } }, @{n = "PercentFree"; e = { if ($_.Capacity) { [math]::Round(($_.FreeSpace / $_.Capacity) * 100, 1) } } } | Sort-Object DriveLetter
     }
+    $script:volumeData | Export-Csv -Path "$directory\volume_info.csv" -NoTypeInformation -Encoding UTF8
 }
 
 #Get local accounts
 Invoke-Step "Getting list of local accounts..." {
-    Get-CimInstance Win32_UserAccount | Select-Object AccountType, Caption, LocalAccount, SID, Domain | Format-Table -AutoSize | Out-File "$directory\local_accounts.log" -Encoding utf8
+    Get-CimInstance Win32_UserAccount | Select-Object AccountType, Caption, LocalAccount, SID, Domain | Export-Csv -Path "$directory\local_accounts.csv" -NoTypeInformation -Encoding UTF8
 }
 
 #Get Windows Firewall profile (Get-NetFirewallProfile requires Server 2012/Windows 8 or later; fall back to netsh)
@@ -417,7 +968,10 @@ Invoke-Step "Getting status of Windows Firewall profiles..." {
 
 #Get list of Windows Services' names, status, and log on account
 Invoke-Step "Getting status of Windows Services..." {
-    Get-CimInstance Win32_Service | Select-Object DisplayName, @{Name = "Status"; Expression = { $_.State } }, @{Name = "Log On As"; Expression = { $_.StartName } } | Sort-Object DisplayName | Format-Table -AutoSize | Out-File "$directory\services.log" -Encoding utf8
+    #PathName is included to help spot unquoted service paths and identify AV/filter products by install location.
+    #Service data is kept in script scope so the summary file can reuse it.
+    $script:serviceData = Get-CimInstance Win32_Service | Select-Object Name, DisplayName, State, StartMode, @{Name = "LogOnAs"; Expression = { $_.StartName } }, PathName | Sort-Object DisplayName
+    $script:serviceData | Export-Csv -Path "$directory\services.csv" -NoTypeInformation -Encoding UTF8
 }
 
 #Get network security settings (This is where customizations such as disabling TLS 1.0/1.1 or key exchange algorithms are done)
@@ -431,16 +985,36 @@ Invoke-Step "Checking for common network customizations (ie. Is TLS 1.0/1.1 disa
 #Get status of 'File and Printer Sharing'
 Invoke-Step "Checking if 'File and Printer Sharing' is enabled..." {
     if (Get-Command Get-NetAdapterBinding -ErrorAction SilentlyContinue) {
-        Get-NetAdapterBinding | Where-Object { $_.DisplayName -match "File and Printer Sharing" } | Format-Table -AutoSize | Out-File "$directory\file_and_printer_sharing.log" -Encoding utf8
+        Get-NetAdapterBinding | Where-Object { $_.DisplayName -match "File and Printer Sharing" } | Select-Object Name, InterfaceDescription, DisplayName, ComponentID, Enabled | Export-Csv -Path "$directory\file_and_printer_sharing.csv" -NoTypeInformation -Encoding UTF8
     }
     else {
-        Write-Output "Get-NetAdapterBinding is not available on this OS version (requires Windows 8/Server 2012 or later). Unable to collect 'File and Printer Sharing' binding state." | Out-File "$directory\file_and_printer_sharing.log" -Encoding utf8
+        Write-Output "Get-NetAdapterBinding is not available on this OS version (requires Windows 8/Server 2012 or later). Unable to collect 'File and Printer Sharing' binding state." | Out-File "$directory\file_and_printer_sharing.csv" -Encoding utf8
     }
 }
 
 #Get settings of attached NICs
 Invoke-Step "Getting settings of attached NICs..." {
     ipconfig /all > "$directory\ipconfig.log"
+}
+
+#Get point-in-time snapshot of TCP/UDP endpoints. Raw artifact only -- deliberately NOT referenced by
+#the summary file, to avoid misinterpretation. The disclaimer is written into the file itself so it
+#cannot be separated from the data.
+Invoke-Step "Collecting netstat snapshot..." {
+    $disclaimer = @(
+        "============================================================================",
+        " POINT-IN-TIME SNAPSHOT taken at collection time, outside of any backup job.",
+        " Many ports used by Veeam components are bound only while a job or other",
+        " operation is actively using them (for example, the 2500-3300 data",
+        " transport range). The absence of any such port in this snapshot is",
+        " EXPECTED outside of an active operation and is not evidence of a",
+        " connectivity problem. Inbound reachability from the backup server/proxy",
+        " cannot be determined from this guest-side snapshot.",
+        "============================================================================",
+        ""
+    )
+    $netstatOutput = netstat -ano
+    ($disclaimer + $netstatOutput) | Out-File "$directory\netstat.log" -Encoding utf8
 }
 
 #Check if 'LocalAccountTokenFilterPolicy' registry value is enabled
@@ -514,6 +1088,12 @@ if ((Get-CimInstance -ClassName Win32_OperatingSystem).ProductType -ne 1) {
     }
 }
 
+#Generate the triage summary at the root of the bundle. Runs after all collection steps so it can
+#report on collection health. Its own failure is recorded to CollectionErrors.log like any other step.
+Invoke-Step "Generating triage summary (!_SUMMARY.txt)..." {
+    New-SummaryFile -summaryPath "$directory\!_SUMMARY.txt"
+}
+
 #Write step error summary into the bundle so the reviewing engineer can distinguish "collection failed" from "not present on this system".
 if ($script:stepErrors.Count -gt 0) {
     $script:stepErrors | Out-File "$directory\CollectionErrors.log" -Encoding utf8
@@ -525,13 +1105,17 @@ else {
 #Compress folder containing data
 Invoke-Step "Compressing and zipping collected logs..." {
     Compress-Directory -sourcePath $directory -zipPath "$directory.zip" -includeBaseDirectory $true
+    #The zip is created in the parent folder and does not inherit the restricted ACL of the data folder.
+    Protect-Path -path "$directory.zip"
 }
 
 #Remove temporary log folder, but only if the zip was successfully created.
-if (Test-Path -Path "$directory.zip") {
+#(-LiteralPath is used on paths that can be user-influenced via -OutputDirectory so that wildcard
+#characters such as '[' are never glob-expanded by file cmdlets.)
+if (Test-Path -LiteralPath "$directory.zip") {
     Write-Console "Removing temporary log folder..." "White"
-    Remove-Item "$directory" -Recurse -Force -Confirm:$false
-    if (Test-Path -Path $directory) {
+    Remove-Item -LiteralPath "$directory" -Recurse -Force -Confirm:$false
+    if (Test-Path -LiteralPath $directory) {
         Write-Console "Problem encountered cleaning up temporary log folder. Manual cleanup may be necessary. Location: $directory" "Yellow" 3
     }
 }
@@ -548,24 +1132,38 @@ else {
     Write-Console "Log collection finished. Please find the collected logs at $logDir" "Green" 3
 }
 
+Write-Console "NOTE: The collected archive contains sensitive configuration data (accounts, permissions, event logs). `
+Archives are not removed automatically -- please delete previous collections under $logDir once your support case is closed." "Yellow"
+
 #Remove custom Out-File width setting just in case.
 $PSDefaultParameterValues.Remove('Out-File:Width')
 
-#Stop transcript, copy Execution.log into the .zip archive, then cleanup Execution.log from the temp directory.
-try { Stop-Transcript > $null } catch { }
+#Stop transcript and copy Execution.log into the .zip archive.
+try { Stop-Transcript > $null } catch { Write-Verbose "No active transcript to stop." }
 Start-Sleep -Seconds 1
-if (Test-Path -Path "$directory.zip") {
-    Add-FileToZip -FileToAdd "$temp\Execution.log" -ZipName ($directory + ".zip")
-    Remove-Item "$temp\Execution.log" -Force
+if (Test-Path -LiteralPath "$temp\Execution.log") {
+    if (Test-Path -LiteralPath "$directory.zip") {
+        Add-FileToZip -FileToAdd "$temp\Execution.log" -ZipName ($directory + ".zip")
+    }
+    else {
+        #Zip was not created -- preserve the transcript alongside the uncompressed log folder instead.
+        Move-Item -LiteralPath "$temp\Execution.log" -Destination $directory -Force
+    }
 }
-else {
-    #Zip was not created -- preserve the transcript alongside the uncompressed log folder instead.
-    Move-Item "$temp\Execution.log" -Destination $directory -Force
-}
+
+#Remove the per-run working directory.
+Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
 
 #Open Windows Explorer to the location of the created .zip file (interactive sessions only)
 if ($isInteractive) {
     Explorer $logDir
     Start-Sleep 2
 }
-Exit
+
+#Exit non-zero if the archive is missing or any collection step failed, so unattended callers
+#(e.g. Invoke-Command) can detect problems programmatically.
+$exitCode = 0
+if (($script:stepErrors.Count -gt 0) -or !(Test-Path -LiteralPath "$directory.zip")) {
+    $exitCode = 1
+}
+Exit $exitCode
