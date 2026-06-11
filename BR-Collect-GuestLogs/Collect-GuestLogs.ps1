@@ -481,11 +481,13 @@ function New-SummaryFile (
     try {
         $fltFile = "$directory\FLTMC.txt"
         if (Test-Path $fltFile) {
-            #Minifilters shipped in-box with Windows. Anything else is listed for review (AV/EDR/encryption/backup agents).
-            $knownMicrosoftFilters = @('bindflt', 'wcifs', 'cldflt', 'fileinfo', 'filecrypt', 'luafv', 'npsvctrig', 'wof',
-                'storqosflt', 'wdfilter', 'filetrace', 'peauth', 'applockerfltr', 'datascrn', 'quota', 'dfsrro',
-                'fsdepends', 'iorate', 'prjflt', 'resumekeyfilter', 'sisraw', 'unionfs', 'mssecflt', 'bfs',
-                'easeflt', 'dedup', 'rsfilt', 'wimmount', 'msseccore')
+            #Minifilters confidently known to ship in-box with Windows. This list is a fast path only:
+            #any filter NOT in it has its driver binary's publisher metadata checked before being flagged,
+            #so newly introduced in-box Microsoft filters (e.g. UCPD) are not misreported as third-party.
+            $knownMicrosoftFilters = @('bindflt', 'wcifs', 'cldflt', 'cimfs', 'fileinfo', 'filecrypt', 'luafv', 'npsvctrig',
+                'wof', 'storqosflt', 'wdfilter', 'wddevflt', 'applockerfltr', 'datascrn', 'quota', 'dfsrro',
+                'fsdepends', 'iorate', 'prjflt', 'resumekeyfilter', 'sisraw', 'mssecflt', 'msseccore', 'bfs',
+                'wcnfs', 'dedup', 'wimmount', 'peauth', 'ucpd')
             $filters = @()
             foreach ($line in (Get-Content $fltFile | Where-Object { $_.Trim() })) {
                 $tokens = $line.Trim() -split '\s+'
@@ -498,16 +500,40 @@ function New-SummaryFile (
                 $s.Add(" [INFO] Could not parse FLTMC.txt. Review the file manually.")
             }
             else {
-                $unknownFilters = @($filters | Where-Object { $knownMicrosoftFilters -notcontains $_.Name.ToLower() })
+                $candidates = @($filters | Where-Object { $knownMicrosoftFilters -notcontains $_.Name.ToLower() })
+                $unknownFilters = @()
+                if ($candidates.Count -gt 0) {
+                    #Fallback check: minifilter names normally match their driver service name, so resolve the
+                    #driver binary and read its publisher. Publisher metadata is self-declared (not a signature
+                    #check), but is sufficient for an advisory triage hint; FLTMC.txt remains the source of truth.
+                    $driverIndex = @{}
+                    try {
+                        Get-CimInstance Win32_SystemDriver | ForEach-Object {
+                            if ($_.Name -and $_.PathName) { $driverIndex[$_.Name.ToLower()] = $_.PathName }
+                        }
+                    }
+                    catch { }
+                    foreach ($f in $candidates) {
+                        $company = $null
+                        $driverPath = $driverIndex[$f.Name.ToLower()]
+                        if ($driverPath) {
+                            $driverPath = $driverPath -replace '^\\\?\?\\', ''
+                            try { $company = (Get-Item -LiteralPath $driverPath -ErrorAction Stop).VersionInfo.CompanyName } catch { }
+                        }
+                        if ($company -notmatch '^Microsoft') {
+                            $unknownFilters += $f
+                        }
+                    }
+                }
                 if ($unknownFilters.Count -gt 0) {
-                    $s.Add(" [INFO] $($unknownFilters.Count) of $($filters.Count) registered minifilter driver(s) are not in this script's known in-box Windows filter list -- review:")
+                    $s.Add(" [INFO] $($unknownFilters.Count) of $($filters.Count) registered minifilter driver(s) are not known in-box Windows filters -- review:")
                     foreach ($f in $unknownFilters) {
                         $s.Add("        - $($f.Name) (Altitude $($f.Altitude))")
                     }
                     $s.Add("        AV/EDR/encryption filters can interfere with VSS snapshots and guest interaction.")
                 }
                 else {
-                    $s.Add(" [OK]   All $($filters.Count) registered minifilter driver(s) are known in-box Windows filters.")
+                    $s.Add(" [OK]   All $($filters.Count) registered minifilter driver(s) are in-box Windows filters or report Microsoft as the driver publisher.")
                 }
             }
         }
