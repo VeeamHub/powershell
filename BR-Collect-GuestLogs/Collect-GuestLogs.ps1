@@ -919,9 +919,11 @@ Invoke-Step "Collecting netstat snapshot..." {
     $disclaimer = @(
         "============================================================================",
         " POINT-IN-TIME SNAPSHOT taken at collection time, outside of any backup job.",
-        " Veeam data transport ports (2500-3300) are bound only while a job is",
-        " actively running -- their absence here is EXPECTED and is not evidence of",
-        " a connectivity problem. Inbound reachability from the backup server/proxy",
+        " Many ports used by Veeam components are bound only while a job or other",
+        " operation is actively using them (for example, the 2500-3300 data",
+        " transport range). The absence of any such port in this snapshot is",
+        " EXPECTED outside of an active operation and is not evidence of a",
+        " connectivity problem. Inbound reachability from the backup server/proxy",
         " cannot be determined from this guest-side snapshot.",
         "============================================================================",
         ""
