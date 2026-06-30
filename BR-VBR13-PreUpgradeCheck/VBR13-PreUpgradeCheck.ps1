@@ -17,16 +17,10 @@
       7.  Running SureBackup / SureLive sessions (must be zero)
       8.  Repository free space (warns below 10 GB, fails below 2 GB)
       9.  Backup proxy availability
-      10. Managed Server Components (out of date)
-      11. Local OS version (Windows Server 2019 or 2022 required for VBR 13)
-      12. Pending Windows reboot check
-      13. Veeam Windows services status
-      14. System drive free disk space (>= 10 GB recommended for installer)
-      15. Deprecated Features
-	      - Reversed incremental backup mode
-	      - Restore point-based retention
-	      - Per-Machine backup disabled
-	      - AD-based auth for Cloud Connect tenants 
+     10.  Local OS version (Windows Server 2019 or 2022 required for VBR 13)
+     11.  Pending Windows reboot check
+     12.  Veeam Windows services status
+     13.  System drive free disk space (>= 10 GB recommended for installer)
 
 .PARAMETER VBRServer
     FQDN or IP address of the Veeam Backup & Replication server.
@@ -533,66 +527,103 @@ function Test-ManagedServers {
     }
 }
 
-# -- 11. Local OS version ------------------------------------------------------
-function Test-LocalOSVersion {
-    Write-Log "Checking local OS version..." -Level INFO
+# Shared helper: open CIM session to VBR server (WSMan, fall back to DCOM)
+function New-VBRCimSession {
+    $credArgs = @{}
+    if ($Credential) { $credArgs['Credential'] = $Credential }
     try {
-        $os       = Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop
-        $caption  = $os.Caption
-        $build    = $os.BuildNumber
+        return New-CimSession -ComputerName $VBRServer @credArgs -ErrorAction Stop
+    } catch {
+        $dcom = New-CimSessionOption -Protocol Dcom
+        return New-CimSession -ComputerName $VBRServer @credArgs -SessionOption $dcom -ErrorAction Stop
+    }
+}
 
-        Add-Result 'Local Server' 'Operating system version' $INFO "$caption (Build $build)"
+# -- 11. VBR server OS version -------------------------------------------------
+function Test-LocalOSVersion {
+    Write-Log "Checking VBR server ($VBRServer) OS version via WMI..." -Level INFO
+    try {
+        $cimSession = New-VBRCimSession
+        try {
+            $os = Get-CimInstance -CimSession $cimSession -ClassName Win32_OperatingSystem -ErrorAction Stop
+        } finally {
+            Remove-CimSession $cimSession -ErrorAction SilentlyContinue
+        }
+        $caption = $os.Caption
+        $build   = $os.BuildNumber
 
-        # VBR 13 on Windows requires Windows Server 2019 (build 17763) or 2022 (build 20348)
+        Add-Result 'VBR Server' 'Operating system version' $INFO "$caption (Build $build)"
+
         if ($build -ge 20348) {
-            Add-Result 'Local Server' 'OS meets VBR 13 requirements' $PASS "Windows Server 2022  -  fully supported"
+            Add-Result 'VBR Server' 'OS meets VBR 13 requirements' $PASS "Windows Server 2022  -  fully supported"
         } elseif ($build -ge 17763) {
-            Add-Result 'Local Server' 'OS meets VBR 13 requirements' $PASS "Windows Server 2019  -  fully supported"
+            Add-Result 'VBR Server' 'OS meets VBR 13 requirements' $PASS "Windows Server 2019  -  fully supported"
         } elseif ($build -ge 14393) {
-            Add-Result 'Local Server' 'OS meets VBR 13 requirements' $WARN "Windows Server 2016  -  verify support with Veeam KB for VBR 13"
+            Add-Result 'VBR Server' 'OS meets VBR 13 requirements' $WARN "Windows Server 2016  -  verify support with Veeam KB for VBR 13"
         } else {
-            Add-Result 'Local Server' 'OS meets VBR 13 requirements' $FAIL "$caption is not supported for VBR 13. Upgrade to Windows Server 2019 or 2022."
+            Add-Result 'VBR Server' 'OS meets VBR 13 requirements' $FAIL "$caption is not supported for VBR 13. Upgrade to Windows Server 2019 or 2022."
         }
     } catch {
-        Add-Result 'Local Server' 'OS version check' $ERROR_S "Could not query OS version  -  $($_.Exception.Message)"
+        Add-Result 'VBR Server' 'OS version check' $WARN "Could not query OS version on $VBRServer via WMI  -  $($_.Exception.Message). Verify manually."
         $ErrorLog.Add("[ERROR] Test-LocalOSVersion: $($_.Exception.Message)")
     }
 }
 
-# -- 12. Pending reboot --------------------------------------------------------
+# -- 12. Pending reboot (on VBR server via WMI) --------------------------------
 function Test-PendingReboot {
-    Write-Log "Checking for pending Windows reboot..." -Level INFO
-    $pendingReboot = $false
-    $reasons       = @()
-
+    Write-Log "Checking VBR server ($VBRServer) for pending reboot via WMI..." -Level INFO
     try {
-        # Windows Update pending reboot
-        $wuKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired'
-        if (Test-Path $wuKey) { $pendingReboot = $true; $reasons += 'Windows Update' }
+        $cimSession = New-VBRCimSession
+        try {
+            # Use Win32_ComputerSystem + registry keys via StdRegProv WMI class
+            $reg    = [Microsoft.Win32.RegistryKey]
+            $hklm   = 2147483650   # HKEY_LOCAL_MACHINE
+            $stdReg = Get-CimClass -CimSession $cimSession -Namespace root/default -ClassName StdRegProv -ErrorAction Stop
 
-        # Component Based Servicing
-        $cbsKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending'
-        if (Test-Path $cbsKey) { $pendingReboot = $true; $reasons += 'Component Based Servicing' }
+            $checkKey = {
+                param($session, $hive, $key)
+                $result = Invoke-CimMethod -CimSession $session -ClassName StdRegProv `
+                    -Namespace root/default -MethodName CheckAccess `
+                    -Arguments @{ hDefKey = $hive; sSubKeyName = $key; uRequired = 1 } -ErrorAction SilentlyContinue
+                return ($result -and $result.bGranted)
+            }
 
-        # PendingFileRenameOperations
-        $pfroKey = 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager'
-        $pfro    = Get-ItemProperty -Path $pfroKey -Name PendingFileRenameOperations -ErrorAction SilentlyContinue
-        if ($pfro -and $pfro.PendingFileRenameOperations) { $pendingReboot = $true; $reasons += 'Pending File Rename' }
+            $pendingReboot = $false
+            $reasons       = @()
+
+            if (& $checkKey $cimSession $hklm 'SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired') {
+                $pendingReboot = $true; $reasons += 'Windows Update'
+            }
+            if (& $checkKey $cimSession $hklm 'SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') {
+                $pendingReboot = $true; $reasons += 'Component Based Servicing'
+            }
+
+            # PendingFileRenameOperations via WMI registry
+            $pfroResult = Invoke-CimMethod -CimSession $cimSession -ClassName StdRegProv `
+                -Namespace root/default -MethodName GetMultiStringValue `
+                -Arguments @{ hDefKey = $hklm; sSubKeyName = 'SYSTEM\CurrentControlSet\Control\Session Manager'; sValueName = 'PendingFileRenameOperations' } `
+                -ErrorAction SilentlyContinue
+            if ($pfroResult -and $pfroResult.sValue -and $pfroResult.sValue.Count -gt 0) {
+                $pendingReboot = $true; $reasons += 'Pending File Rename'
+            }
+        } finally {
+            Remove-CimSession $cimSession -ErrorAction SilentlyContinue
+        }
 
         if ($pendingReboot) {
-            Add-Result 'Local Server' 'No pending Windows reboot' $FAIL "Server has a pending reboot: $($reasons -join ', '). Reboot and verify before upgrading."
+            Add-Result 'VBR Server' 'No pending Windows reboot' $FAIL "Server has a pending reboot: $($reasons -join ', '). Reboot and verify before upgrading."
         } else {
-            Add-Result 'Local Server' 'No pending Windows reboot' $PASS "No pending reboot detected"
+            Add-Result 'VBR Server' 'No pending Windows reboot' $PASS "No pending reboot detected on $VBRServer"
         }
     } catch {
-        Add-Result 'Local Server' 'Pending reboot check' $ERROR_S "Could not check pending reboot  -  $($_.Exception.Message)"
+        Add-Result 'VBR Server' 'Pending reboot check' $WARN "Could not check pending reboot on $VBRServer via WMI  -  $($_.Exception.Message). Verify manually."
         $ErrorLog.Add("[ERROR] Test-PendingReboot: $($_.Exception.Message)")
     }
 }
 
-# -- 13. Veeam Windows services ------------------------------------------------
+# -- 13. Veeam Windows services (on VBR server) --------------------------------
 function Test-VeeamServices {
-    Write-Log "Checking Veeam Windows services..." -Level INFO
+    Write-Log "Checking Veeam Windows services on $VBRServer..." -Level INFO
     $veeamServices = @(
         'VeeamBackupSvc',
         'VeeamBrokerSvc',
@@ -607,39 +638,55 @@ function Test-VeeamServices {
     )
 
     try {
-        $services    = Get-Service -ErrorAction Stop
-        $veeamSvcs   = $services | Where-Object { $_.Name -in $veeamServices -and $_.StartType -ne 'Disabled' }
-        $notRunning  = @($veeamSvcs | Where-Object { $_.Status -ne 'Running' })
+        $cimSession = New-VBRCimSession
+        try {
+            $svcData = Get-CimInstance -CimSession $cimSession -ClassName Win32_Service `
+                           -Filter "Name LIKE 'Veeam%'" -ErrorAction Stop
+        } finally {
+            Remove-CimSession $cimSession -ErrorAction SilentlyContinue
+        }
+
+        $veeamSvcs  = @($svcData | Where-Object { $_.Name -in $veeamServices -and $_.StartMode -ne 'Disabled' })
+        $notRunning = @($veeamSvcs | Where-Object { $_.State -ne 'Running' })
 
         if ($notRunning.Count -eq 0) {
-            Add-Result 'Local Server' 'Veeam services running' $PASS "All $($veeamSvcs.Count) Veeam service(s) are running"
+            Add-Result 'VBR Server' 'Veeam services running' $PASS "All $($veeamSvcs.Count) Veeam service(s) are running on $VBRServer"
         } else {
-            $names = ($notRunning | ForEach-Object { "$($_.Name) [$($_.Status)]" }) -join ', '
-            Add-Result 'Local Server' 'Veeam services running' $FAIL "$($notRunning.Count) Veeam service(s) are not running: $names"
+            $names = ($notRunning | ForEach-Object { "$($_.Name) [$($_.State)]" }) -join ', '
+            Add-Result 'VBR Server' 'Veeam services running' $FAIL "$($notRunning.Count) Veeam service(s) not running on ${VBRServer}: $names"
         }
     } catch {
-        Add-Result 'Local Server' 'Veeam services check' $ERROR_S "Could not query Windows services  -  $($_.Exception.Message)"
+        Add-Result 'VBR Server' 'Veeam services check' $WARN "Could not query services on $VBRServer via WMI  -  $($_.Exception.Message). Verify manually."
         $ErrorLog.Add("[ERROR] Test-VeeamServices: $($_.Exception.Message)")
     }
 }
 
-# -- 14. System drive free space -----------------------------------------------
+# -- 14. System drive free space (on VBR server via WMI) ----------------------
 function Test-SystemDriveSpace {
-    Write-Log "Checking system drive free space..." -Level INFO
+    Write-Log "Checking VBR server ($VBRServer) system drive free space via WMI..." -Level INFO
     try {
-        $sysDrive = $env:SystemDrive
-        $disk     = Get-PSDrive -Name $sysDrive.TrimEnd(':') -ErrorAction Stop
-        $freeGB   = [math]::Round($disk.Free / 1GB, 1)
+        $cimSession = New-VBRCimSession
+        try {
+            $remoteOS = Get-CimInstance -CimSession $cimSession -ClassName Win32_OperatingSystem -ErrorAction Stop
+            $sysDrive = $remoteOS.SystemDrive   # e.g. "C:"
+
+            $diskInfo = Get-CimInstance -CimSession $cimSession -ClassName Win32_LogicalDisk `
+                            -Filter "DeviceID='$sysDrive'" -ErrorAction Stop
+            $freeGB  = [math]::Round($diskInfo.FreeSpace / 1073741824, 1)
+            $totalGB = [math]::Round($diskInfo.Size       / 1073741824, 1)
+        } finally {
+            Remove-CimSession $cimSession -ErrorAction SilentlyContinue
+        }
 
         if ($freeGB -ge 10) {
-            Add-Result 'Local Server' "System drive free space ($sysDrive)" $PASS "${freeGB} GB free  -  sufficient for upgrade installer"
+            Add-Result 'VBR Server' "System drive ($sysDrive) free space" $PASS "${freeGB} GB free of ${totalGB} GB  -  sufficient for upgrade installer"
         } elseif ($freeGB -ge 5) {
-            Add-Result 'Local Server' "System drive free space ($sysDrive)" $WARN "${freeGB} GB free  -  minimum met but additional space recommended (10 GB+)"
+            Add-Result 'VBR Server' "System drive ($sysDrive) free space" $WARN "${freeGB} GB free of ${totalGB} GB  -  minimum met but 10 GB+ recommended"
         } else {
-            Add-Result 'Local Server' "System drive free space ($sysDrive)" $FAIL "${freeGB} GB free on $sysDrive  -  insufficient. At least 10 GB required for the upgrade installer."
+            Add-Result 'VBR Server' "System drive ($sysDrive) free space" $FAIL "${freeGB} GB free of ${totalGB} GB  -  insufficient, at least 10 GB required for the upgrade installer"
         }
     } catch {
-        Add-Result 'Local Server' 'System drive space check' $ERROR_S "Could not check disk space  -  $($_.Exception.Message)"
+        Add-Result 'VBR Server' 'System drive free space' $WARN "Could not query disk space on $VBRServer via WMI  -  $($_.Exception.Message). Verify manually before upgrading."
         $ErrorLog.Add("[ERROR] Test-SystemDriveSpace: $($_.Exception.Message)")
     }
 }
@@ -926,7 +973,7 @@ if (-not $connected) {
     }
 }
 
-# Local checks  -  always run regardless of API connectivity
+# VBR server checks via WMI  -  always run if server is reachable
 Test-LocalOSVersion
 Test-PendingReboot
 Test-VeeamServices
