@@ -17,10 +17,16 @@
       7.  Running SureBackup / SureLive sessions (must be zero)
       8.  Repository free space (warns below 10 GB, fails below 2 GB)
       9.  Backup proxy availability
-     10.  Local OS version (Windows Server 2019 or 2022 required for VBR 13)
-     11.  Pending Windows reboot check
-     12.  Veeam Windows services status
-     13.  System drive free disk space (>= 10 GB recommended for installer)
+      10. Managed Server Components (out of date)
+      11. Local OS version (Windows Server 2019 or 2022 required for VBR 13)
+      12. Pending Windows reboot check
+      13. Veeam Windows services status
+      14. System drive free disk space (>= 10 GB recommended for installer)
+      15. Deprecated Features
+	      - Reversed incremental backup mode
+	      - Restore point-based retention
+	      - Per-Machine backup disabled
+	      - AD-based auth for Cloud Connect tenants 
 
 .PARAMETER VBRServer
     FQDN or IP address of the Veeam Backup & Replication server.
