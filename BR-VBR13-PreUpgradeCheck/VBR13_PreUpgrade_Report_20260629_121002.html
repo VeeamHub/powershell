@@ -1,0 +1,73 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Veeam VBR 13 Pre-Upgrade Report</title>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; color: #2c3e50; }
+  .container { max-width: 1100px; margin: auto; }
+  .header { background: #1a2433; color: #fff; padding: 24px 32px; border-radius: 8px 8px 0 0; }
+  .header h1 { margin: 0 0 4px 0; font-size: 1.6em; }
+  .header p  { margin: 0; opacity: 0.7; font-size: 0.9em; }
+  .summary { display: flex; gap: 12px; background: #fff; padding: 20px 32px; border-left: 1px solid #dde; border-right: 1px solid #dde; flex-wrap: wrap; align-items: center; }
+  .overall { font-size: 1.3em; font-weight: bold; padding: 10px 20px; border-radius: 6px; color: #fff; background: #e74c3c; }
+  .stat { text-align: center; padding: 8px 16px; border-radius: 6px; background: #f8f9fa; min-width: 70px; }
+  .stat .num { font-size: 1.6em; font-weight: bold; }
+  .stat .lbl { font-size: 0.75em; text-transform: uppercase; opacity: 0.7; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 0 0 8px 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  th { background: #1a2433; color: #fff; padding: 12px 16px; text-align: left; font-size: 0.9em; }
+  td { padding: 10px 16px; border-bottom: 1px solid #ecf0f1; font-size: 0.88em; vertical-align: top; }
+  .cat-cell { font-weight: 600; background: #f8fafc; color: #2c3e50; border-right: 3px solid #2980b9; white-space: nowrap; }
+  .row-fail  { background: #fff5f5; }
+  .row-warn  { background: #fffbf0; }
+  .row-error { background: #fdf0ff; }
+  tr:last-child td { border-bottom: none; }
+  .footer { text-align: center; margin-top: 16px; font-size: 0.8em; opacity: 0.6; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>Veeam Backup &amp; Replication  -  Pre-Upgrade Readiness Report</h1>
+    <p>Target: 10.0.0.6 &nbsp;|&nbsp; Generated: 2026-06-29 12:10:03 &nbsp;|&nbsp; Checking readiness for upgrade to VBR 13</p>
+  </div>
+  <div class="summary">
+    <div class="overall">NOT READY  -  BLOCKERS FOUND</div>
+    <div class="stat"><div class="num" style="color:#27ae60">18</div><div class="lbl">Pass</div></div>
+    <div class="stat"><div class="num" style="color:#f39c12">0</div><div class="lbl">Warn</div></div>
+    <div class="stat"><div class="num" style="color:#e74c3c">1</div><div class="lbl">Fail</div></div>
+    <div class="stat"><div class="num" style="color:#8e44ad">0</div><div class="lbl">Error</div></div>
+    <div class="stat"><div class="num" style="color:#2980b9">4</div><div class="lbl">Info</div></div>
+  </div>
+  <table>
+    <thead><tr><th width="160">Category</th><th>Check</th><th width="90">Status</th><th>Detail</th></tr></thead>
+    <tbody>
+      <tr class=''><td class='cat-cell' rowspan='2'>Connectivity</td><td>TCP port 9419 reachable</td><td><span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>PASS</span></td><td>Successfully connected to 10.0.0.6:9419</td></tr>
+      <tr class=''><td>REST API authentication</td><td><span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>PASS</span></td><td>Authenticated as VBR\Administrator</td></tr>
+      <tr class=''><td class='cat-cell' rowspan='2'>Version</td><td>VBR server version</td><td><span style='background:#2980b9;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>INFO</span></td><td>Installed version: 12.3.2.3617</td></tr>
+      <tr class=''><td>Version eligible for upgrade to v13</td><td><span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>PASS</span></td><td>Version 12.3.2.3617 supports direct upgrade to VBR 13</td></tr>
+      <tr class=''><td class='cat-cell' rowspan='2'>License</td><td>License type</td><td><span style='background:#2980b9;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>INFO</span></td><td>Type: Subscription | Status: Valid</td></tr>
+      <tr class=''><td>License expiry</td><td><span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>PASS</span></td><td>License valid  -  expires 2028-03-09 (619 days remaining)</td></tr>
+      <tr class=''><td class='cat-cell' rowspan='2'>Config Backup</td><td>Configuration backup enabled</td><td><span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>PASS</span></td><td>Configuration backup is enabled (target: unknown)</td></tr>
+      <tr class=''><td>Recent config backup exists</td><td><span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>PASS</span></td><td>Last successful backup: 2026-06-29 10:00 (0 day(s) ago)</td></tr>
+      <tr class=''><td class='cat-cell' rowspan='1'>Active Jobs</td><td>No jobs currently running</td><td><span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>PASS</span></td><td>All backup/replication jobs are idle</td></tr>
+      <tr class=''><td class='cat-cell' rowspan='1'>Active Sessions</td><td>No active sessions</td><td><span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>PASS</span></td><td>No backup, restore, or replication sessions are currently active</td></tr>
+      <tr class=''><td class='cat-cell' rowspan='2'>Repositories</td><td>Repository space: Default Backup Repository</td><td><span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>PASS</span></td><td>Default Backup Repository  -  Free: 12.8 GB / Total: 79.4 GB (16.1%)</td></tr>
+      <tr class=''><td>Repository space: vbr-proxy-repo</td><td><span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>PASS</span></td><td>vbr-proxy-repo  -  Free: 473.3 GB / Total: 500 GB (94.7%)</td></tr>
+      <tr class=''><td class='cat-cell' rowspan='1'>Proxies</td><td>Proxy availability</td><td><span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>PASS</span></td><td>1 proxy/proxies  -  no failed proxies detected: VMware Backup Proxy [Unknown]</td></tr>
+      <tr class=''><td class='cat-cell' rowspan='1'>Infrastructure</td><td>Managed server components up to date</td><td><span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>PASS</span></td><td>All 4 managed server(s) are current</td></tr>
+      <tr class=''><td class='cat-cell' rowspan='4'>Deprecated Features</td><td>Reversed incremental backup mode</td><td><span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>PASS</span></td><td>No jobs using reversed incremental backup mode</td></tr>
+      <tr class=''><td>Restore point-based retention</td><td><span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>PASS</span></td><td>No jobs using restore point-based retention</td></tr>
+      <tr class=''><td>Single-storage backup format</td><td><span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>PASS</span></td><td>No repositories using single-storage backup format</td></tr>
+      <tr class=''><td>Cloud Connect AD authentication</td><td><span style='background:#2980b9;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>INFO</span></td><td>Cloud Connect tenants endpoint not available or no CC license - skipping AD auth check (The remote server returned an error: (404) Not Found.)</td></tr>
+      <tr class=''><td class='cat-cell' rowspan='5'>Local Server</td><td>Operating system version</td><td><span style='background:#2980b9;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>INFO</span></td><td>Microsoft Windows Server 2022 Datacenter (Build 20348)</td></tr>
+      <tr class=''><td>OS meets VBR 13 requirements</td><td><span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>PASS</span></td><td>Windows Server 2022  -  fully supported</td></tr>
+      <tr class='row-fail'><td>No pending Windows reboot</td><td><span style='background:#e74c3c;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>FAIL</span></td><td>Server has a pending reboot: Pending File Rename. Reboot and verify before upgrading.</td></tr>
+      <tr class=''><td>Veeam services running</td><td><span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>PASS</span></td><td>All 2 Veeam service(s) are running</td></tr>
+      <tr class=''><td>System drive free space (C:)</td><td><span style='background:#27ae60;color:#fff;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:0.85em'>PASS</span></td><td>38.9 GB free  -  sufficient for upgrade installer</td></tr>
+    </tbody>
+  </table>
+  <div class="footer">Veeam VBR 13 Pre-Upgrade Check &nbsp;|&nbsp; Reference: helpcenter.veeam.com/docs/vbr/userguide/upgrade_vbr_byb.html?ver=13</div>
+</div>
+</body>
+</html>
