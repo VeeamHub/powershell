@@ -1,15 +1,22 @@
 ﻿<#
 .SYNOPSIS
-    Veeam Backup & Replication v13 Pre-Upgrade Readiness Check
+    Veeam Backup & Replication Pre-Upgrade Readiness Check (VBR 13.0 / 13.1)
 
 .DESCRIPTION
     Connects to a VBR server via the REST API and validates all pre-upgrade
     requirements documented at:
     https://helpcenter.veeam.com/docs/vbr/userguide/upgrade_vbr_byb.html?ver=13
 
+    Use -TargetVersion to select the upgrade target:
+      13.0  (default)  Upgrading from VBR 12.x  -  requires 12.3.1.1139+ or 12.3.2+
+      13.1             Upgrading from VBR 13.0.x -  requires 13.0.1 or later
+
+    The API version (-ApiVersion) is auto-selected based on the target if not specified:
+      Target 13.0 -> 1.2-rev0   Target 13.1 -> 1.3-rev1
+
     Checks performed:
       1.  Server connectivity and API availability
-      2.  Current VBR version (must be v11 or v12 to upgrade to v13)
+      2.  Current VBR version eligibility for the selected target
       3.  License status and expiry
       4.  Configuration backup  -  enabled and recent (within 7 days)
       5.  Running backup/replication/copy jobs (must be zero)
@@ -17,10 +24,23 @@
       7.  Running SureBackup / SureLive sessions (must be zero)
       8.  Repository free space (warns below 10 GB, fails below 2 GB)
       9.  Backup proxy availability
-     10.  Local OS version (Windows Server 2019 or 2022 required for VBR 13)
-     11.  Pending Windows reboot check
-     12.  Veeam Windows services status
-     13.  System drive free disk space (>= 10 GB recommended for installer)
+     10.  Managed server component versions
+     11.  Deprecated features in use (reversed incremental, restore-point retention,
+           single-storage format, Cloud Connect AD auth)
+     12.  VBR server OS version via WMI (Windows Server 2019 or 2022 required)
+     13.  Pending Windows reboot on VBR server (via WMI)
+     14.  Veeam Windows services status (via WMI)
+     15.  System drive free disk space on VBR server (>= 10 GB required)
+     16.  Port 443 availability on VBR server (VBR 13 REST service requires port 443)
+     17.  SQL Server version on VBR server (2016 or later required; PostgreSQL is fine)
+     18.  PowerShell 7 installed on VBR server (required for Veeam PS module in VBR 13)
+     19.  CPU core count on VBR server (minimum 8 logical cores required for VBR 13)
+     20.  RAM on VBR server (minimum 16 GB required for VBR 13)
+
+.PARAMETER TargetVersion
+    The VBR version you are upgrading TO. Accepted values: '13.0' (default) or '13.1'.
+    Use '13.0' when upgrading from VBR 12.x to VBR 13.
+    Use '13.1' when upgrading from VBR 13.0.x to VBR 13.1.
 
 .PARAMETER VBRServer
     FQDN or IP address of the Veeam Backup & Replication server.
@@ -43,6 +63,10 @@
 
 .EXAMPLE
     .\VBR13-PreUpgradeCheck.ps1 -VBRServer 10.0.0.50 -SkipCertCheck -ReportPath C:\Temp
+
+.EXAMPLE
+    .\VBR13-PreUpgradeCheck.ps1 -VBRServer vbr01.corp.local -TargetVersion 13.1 -Credential (Get-Credential)
+    Check readiness for upgrading VBR 13.0.x to VBR 13.1.
 
 .NOTES
     Author  : Veeam Pre-Upgrade Automation
@@ -68,10 +92,17 @@ param(
     [Parameter(Mandatory = $false)]
     [switch]$SkipCertCheck,
 
-    # REST API version of the installed VBR build (not the target version).
-    # VBR 11 = 1.1-rev2 | VBR 12 = 1.2-rev0 (default) | VBR 13 = 1.3-rev1
+    # Target VBR version to check upgrade eligibility for.
+    # '13.0' = upgrading from VBR 12.x | '13.1' = upgrading from VBR 13.0.x
     [Parameter(Mandatory = $false)]
-    [string]$ApiVersion = '1.2-rev0'
+    [ValidateSet('13.0', '13.1')]
+    [string]$TargetVersion = '13.0',
+
+    # REST API version of the INSTALLED VBR build (not the target).
+    # VBR 11 = 1.1-rev2 | VBR 12 = 1.2-rev0 | VBR 13 = 1.3-rev1
+    # Leave unset to auto-select based on -TargetVersion.
+    [Parameter(Mandatory = $false)]
+    [string]$ApiVersion = ''
 )
 
 Set-StrictMode -Version Latest
@@ -84,9 +115,15 @@ if (-not (Test-Path $ReportPath)) {
     Write-Host "[INFO] Created report directory: $ReportPath" -ForegroundColor Cyan
 }
 
+# Auto-select API version based on target if not explicitly supplied
+if ([string]::IsNullOrEmpty($ApiVersion)) {
+    $ApiVersion = if ($TargetVersion -eq '13.1') { '1.3-rev1' } else { '1.2-rev0' }
+}
+
+$TargetLabel    = $TargetVersion -replace '\.', ''
 $RunTimestamp   = Get-Date -Format 'yyyyMMdd_HHmmss'
-$ReportFile     = Join-Path $ReportPath "VBR13_PreUpgrade_Report_$RunTimestamp.html"
-$ErrorLogFile   = Join-Path $ReportPath "VBR13_PreUpgrade_Errors_$RunTimestamp.log"
+$ReportFile     = Join-Path $ReportPath "VBR${TargetLabel}_PreUpgrade_Report_$RunTimestamp.html"
+$ErrorLogFile   = Join-Path $ReportPath "VBR${TargetLabel}_PreUpgrade_Errors_$RunTimestamp.log"
 $BaseUrl        = "https://${VBRServer}:${Port}/api/v1"
 $AuthUrl        = "https://${VBRServer}:${Port}/api/oauth2/token"
 
@@ -261,19 +298,60 @@ function Connect-VBRApi {
 
 # -- 3. VBR version -----------------------------------------------------------
 function Test-VBRVersion {
-    Write-Log "Checking VBR server version..." -Level INFO
+    Write-Log "Checking VBR server version (target: VBR $TargetVersion)..." -Level INFO
     try {
         $vbrInfo = Invoke-VBRApi -Endpoint '/serverInfo'
         $version = $vbrInfo.buildVersion
         Add-Result 'Version' 'VBR server version' $INFO "Installed version: $version"
 
-        # Version must be 11.x or 12.x to support direct upgrade to 13
-        if ($version -match '^(11|12)\.') {
-            Add-Result 'Version' 'Version eligible for upgrade to v13' $PASS "Version $version supports direct upgrade to VBR 13"
-        } elseif ($version -match '^13\.') {
-            Add-Result 'Version' 'Version eligible for upgrade to v13' $WARN "Version $version appears to be VBR 13 already  -  upgrade may not be required"
+        $vParts = $version -split '\.'
+        $vMaj   = if ($vParts.Count -ge 1) { [int]$vParts[0] } else { 0 }
+        $vMin   = if ($vParts.Count -ge 2) { [int]$vParts[1] } else { 0 }
+        $vPatch = if ($vParts.Count -ge 3) { [int]$vParts[2] } else { 0 }
+        $vBuild = if ($vParts.Count -ge 4) { [int]$vParts[3] } else { 0 }
+
+        if ($TargetVersion -eq '13.1') {
+            # --- Target: VBR 13.1 (upgrading from 13.0.x) ---
+            if ($vMaj -eq 13 -and $vMin -ge 1) {
+                Add-Result 'Version' "Version eligible for upgrade to VBR $TargetVersion" $WARN "Version $version is VBR 13.1 or later already  -  upgrade may not be required"
+            } elseif ($vMaj -eq 13 -and $vMin -eq 0 -and $vPatch -ge 1) {
+                # 13.0.1 or later patch - supported for direct upgrade to 13.1
+                Add-Result 'Version' "Version eligible for upgrade to VBR $TargetVersion" $PASS "Version $version  -  eligible for direct upgrade to VBR 13.1"
+            } elseif ($vMaj -eq 13 -and $vMin -eq 0 -and $vPatch -eq 0) {
+                # 13.0.0 RTM - recommend patching to 13.0.1 first
+                Add-Result 'Version' "Version eligible for upgrade to VBR $TargetVersion" $WARN "Version $version (VBR 13.0.0). Apply the latest VBR 13.0 patch (13.0.1+) before upgrading to VBR 13.1."
+            } elseif ($vMaj -eq 12) {
+                Add-Result 'Version' "Version eligible for upgrade to VBR $TargetVersion" $FAIL "Version $version (VBR 12) cannot upgrade directly to VBR 13.1. Upgrade to VBR 13.0.1 first, then to VBR 13.1."
+            } else {
+                Add-Result 'Version' "Version eligible for upgrade to VBR $TargetVersion" $FAIL "Version $version is not eligible for VBR 13.1. Upgrade path: VBR 13.0.1 -> VBR 13.1."
+            }
         } else {
-            Add-Result 'Version' 'Version eligible for upgrade to v13' $FAIL "Version $version is not directly upgradeable to VBR 13. Intermediate upgrade steps may be required."
+            # --- Target: VBR 13.0 (upgrading from VBR 12.x) ---
+            # Minimum source: 12.3.1.1139+ or 12.3.2+
+            if ($vMaj -eq 13) {
+                Add-Result 'Version' "Version eligible for upgrade to VBR $TargetVersion" $WARN "Version $version appears to be VBR 13 already  -  upgrade may not be required"
+            } elseif ($vMaj -eq 12) {
+                if ($vMin -gt 3) {
+                    # 12.4+ (future release) - treat as eligible
+                    Add-Result 'Version' "Version eligible for upgrade to VBR $TargetVersion" $PASS "Version $version  -  eligible for direct upgrade to VBR 13"
+                } elseif ($vMin -eq 3 -and $vPatch -ge 2) {
+                    # 12.3.2 or later
+                    Add-Result 'Version' "Version eligible for upgrade to VBR $TargetVersion" $PASS "Version $version  -  eligible for direct upgrade to VBR 13"
+                } elseif ($vMin -eq 3 -and $vPatch -eq 1 -and $vBuild -ge 1139) {
+                    # 12.3.1 build 1139 or later
+                    Add-Result 'Version' "Version eligible for upgrade to VBR $TargetVersion" $PASS "Version $version  -  eligible for direct upgrade to VBR 13 (minimum 12.3.1.1139 met)"
+                } elseif ($vMin -eq 3 -and $vPatch -eq 1 -and $vBuild -gt 0) {
+                    # 12.3.1 but build < 1139
+                    Add-Result 'Version' "Version eligible for upgrade to VBR $TargetVersion" $FAIL "Version $version is below minimum build 12.3.1.1139 for direct VBR 13 upgrade. Apply the 12.3.1 patch (build 1139+) or upgrade to 12.3.2 first."
+                } else {
+                    # 12.3.0 or earlier 12.x
+                    Add-Result 'Version' "Version eligible for upgrade to VBR $TargetVersion" $FAIL "Version $version requires an intermediate upgrade to VBR 12.3.1 (build 1139+) or 12.3.2 before upgrading to VBR 13."
+                }
+            } elseif ($vMaj -eq 11) {
+                Add-Result 'Version' "Version eligible for upgrade to VBR $TargetVersion" $FAIL "Version $version (VBR 11) cannot upgrade directly to VBR 13. Upgrade to VBR 12.3.1 (build 1139+) or 12.3.2 first."
+            } else {
+                Add-Result 'Version' "Version eligible for upgrade to VBR $TargetVersion" $FAIL "Version $version is not directly upgradeable to VBR 13. Review upgrade path requirements."
+            }
         }
     } catch {
         Add-Result 'Version' 'VBR server version' $ERROR_S "Could not retrieve version  -  $($_.Exception.Message)"
@@ -326,7 +404,22 @@ function Test-ConfigBackup {
         $lastRunRaw = $null
         if ($cfg.PSObject.Properties['lastSuccessfulBackup'] -and $cfg.lastSuccessfulBackup) {
             if ($cfg.lastSuccessfulBackup -is [System.Management.Automation.PSCustomObject]) {
-                $lastRunRaw = [string]$cfg.lastSuccessfulBackup.lastSuccessfulTime
+                # Property name varies by VBR version - try each known variant under StrictMode-safe checks
+                if      ($cfg.lastSuccessfulBackup.PSObject.Properties['lastSuccessfulTime']) { $lastRunRaw = [string]$cfg.lastSuccessfulBackup.lastSuccessfulTime }
+                elseif  ($cfg.lastSuccessfulBackup.PSObject.Properties['lastSuccessTime'])    { $lastRunRaw = [string]$cfg.lastSuccessfulBackup.lastSuccessTime    }
+                elseif  ($cfg.lastSuccessfulBackup.PSObject.Properties['time'])               { $lastRunRaw = [string]$cfg.lastSuccessfulBackup.time               }
+                else {
+                    # Fallback: find first property whose value looks like a datetime string
+                    $dtProp = $cfg.lastSuccessfulBackup.PSObject.Properties |
+                        Where-Object { ($_.Value -is [datetime]) -or (($_.Value -is [string]) -and ($_.Value -match '^\d{4}-\d{2}-\d{2}')) } |
+                        Select-Object -First 1
+                    if ($dtProp) {
+                        $lastRunRaw = [string]$dtProp.Value
+                    } else {
+                        $propList = ($cfg.lastSuccessfulBackup.PSObject.Properties | Select-Object -ExpandProperty Name) -join ', '
+                        Write-Log "Config backup nested object has unexpected structure. Properties: $propList" -Level INFO
+                    }
+                }
             } else {
                 $lastRunRaw = [string]$cfg.lastSuccessfulBackup
             }
@@ -360,24 +453,41 @@ function Test-ConfigBackup {
 # -- 6. Running jobs -----------------------------------------------------------
 function Test-RunningJobs {
     Write-Log "Checking for running jobs..." -Level INFO
-    try {
-        $states  = Invoke-VBRApi -Endpoint '/jobs/states'
-        $allJobs = @(if ($states.data) { $states.data } elseif ($states -is [array]) { $states } else { @() })
-        # VBR 12 uses 'status'; VBR 13 uses 'state' - handle both
-        $running = @($allJobs | Where-Object {
-            ($_.PSObject.Properties['state']  -and $_.state  -in 'Running','Starting','Stopping','WaitingTape') -or
-            ($_.PSObject.Properties['status'] -and $_.status -in 'Running','Starting','Stopping','WaitingTape')
-        })
 
-        if ($running.Count -eq 0) {
-            Add-Result 'Active Jobs' 'No jobs currently running' $PASS "All backup/replication jobs are idle"
-        } else {
-            $names = ($running | ForEach-Object { if ($_.PSObject.Properties['name']) { $_.name } else { '(unnamed)' } }) -join ', '
-            Add-Result 'Active Jobs' 'No jobs currently running' $FAIL "$($running.Count) job(s) are running: $names  -  stop all jobs before upgrading"
-        }
+    $jobData   = @()
+    $statesSrc = ''
+    $fetchErr  = ''
+
+    # Try /jobs/states (preferred); fall back to /sessions if it returns an error (e.g. HTTP 500)
+    try {
+        $states    = Invoke-VBRApi -Endpoint '/jobs/states'
+        $jobData   = @(if ($states.data) { $states.data } elseif ($states -is [array]) { $states } else { @() })
+        $statesSrc = '/jobs/states'
     } catch {
-        Add-Result 'Active Jobs' 'Running jobs check' $ERROR_S "Could not retrieve job states  -  $($_.Exception.Message)"
-        $ErrorLog.Add("[ERROR] Test-RunningJobs: $($_.Exception.Message)")
+        $fetchErr = $_.Exception.Message
+        Write-Log "  /jobs/states unavailable ($fetchErr) - falling back to /sessions" -Level INFO
+        try {
+            $sessResp  = Invoke-VBRApi -Endpoint '/sessions?limit=500'
+            $jobData   = @(if ($sessResp.data) { $sessResp.data } elseif ($sessResp -is [array]) { $sessResp } else { @() })
+            $statesSrc = '/sessions (fallback)'
+        } catch {
+            Add-Result 'Active Jobs' 'Running jobs check' $WARN "/jobs/states returned an error ($fetchErr) and session fallback also failed  -  verify no jobs are running before upgrading"
+            $ErrorLog.Add("[WARN] Test-RunningJobs (both endpoints failed): $fetchErr")
+            return
+        }
+    }
+
+    # VBR 12 uses 'status'; VBR 13 uses 'state' - handle both
+    $running = @($jobData | Where-Object {
+        ($_.PSObject.Properties['state']  -and $_.state  -in 'Running','Starting','Stopping','WaitingTape') -or
+        ($_.PSObject.Properties['status'] -and $_.status -in 'Running','Starting','Stopping','WaitingTape')
+    })
+
+    if ($running.Count -eq 0) {
+        Add-Result 'Active Jobs' 'No jobs currently running' $PASS "All backup/replication jobs are idle (source: $statesSrc)"
+    } else {
+        $names = ($running | ForEach-Object { if ($_.PSObject.Properties['name']) { $_.name } else { '(unnamed)' } }) -join ', '
+        Add-Result 'Active Jobs' 'No jobs currently running' $FAIL "$($running.Count) job(s) are running: $names  -  stop all jobs before upgrading (source: $statesSrc)"
     }
 }
 
@@ -810,6 +920,174 @@ function Test-DeprecatedFeatures {
     }
 }
 
+# -- 16. Port 443 availability on VBR server -----------------------------------
+function Test-Port443 {
+    # For a 13.1 upgrade the server is already running VBR 13, which owns port 443.
+    # The check only applies when migrating from VBR 12 where 443 may be free or occupied
+    # by a different service that would conflict with the new VBR 13 REST listener.
+    if ($TargetVersion -eq '13.1') {
+        Add-Result 'VBR Server' 'Port 443 available for VBR 13' $INFO "Port 443 check skipped for VBR $TargetVersion upgrade  -  VBR 13 already holds port 443 (expected)"
+        return
+    }
+    Write-Log "Checking if port 443 is available on ${VBRServer} for VBR 13 REST API..." -Level INFO
+    try {
+        $tcp = New-Object System.Net.Sockets.TcpClient
+        $ar  = $tcp.BeginConnect($VBRServer, 443, $null, $null)
+        $connected = $ar.AsyncWaitHandle.WaitOne(3000, $false)
+        if ($connected) {
+            try { $tcp.EndConnect($ar) } catch { $connected = $false }
+        }
+        try { $tcp.Close() } catch {}
+
+        if ($connected) {
+            Add-Result 'VBR Server' 'Port 443 available for VBR 13' $WARN "Port 443 is already in use on ${VBRServer}. VBR 13 REST service requires port 443. Identify and stop the conflicting service before upgrading."
+        } else {
+            Add-Result 'VBR Server' 'Port 443 available for VBR 13' $PASS "Port 443 is not in use on ${VBRServer}  -  available for VBR 13 REST service"
+        }
+    } catch {
+        Add-Result 'VBR Server' 'Port 443 available for VBR 13' $INFO "Could not determine port 443 status on ${VBRServer}  -  $($_.Exception.Message). Verify manually."
+        $ErrorLog.Add("[INFO] Test-Port443: $($_.Exception.Message)")
+    }
+}
+
+# -- 17. SQL Server version (on VBR server via WMI) ----------------------------
+function Test-SQLServerVersion {
+    Write-Log "Checking SQL Server version on ${VBRServer} via WMI..." -Level INFO
+    try {
+        $cimSession = New-VBRCimSession
+        try {
+            # Find running SQL Server engine services (default and named instances)
+            $sqlSvcs = @(Get-CimInstance -CimSession $cimSession -ClassName Win32_Service `
+                -Filter "Name LIKE 'MSSQL%'" -ErrorAction Stop |
+                Where-Object { $_.Name -match '^(MSSQLSERVER$|MSSQL\$)' })
+        } finally {
+            Remove-CimSession $cimSession -ErrorAction SilentlyContinue
+        }
+
+        if ($sqlSvcs.Count -eq 0) {
+            Add-Result 'VBR Server' 'SQL Server version' $INFO "No SQL Server instances found on ${VBRServer}. If VBR uses PostgreSQL, no SQL Server upgrade is needed."
+            return
+        }
+
+        foreach ($svc in $sqlSvcs) {
+            $instName = $svc.Name -replace '^MSSQL\$?', ''
+            if ($instName -eq '') { $instName = 'MSSQLSERVER' }
+
+            # Extract SQL major version from binary path: e.g. MSSQL13.VEEAMSQL2016 -> 13
+            $sqlMajor = $null
+            if ($svc.PathName -match 'MSSQL(\d+)\.') {
+                $sqlMajor = [int]$Matches[1]
+            }
+
+            $sqlYear = switch ($sqlMajor) {
+                11 { 'SQL Server 2012' }
+                12 { 'SQL Server 2014' }
+                13 { 'SQL Server 2016' }
+                14 { 'SQL Server 2017' }
+                15 { 'SQL Server 2019' }
+                16 { 'SQL Server 2022' }
+                default { "SQL Server (version $sqlMajor)" }
+            }
+
+            if ($sqlMajor -ne $null -and $sqlMajor -ge 13) {
+                Add-Result 'VBR Server' "SQL Server version ($instName)" $PASS "$sqlYear  -  supported by VBR 13"
+            } elseif ($sqlMajor -ne $null) {
+                Add-Result 'VBR Server' "SQL Server version ($instName)" $FAIL "$sqlYear is NOT supported by VBR 13. Upgrade to SQL Server 2016 or later before upgrading VBR."
+            } else {
+                Add-Result 'VBR Server' "SQL Server version ($instName)" $WARN "Could not parse SQL Server version from path. Verify version is 2016+ before upgrading VBR."
+            }
+        }
+    } catch {
+        Add-Result 'VBR Server' 'SQL Server version check' $WARN "Could not query SQL Server services on ${VBRServer} via WMI  -  $($_.Exception.Message). Verify SQL Server version manually (2016+ required)."
+        $ErrorLog.Add("[ERROR] Test-SQLServerVersion: $($_.Exception.Message)")
+    }
+}
+
+# -- 18. PowerShell 7 installed (on VBR server via WMI) -----------------------
+function Test-PowerShell7 {
+    Write-Log "Checking for PowerShell 7 installation on ${VBRServer} via WMI..." -Level INFO
+    try {
+        $cimSession = New-VBRCimSession
+        try {
+            # Check standard install locations for PowerShell 7.x
+            $pwshCandidates = @(
+                'C:\\Program Files\\PowerShell\\7\\pwsh.exe',
+                'C:\\Program Files\\PowerShell\\7.4\\pwsh.exe',
+                'C:\\Program Files\\PowerShell\\7.5\\pwsh.exe'
+            )
+            $found     = $false
+            $foundPath = ''
+            foreach ($candidate in $pwshCandidates) {
+                $fileObj = Get-CimInstance -CimSession $cimSession -ClassName CIM_DataFile `
+                    -Filter "Name='$candidate'" -ErrorAction SilentlyContinue
+                if ($fileObj) {
+                    $found     = $true
+                    $foundPath = $candidate -replace '\\\\', '\'
+                    break
+                }
+            }
+        } finally {
+            Remove-CimSession $cimSession -ErrorAction SilentlyContinue
+        }
+
+        if ($found) {
+            Add-Result 'VBR Server' 'PowerShell 7 installed' $PASS "PowerShell 7 found at $foundPath  -  required for Veeam PowerShell module in VBR 13"
+        } else {
+            Add-Result 'VBR Server' 'PowerShell 7 installed' $WARN "PowerShell 7 (pwsh.exe) not found in standard locations on ${VBRServer}. Required for Veeam PowerShell cmdlets post-upgrade. Download from https://aka.ms/install-powershell"
+        }
+    } catch {
+        Add-Result 'VBR Server' 'PowerShell 7 check' $INFO "Could not check PowerShell 7 on ${VBRServer} via WMI  -  $($_.Exception.Message). Verify manually if using Veeam PowerShell automation."
+        $ErrorLog.Add("[INFO] Test-PowerShell7: $($_.Exception.Message)")
+    }
+}
+
+# -- 19 & 20. CPU and RAM hardware requirements (on VBR server via WMI) -------
+function Test-HardwareRequirements {
+    Write-Log "Checking CPU and RAM hardware requirements on ${VBRServer} via WMI..." -Level INFO
+
+    # VBR 13 Windows-Based Backup Server minimums (per Veeam system requirements):
+    #   CPU : 8 logical cores (vCPUs)
+    #   RAM : 16 GB
+    # Source: https://helpcenter.veeam.com/docs/vbr/userguide/system_requirements_backup_server.html?ver=13
+    $cpuMin = 8
+    $ramMin = 16
+
+    try {
+        $cimSession = New-VBRCimSession
+        try {
+            $cs = Get-CimInstance -CimSession $cimSession -ClassName Win32_ComputerSystem -ErrorAction Stop
+        } finally {
+            Remove-CimSession $cimSession -ErrorAction SilentlyContinue
+        }
+
+        # CPU  -  NumberOfLogicalProcessors reflects vCPUs on VMs, logical processors on physical
+        $cpuCount = [int]$cs.NumberOfLogicalProcessors
+
+        if ($cpuCount -ge $cpuMin) {
+            Add-Result 'VBR Server' "CPU logical cores (minimum $cpuMin)" $PASS "$cpuCount logical core(s) detected  -  meets VBR 13 requirement"
+        } else {
+            Add-Result 'VBR Server' "CPU logical cores (minimum $cpuMin)" $FAIL "$cpuCount logical core(s) detected  -  VBR 13 requires $cpuMin cores minimum. Add CPU resources before upgrading."
+        }
+
+        # RAM
+        $ramBytes = [long]$cs.TotalPhysicalMemory
+        $ramGB    = [math]::Round($ramBytes / 1073741824, 1)
+
+        if ($ramGB -ge $ramMin) {
+            Add-Result 'VBR Server' "RAM (minimum ${ramMin} GB)" $PASS "${ramGB} GB RAM detected  -  meets VBR 13 requirement"
+        } elseif ($ramGB -ge ($ramMin - 2)) {
+            # Within 2 GB of minimum - possibly a rounding/reserved memory difference
+            Add-Result 'VBR Server' "RAM (minimum ${ramMin} GB)" $WARN "${ramGB} GB RAM detected  -  marginally below ${ramMin} GB minimum. Verify available RAM before upgrading."
+        } else {
+            Add-Result 'VBR Server' "RAM (minimum ${ramMin} GB)" $FAIL "${ramGB} GB RAM detected  -  VBR 13 requires ${ramMin} GB minimum. Add RAM before upgrading."
+        }
+
+    } catch {
+        Add-Result 'VBR Server' 'Hardware requirements (CPU/RAM)' $WARN "Could not query hardware specs on ${VBRServer} via WMI  -  $($_.Exception.Message). Verify manually: 8+ CPU cores and 16+ GB RAM required."
+        $ErrorLog.Add("[ERROR] Test-HardwareRequirements: $($_.Exception.Message)")
+    }
+}
+
 #endregion
 
 #region -- Report Generation ---------------------------------------------------
@@ -871,7 +1149,7 @@ function Export-HTMLReport {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Veeam VBR 13 Pre-Upgrade Report</title>
+<title>Veeam VBR $TargetVersion Pre-Upgrade Report</title>
 <style>
   body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; color: #2c3e50; }
   .container { max-width: 1100px; margin: auto; }
@@ -898,7 +1176,7 @@ function Export-HTMLReport {
 <div class="container">
   <div class="header">
     <h1>Veeam Backup &amp; Replication  -  Pre-Upgrade Readiness Report</h1>
-    <p>Target: $VBRServer &nbsp;|&nbsp; Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') &nbsp;|&nbsp; Checking readiness for upgrade to VBR 13</p>
+    <p>Target: $VBRServer &nbsp;|&nbsp; Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') &nbsp;|&nbsp; Upgrade target: VBR $TargetVersion</p>
   </div>
   <div class="summary">
     <div class="overall">$overallStatus</div>
@@ -914,7 +1192,7 @@ function Export-HTMLReport {
       $($tableRows -join "`n      ")
     </tbody>
   </table>
-  <div class="footer">Veeam VBR 13 Pre-Upgrade Check &nbsp;|&nbsp; Reference: helpcenter.veeam.com/docs/vbr/userguide/upgrade_vbr_byb.html?ver=13</div>
+  <div class="footer">Veeam VBR $TargetVersion Pre-Upgrade Check &nbsp;|&nbsp; Reference: helpcenter.veeam.com/docs/vbr/userguide/upgrade_vbr_byb.html?ver=13</div>
 </div>
 </body>
 </html>
@@ -939,11 +1217,13 @@ function Export-ErrorLog {
 
 #region -- Main Execution ------------------------------------------------------
 
-Write-Log "===== Veeam VBR 13 Pre-Upgrade Readiness Check =====" -Level INFO
-Write-Log "Target server : $VBRServer" -Level INFO
-Write-Log "API port      : $Port"      -Level INFO
-Write-Log "Report path   : $ReportPath" -Level INFO
-Write-Log "=====================================================" -Level INFO
+Write-Log "===== Veeam VBR Pre-Upgrade Readiness Check ============" -Level INFO
+Write-Log "Target server  : $VBRServer"       -Level INFO
+Write-Log "Upgrade target : VBR $TargetVersion" -Level INFO
+Write-Log "API version    : $ApiVersion"       -Level INFO
+Write-Log "API port       : $Port"             -Level INFO
+Write-Log "Report path    : $ReportPath"       -Level INFO
+Write-Log "========================================================" -Level INFO
 
 # Prompt for credentials if not supplied
 if (-not $Credential) {
@@ -978,6 +1258,10 @@ Test-LocalOSVersion
 Test-PendingReboot
 Test-VeeamServices
 Test-SystemDriveSpace
+Test-Port443
+Test-SQLServerVersion
+Test-PowerShell7
+Test-HardwareRequirements
 
 # Logout cleanly
 if ($AccessToken) {
