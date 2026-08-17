@@ -2,11 +2,13 @@
 
 # 📗 Documentation
 ## **Versions supported**
-This script has been tested to work on Windows Server/Workstation operating systems that use PowerShell version 4.0 or higher.
+This script has been tested to work on Windows Server/Workstation operating systems that use PowerShell version 4.0 or higher, and runs identically under Windows PowerShell (4.0–5.1) and PowerShell 7.x.
+
+It is compatible with guests and servers backed up or managed by **Veeam Backup & Replication 12.x and older as well as 13.x and newer**. No Veeam PowerShell cmdlets are used, so the v13 change requiring PowerShell 7 for Veeam cmdlets does not apply — wherever v12 and v13 differ (registry layout, log rotation scheme), the script probes for what actually exists on the machine rather than branching on a detected version.
 
 PowerShell 4.0 ships in-box with Windows Server 2012 R2 / Windows 8.1 and later. Older guest OSes still supported by Veeam Backup & Replication 12 (e.g. Windows Server 2008 R2 SP1 / Windows 7 SP1) must have [WMF 4.0](https://www.microsoft.com/en-us/download/details.aspx?id=40855) installed. On operating systems older than Windows Server 2012 / Windows 8, the script automatically falls back to built-in alternatives for cmdlets that are not available (e.g. `netsh advfirewall` instead of `Get-NetFirewallProfile`).
 
-The script uses only components shipped with a default Windows installation — no third-party tools or modules are required.
+The script uses only components shipped with a default Windows installation — no third-party tools or modules are required. (One optional exception: enumerating SQL permissions under PowerShell 7 requires the `SqlServer` module; without it, the report explains how to include that data. Windows PowerShell needs nothing extra.)
 
 ## **Purpose**
 This script helps automate and simplify the Guest OS log collection process documented in [Veeam KB1789](https://www.veeam.com/kb1789).
@@ -38,6 +40,8 @@ Unblock-File .\Collect-GuestLogs.ps1
 | `-IncludeSecurityEvents` | Includes the Security event log in the exported Windows Event Logs. If omitted in an interactive session, a prompt is shown (defaults to No). In a non-interactive session, the Security log is excluded unless this switch is passed. |
 | `-Force` | Suppresses the confirmation normally shown when the script detects it is running on a Veeam Backup & Replication server. Required for unattended runs on a VBR server. |
 | `-OutputDirectory <path>` | Directory where the collected log bundle is created. Useful when the default location (a _Case_Logs_ folder on the same volume as the Veeam log directory) is low on disk space. The directory is created if it does not exist. Paths containing wildcard characters (`[`, `]`, `*`, `?`) are not supported and are rejected at startup. |
+| `-VeeamLogRotations <n>` | Number of newest rotations of each Veeam log file "family" to collect (default: `3`). Veeam B&R v13+ rotates logs aggressively, so log directories can accumulate hundreds of archived rotations; this keeps bundles a practical size. Pass `0` to disable filtering and collect every file. |
+| `-SkipFreeSpaceCheck` | Skips the preflight free-disk-space check. Before collecting anything, the script estimates the size of the data it is about to gather and refuses to start if the target volume(s) lack the headroom. Use only if you have reviewed the free space yourself and believe the estimate is wrong. |
 
 ### **Remote execution** <br>
 The script can be executed against a remote guest OS using PowerShell Remoting. All interactive prompts are automatically skipped in remote sessions, so use the parameters above to control behavior:
@@ -48,11 +52,13 @@ Invoke-Command -FilePath .\Collect-GuestLogs.ps1 -ComputerName <GUEST_OS_SERVERN
 ## **Features** <br>
 This script will collect the following information from the machine. Tabular data (installed software, services, volumes, local accounts, '_File and Printer Sharing_' status) is exported in CSV format so it can be sorted and filtered in a spreadsheet application.
 
-* Collects _GuestHelper_, _GuestIndexer_ and other logs located in _%ProgramData%\Veeam\Backup\_ (or alternate configured directory)
+* Collects _GuestHelper_, _GuestIndexer_ and other logs located in _%ProgramData%\Veeam\Backup\_ (or alternate configured directory), keeping the newest rotations of each log (see `-VeeamLogRotations`). When run on a VBR server, a rotation-filtered set of the server logs is collected (and the bundle is flagged, since the VBR server is not the typical place to run this script)
 * Collects output of various VSSAdmin commands: Writers/Shadows/ShadowStorage/Providers
 * Collects output of SystemInfo.exe
 * Collects output of FLTMC.exe (list of registered Filter Manager minifilter drivers)
-* Detects the hypervisor and collects guest tools information (VMware Tools / Hyper-V Integration Services / Nutanix Guest Tools version and service status)
+* Detects the hypervisor and collects guest tools information (VMware Tools / Hyper-V Integration Services / Nutanix Guest Tools / QEMU guest agent version and service status)
+* Inventories installed Veeam components and their versions from each Veeam service binary (works identically across VBR v12 and v13)
+* Collects the hosts file (and lmhosts if present) — active entries are surfaced in the triage summary, since stale hosts-file overrides are a recurring root cause in "DNS is fine" cases
 * Collects list of installed Windows updates/hotfixes
 * Collects various registry values (_Veeam Backup and Replication_, _SCHANNEL_ and _System_ hives specifically) to check for various settings that affect In-Guest Processing
 * Checks for Veeam registry values which may have leading or trailing whitespace which would cause them not to work as intended
@@ -68,7 +74,7 @@ This script will collect the following information from the machine. Tabular dat
 * Collects a point-in-time netstat snapshot (with an embedded disclaimer noting that many Veeam ports are only bound during active jobs/operations; deliberately excluded from the triage summary)
 * Collects list of installed features/roles
 * Writes a _CollectionErrors.log_ into the archive listing any collection steps that failed, so it is possible to distinguish "collection failed" from "not present on this system"
-* Generates a triage summary (_!_SUMMARY.txt_) at the root of the archive surfacing facts an engineer typically checks first: VSS writer states, non-default VSS providers, key service states, low disk space, minifilter drivers not shipped in-box with Windows, pending reboot indicators, SCHANNEL protocol customizations, and any collection failures. The summary is advisory only (facts, not a diagnosis) — any check that cannot be parsed (e.g. localized vssadmin output on non-English OSes) is flagged for manual review instead of reporting an all-clear
+* Generates a triage summary (_!_SUMMARY.txt_) at the root of the archive surfacing facts an engineer typically checks first: Veeam component versions, VSS writer states, non-default VSS providers, key service states, low disk space, minifilter drivers not shipped in-box with Windows, active hosts-file entries, pending reboot indicators, SCHANNEL protocol customizations, and any collection failures. The summary is advisory only (facts, not a diagnosis) — any check that cannot be parsed (e.g. localized vssadmin output on non-English OSes) is flagged for manual review instead of reporting an all-clear
 
 ## **Data handling** <br>
 The collected archive contains sensitive configuration data (local/domain account listings, SQL permissions, event logs, registry exports, network configuration). To protect it:
@@ -77,7 +83,10 @@ The collected archive contains sensitive configuration data (local/domain accoun
 * The script's temporary working files are kept in a uniquely-named per-run folder under `%windir%\Temp` and are removed when the run completes.
 * Archives are **not** removed automatically — please delete previous collections from the output location once your support case is closed.
 
-The script makes no changes to system state: it only reads (services, registry, VSS, event logs are exported, never modified). The script exits with code `1` if the archive could not be created or any collection step failed, so unattended/remote callers can detect problems.
+The script makes no changes to system state: it only reads (services, registry, VSS, event logs are exported, never modified). Before collecting anything it estimates the collection size and verifies the target volume(s) have sufficient free space, refusing to start rather than risk filling a production volume (see `-SkipFreeSpaceCheck`). If restricting permissions on the output location fails, the script aborts before gathering any data rather than write sensitive data to a location it cannot protect. The script exits with code `1` if the archive could not be created or any collection step failed, so unattended/remote callers can detect problems.
+
+## **For maintainers** <br>
+`Test-CollectGuestLogs.ps1` (in this folder — end users do not need it) validates the script after changes: it parse-checks the script on the current PowerShell engine, unit-tests the log rotation-family grouping against every known Veeam log naming scheme, and can dry-run the rotation filter against a live Veeam log directory (read-only). Run it under both Windows PowerShell 5.1 and PowerShell 7 before publishing changes, especially after modifying `Get-LogFamilyKey`.
 
 ## Project Notes
 **Author:** Chris Evans <br>
