@@ -12,7 +12,7 @@
 
 .NOTES
 	NAME:  VB365-JetToObjectMigration.ps1
-	VERSION: 0.5
+	VERSION: 0.6
 	AUTHOR: David Bewernick
 	GITHUB: https://github.com/d-works
 
@@ -33,22 +33,22 @@ $organisationNum = Read-Host "Enter organization number"
 $organization = $orgs[$organisationNum]
 Write-Host
 
-# Validation type selection
-Write-Host "Select validation type:"
+# Migration type selection
+Write-Host "Select migration type:"
 Write-Host "0. Organization"
 Write-Host "1. Job"
-$validationTypeNum = Read-Host "Enter validation type number"
+$migrationTypeNum = Read-Host "Enter migration type number"
 Write-Host
 
-if ($validationTypeNum -eq "1") {
+if ($migrationTypeNum -eq "1") {
     # Job selection
     Write-Host "Select Job:"
     $jobs = Get-VBOJob -Organization $organization | Sort-Object Name
     for($i=0; $i -lt $jobs.count; $i++) { Write-Host $i. $jobs[$i].name }
     $jobNum = Read-Host "Enter job number"
     $selectedJob = $jobs[$jobNum]
-    $validationTarget = $selectedJob
-    $validationType = "Job"
+    $migrationTarget = $selectedJob
+    $migrationType = "Job"
     $inventoryDataIdColumnName = "Backup Job Id"
     Write-Host
 
@@ -86,7 +86,7 @@ $switchJob = Read-Host
 # disable the retention for the proxy
 Set-VBOConfigurationParameter -XPath "/Veeam/Archiver/RepositoryConfig" -Key "RetentionDisabled" -Value "True" -Proxy $proxy
 
-if ($validationTypeNum -eq "0") {
+if ($migrationTypeNum -eq "0") {
 	# start the job mode migration process
 	if($switchJob -eq "y") { 
 		Start-VBODataMigration -Organization $organization -From $sourceRepository -To $targetRepository -SwitchJobToTargetRepository -RunAsync 
@@ -96,7 +96,7 @@ if ($validationTypeNum -eq "0") {
 	}
 }
 
-if ($validationTypeNum -eq "1") {
+if ($migrationTypeNum -eq "1") {
 	# start the job mode migration process
 	if($switchJob -eq "y") { 
 		Start-VBODataMigration -Job $selectedJob -From $sourceRepository -To $targetRepository -SwitchJobToTargetRepository -RunAsync 

@@ -3,15 +3,19 @@ This project has the goal to support in migrating backup data from disk Reposito
 
 ## Important note:
 Please be aware that the provided code is only seen as examples and is not officially tested and supported by Veeam. The used commands themself are supported, since they are offered directly through the product.
-Always check the offical Veeam Backup for Microsoft 365 PowerShell Reference in this limited access [Helpcenter](https://helpcenter.veeam.com/archive/vbo365/8.5/powershell_private/backup_data.html) version including the hidden comdlets.
+
+**This is an advanced manual process. If you are unsure what to do, it is recommended to contact your technical Veeam partner for assistance.**
+
+Always check the Veeam Backup for Microsoft 365 PowerShell Reference in this limited access [Helpcenter](https://helpcenter.veeam.com/archive/vbo365/8.5/powershell_private/backup_data.html) version, which includes  the hidden comdlets.
 
 ## Hint for commands
 Most commands require some objects to run. For example, the Start-VBODataMigration cmdlet requires objects like job, repositories or proxy, depending on the run mode. These objects can be created with Get-VBORepository and Get-VBOProxy etc.
 
 ## Important to know
 - **Veeam Backup for Microsoft 365** will be called **VB365** as an acronym in this document.
-- the commands must be run in PowerShell v7, which is default if started from the VB365 GUI.
+- the commands must be run in **PowerShell v7**, which is default if started from the VB365 GUI.
 - It is highly recommended to run migrations with **VB365 v8.5 or newer**.
+- Migration job logfiles are stored on the acting target Proxy only. If the target Object Storage Repository is bound to a Proxy Pool, please check for logs on all related Proxies.
 - This migration option is only supported from **Jet to Object Storage Repositories**.
 - The target Object Storage Repository can **not** have immutability enabled.
 - Migration from multiple Jet Repositories to a single Object Storage Repository is currently **not** supported.
@@ -39,7 +43,7 @@ Most commands require some objects to run. For example, the Start-VBODataMigrati
     The Schedule is frequently and might be running in between the initial migration run.
     The migration should target an object storage Repository.
 #### Advice
-    This is a supported scenario and the -SwitchJobToTargetRepository paramter should be used. 
+    This is a supported scenario and the -SwitchJobToTargetRepository parameter should be used. 
     Use the -Job parameter to target the migration for this specific source job.
     If the -SwitchJobToTargetRepository parameter was true, the source job will be disabled once the migration could successfully finish.
 
@@ -49,7 +53,7 @@ Most commands require some objects to run. For example, the Start-VBODataMigrati
     The Schedule is frequently and might be running in between the initial migration run.
     The migration should target an object storage Repository. 
 #### Advice
-    This is a supported scenario and the -SwitchJobToTargetRepository paramter can be used when planned. 
+    This is a supported scenario and the -SwitchJobToTargetRepository parameter can be used when planned. 
     Use the -Organization parameter to target the migration for the whole source Repository. This will effect all jobs targeting this repository and if the -SwitchJobToTargetRepository parameter was true, the jobs will be disabled once the migration could successfully finish.
     It is possible to use job based migration from the same source repository as long as the MigrationLock is on place on the target repository.
     Only use Remove-VBODataMigrationLock once all data has been migrated!
