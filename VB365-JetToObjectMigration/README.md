@@ -17,6 +17,7 @@ Most commands require some objects to run. For example, the Start-VBODataMigrati
 - It is highly recommended to run migrations with **VB365 v8.5 or newer**.
 - Migration job logfiles are stored on the acting target Proxy only. If the target Object Storage Repository is bound to a Proxy Pool, please check for logs on all related Proxies.
 - This migration option is only supported from **Jet to Object Storage Repositories**.
+- You can migrate from Jet Repositories with item-based Retention to Object Storage Repositories with snapshot-based retention. Be aware that the target Repository retention settings will be used, once the Repository Lock has been removed. Additionally take into consideration, that the first nack job run on the Object Storage Repository might download new data to fulfill the snapshot-based retention. It is recommended to get familiar with the two different types of retention.
 - The target Object Storage Repository can **not** have immutability enabled.
 - Migration from multiple Jet Repositories to a single Object Storage Repository is currently **not** supported.
 - Make sure that port 9193 is opened between the proxy servers, including the default proxy on the VB365 server.

@@ -47,11 +47,13 @@
     KUDOS: Special thanks to the Veeam team to provide valuable input.
 #>
 
+#Requires -Version 7.0
+
 # Variables - set these accordingly
 $reportPath = "C:\VBOMigrationReports"
 
 # If VBO is installed in a different path, please replace it with your own path.
-Import-Module 'C:\Program Files\Veeam\Backup365\Veeam.Archiver.PowerShell.dll'
+Import-Module 'C:\Program Files\Veeam\Backup365\Veeam.Archiver.PowerShell\Veeam.Archiver.PowerShell.psd1'
 
 
 # Logging Function

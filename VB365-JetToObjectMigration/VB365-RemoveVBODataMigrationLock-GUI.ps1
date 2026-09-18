@@ -16,12 +16,14 @@
 	GITHUB: https://github.com/d-works
 #>
 
+#Requires -Version 7.0
+
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 # --- Load the Veeam module --------------------------------------------------
 try {
-    Import-Module Veeam.Archiver.PowerShell -ErrorAction Stop
+    Import-Module 'C:\Program Files\Veeam\Backup365\Veeam.Archiver.PowerShell\Veeam.Archiver.PowerShell.psd1' -ErrorAction Stop
 }
 catch {
     [System.Windows.Forms.MessageBox]::Show(
