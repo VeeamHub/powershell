@@ -43,18 +43,44 @@
 
 .NOTES
     NAME:  VB365-JetToOsrVerification.ps1
-    VERSION: 0.5
+    VERSION: 0.7
     KUDOS: Special thanks to the Veeam team to provide valuable input.
+
+.PARAMETER ArchiverModulePath
+    Path to the Veeam.Archiver.PowerShell module manifest (.psd1). Importing by manifest
+    path (instead of by module name) avoids the pwsh 7 Windows PowerShell compatibility/
+    implicit-remoting layer, which is known to silently drop -Confirm:$false on some
+    VB365 cmdlets.
 #>
 
 #Requires -Version 7.0
 
-# Variables - set these accordingly
-$reportPath = "C:\VBOMigrationReports"
+[CmdletBinding()]
+param(
+    [string]$ArchiverModulePath = 'C:\Program Files\Veeam\Backup365\Veeam.Archiver.PowerShell\Veeam.Archiver.PowerShell.psd1'
+)
 
-# If VBO is installed in a different path, please replace it with your own path.
-Import-Module 'C:\Program Files\Veeam\Backup365\Veeam.Archiver.PowerShell\Veeam.Archiver.PowerShell.psd1'
+### If needed, import PowerShell modules for VB365 and ExchangeOnline
 
+Write-Host "Checking, installing and importing Veeam.Archiver.PowerShell module if needed." -ForegroundColor Yellow
+
+if (-not (Get-Module -Name Veeam.Archiver.PowerShell)) {
+    if (-not (Test-Path $ArchiverModulePath)) {
+        throw "Veeam.Archiver.PowerShell.psd1 not found at '$ArchiverModulePath'. Set -ArchiverModulePath to its location."
+    }
+    Import-Module $ArchiverModulePath
+}
+
+$vb365ModuleLoaded = [bool](Get-Module -Name Veeam.Archiver.PowerShell)
+
+if ($vb365ModuleLoaded) {
+    Write-Host "Veeam.Archiver.PowerShell module loaded successfully." -ForegroundColor Green
+} else {
+    Write-Host "PowerShell module load check failed: `n   Veeam.Archiver.PowerShell loaded: $vb365ModuleLoaded." -ForegroundColor Red
+}
+
+#enable the migration option (on VB365 server)
+[Environment]::SetEnvironmentVariable("VEEAM_DATA_MIGRATION_ENABLED", "true")
 
 # Logging Function
 function Write-Log {
