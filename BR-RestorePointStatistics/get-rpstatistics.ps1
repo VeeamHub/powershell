@@ -31,7 +31,8 @@
 # 2022.06.17 added CompletionTime and corrupt/consistent info
 # 2025.09.10 minor performance optimizations
 # 2025.09.22 added capability to filter on job-names defined in parameter "JobFilterFile" (textfile, one job-name per line)
-# 2025.09.30 added more "average" columns to statistics output
+# 2026.05.27 enhanced job filtering and performance metrics
+# 2026.08.07 fixed a console output bug that falsely indicated that processing started although it didn't
 # -----------------------------------------------
 
 # vbrServer passed as parameter (script will ask for credentials if there is no credentials file!)
@@ -175,8 +176,6 @@ Process {
     #output file for statistics
     $outfileStatistics = "$outputDir\$outfilePrefix-Statistics.csv"
 
-    Write-Progress -Activity "Connecting to $vbrServer" -Id 1
-
     # read credentials for vbr server authentication if file exists, otherwise ask for credentials and save them
     Disconnect-VBRServer -ErrorAction SilentlyContinue
     try {
@@ -197,6 +196,7 @@ Process {
     }
 
     # establish connection to vbr server
+    Write-Progress -Activity "Connecting to $vbrServer" -Id 1
     try {
         Connect-VBRServer -Server $vbrServer -Credential $myCreds
         Write-Verbose "Connection to $vbrServer successful."
@@ -323,6 +323,8 @@ Process {
                     AvgBlocksizeWritten = $null
                     Folder              = get_backupfile_path $restorePoint
                     Filename            = $restorePoint.GetStorage().PartialPath.Internal.Elements[0]
+                    IsImmutable         = $restorePoint.IsImmutable
+                    ImmutableTillUtc    = $restorePoint.ImmutableTillUtc
                 }
                 # calculate blocksize statistics if dedupe ratio is reasonable (vbr provides weird numbers sometimes...)
                 if ($tmpObject.BackupSize -gt 0) {
@@ -394,14 +396,8 @@ Process {
                 AvgIncrChangeRate24h = $null
                 OldestBackupDate     = $null
                 NewestBackupDate     = $null
-                FullDataReadTotal    = 0
-                FullDataReadAvg      = 0
-                FullSizeAvg          = 0
-                FullSizeTotal        = 0
-                IncrDataReadTotal    = 0
-                IncrDataReadAvg      = 0
-                IncrSizeAvg          = 0
-                IncrSizeTotal        = 0
+                FullSize             = 0
+                IncrSize             = 0
                 TotalSize            = 0
                 AvgBlocksizeWritten  = $null
             }
@@ -410,7 +406,7 @@ Process {
             foreach ($selectedRp in $rpSelection) {
                 $null = $combiObject.RPList.Add($selectedRP)
             }
-            # add the object to the master list
+            # add the object to the mater list
             $null = $masterList.Add($combiObject)
             $combiObject = $null
         }
@@ -458,8 +454,7 @@ Process {
             
             if ($rp.BackupType -ne "Increment") {
                 # look at full backups
-                $combi.FullSizeTotal += $rp.BackupSize
-                $combi.FullDataReadTotal += $rp.DataRead
+                $combi.FullSize += $rp.BackupSize
                 $fullCount++
                 $fullDedupSum += $rp.DedupRatio
                 $fullComprSum += $rp.ComprRatio
@@ -477,8 +472,7 @@ Process {
             }
             else {
                 # look at incremental and synthetic backups
-                $combi.IncrSizeTotal += $rp.BackupSize
-                $combi.IncrDataReadTotal += $rp.DataRead
+                $combi.IncrSize += $rp.BackupSize
                 $incrCount++
                 $incrDedupSum += $rp.DedupRatio
                 $incrComprSum += $rp.ComprRatio
@@ -497,8 +491,6 @@ Process {
         # calculate averages and add results to object
         if ($fullCount -gt 0) {
             $combi.FullCount = $fullCount
-            $combi.FullSizeAvg = $combi.FullSizeTotal / $fullCount
-            $combi.FullDataReadAvg = $combi.FullDataReadTotal / $fullCount
             $combi.AvgFullDedup = $fullDedupSum / $fullCount
             $combi.AvgFullCompr = $fullComprSum / $fullCount
             if ($fullCount -eq $syntCount) { $divisor = $fullCount } else { $divisor = $fullCount - $syntCount }
@@ -506,8 +498,6 @@ Process {
             $combi.IncrCount = $incrCount
         }
         if ($incrCount -gt 0) {
-            $combi.IncrSizeAvg = $combi.IncrSizeTotal / $incrCount
-            $combi.IncrDataReadAvg = $combi.IncrDataReadTotal / $incrCount
             $combi.AvgIncrDedup = $incrDedupSum / $incrCount
             $combi.AvgIncrCompr = $incrComprSum / $incrCount
             #$combi.AvgIncrChangeRate = $incrCRSum / $incrCount
@@ -549,15 +539,11 @@ Process {
             avgFullDuration     = $combi.AvgFullDuration
             avgIncrDuration     = $combi.AvgIncrDuration
             avgSyntDuration     = $combi.AvgSyntDuration
-            FullBackupVolume    = $combi.FullSizeTotal
-            avgFullRead         = $combi.FullDataReadAvg
-            avgFullSize         = $combi.FullSizeAvg
+            FullBackupVolume    = $combi.FullSize
             avgFullDedup        = $combi.AvgFullDedup
             avgFullCompr        = $combi.AvgFullCompr
             avgFullReduction    = $combi.AvgFullDedup * $combi.AvgFullCompr
-            IncrBackupVolume    = $combi.IncrSizeTotal
-            avgIncrRead         = $combi.IncrDataReadAvg
-            avgIncrSize         = $combi.IncrSizeAvg
+            IncrBackupVolume    = $combi.IncrSize
             avgIncrDedup        = $combi.AvgIncrDedup
             avgIncrCompr        = $combi.AvgIncrCompr
             avgIncrReduction    = $combi.AvgIncrDedup * $combi.AvgIncrCompr
@@ -602,10 +588,6 @@ Process {
                 $statItem.TotalBackupVolume = Format-Bytes $statItem.TotalBackupVolume
                 $statItem.FullBackupVolume = Format-Bytes $statItem.FullBackupVolume
                 $statItem.IncrBackupVolume = Format-Bytes $statItem.IncrBackupVolume
-                $statItem.avgFullSize = Format-Bytes $statItem.avgFullSize
-                $statItem.avgIncrSize = Format-Bytes $statItem.avgIncrSize
-                $statItem.avgFullRead = Format-Bytes $statItem.avgFullRead
-                $statItem.avgIncrRead = Format-Bytes $statItem.avgIncrRead
                 if ($statItem.AvgBlocksizeWritten -gt 0) { $statItem.AvgBlocksizeWritten = Format-Bytes $statItem.AvgBlocksizeWritten }
                 if ($statItem.BlockSize -gt 0) { $statItem.BlockSize = Format-Bytes $statItem.BlockSize }
                 if ($null -ne $statItem.avgChangeRate24h) { $statItem.avgChangeRate24h = [math]::Round($statItem.avgChangeRate24h * 100, 2) }
