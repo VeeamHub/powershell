@@ -37,13 +37,31 @@ if (-not (Get-Module -Name Veeam.Archiver.PowerShell)) {
     Import-Module $ArchiverModulePath -ErrorAction Stop
 }
 
-if (-not (Get-Module -Name ExchangeOnlineManagement -ListAvailable)) {
-    Write-Host "ExchangeOnlineManagement module not found. Installing..." -ForegroundColor Yellow
-    Install-Module -Name ExchangeOnlineManagement -Scope CurrentUser -Force
+$vb365ExoPathPattern = '\\Veeam\\Backup365\\'
+
+$loadedExo = Get-Module -Name ExchangeOnlineManagement
+if ($loadedExo -and $loadedExo.Path -match $vb365ExoPathPattern) {
+    Write-Warning "ExchangeOnlineManagement is currently loaded from the VB365-bundled copy ('$($loadedExo.Path)'). Removing it so the official module can be loaded instead."
+    Remove-Module -Name ExchangeOnlineManagement -Force
+    $loadedExo = $null
 }
 
-if (-not (Get-Module -Name ExchangeOnlineManagement)) {
-    Import-Module ExchangeOnlineManagement -ErrorAction Stop
+if (-not $loadedExo) {
+    $genuineExo = Get-Module -Name ExchangeOnlineManagement -ListAvailable |
+        Where-Object { $_.Path -notmatch $vb365ExoPathPattern } |
+        Sort-Object Version -Descending |
+        Select-Object -First 1
+
+    if (-not $genuineExo) {
+        Write-Host "No standalone ExchangeOnlineManagement module found (only the copy bundled with VB365). Installing the official module from PSGallery..." -ForegroundColor Yellow
+        Install-Module -Name ExchangeOnlineManagement -Scope CurrentUser -Force -ErrorAction Stop
+        $genuineExo = Get-Module -Name ExchangeOnlineManagement -ListAvailable |
+            Where-Object { $_.Path -notmatch $vb365ExoPathPattern } |
+            Sort-Object Version -Descending |
+            Select-Object -First 1
+    }
+
+    Import-Module $genuineExo.Path -ErrorAction Stop
 }
 
 $vb365ModuleLoaded = [bool](Get-Module -Name Veeam.Archiver.PowerShell)
@@ -110,43 +128,52 @@ if (-not (Read-YesNo "`nContinue enabling EwsEnabled and adding this Application
     return
 }
 
-Connect-ExchangeOnline
+try {
+    Connect-ExchangeOnline -ErrorAction Stop
 
-$orgConfig = Get-OrganizationConfig
-Write-Host "`nCurrent EwsEnabled status:"
-$orgConfig | Format-List EwsEnabled
+    $orgConfig = Get-OrganizationConfig -ErrorAction Stop
+    Write-Host "`nCurrent EwsEnabled status:"
+    $orgConfig | Format-List EwsEnabled
 
-if (-not $orgConfig.EwsEnabled) {
-    if (Read-YesNo "EwsEnabled is not set to `$true. Enable it now?" -Color Magenta) {
-        Set-OrganizationConfig -EwsEnabled $true
-        Write-Host "EwsEnabled set to `$true." -ForegroundColor Green
+    if (-not $orgConfig.EwsEnabled) {
+        if (Read-YesNo "EwsEnabled is not set to `$true. Enable it now?" -Color Magenta) {
+            Set-OrganizationConfig -EwsEnabled $true -ErrorAction Stop
+            Write-Host "EwsEnabled set to `$true." -ForegroundColor Green
+        }
     }
-}
 
-$ewsPolicy = Get-OrganizationConfig -RetrieveEwsOperationAccessPolicy
-Write-Host "`nCurrent EwsAllowedAppIDs:"
-$ewsPolicy | Format-List EwsAllowedAppIDs
+    $ewsPolicy = Get-OrganizationConfig -RetrieveEwsOperationAccessPolicy -ErrorAction Stop
+    if ($null -eq $ewsPolicy) {
+        throw "Get-OrganizationConfig -RetrieveEwsOperationAccessPolicy returned nothing. Cannot safely determine the current EwsAllowedAppIDs list."
+    }
+    Write-Host "`nCurrent EwsAllowedAppIDs:"
+    $ewsPolicy | Format-List EwsAllowedAppIDs
 
-$currentAppIdList = @()
-if (-not [string]::IsNullOrWhiteSpace($ewsPolicy.EwsAllowedAppIDs)) {
-    $currentAppIdList = $ewsPolicy.EwsAllowedAppIDs -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }
-}
+    $currentAppIdList = @()
+    if (-not [string]::IsNullOrWhiteSpace($ewsPolicy.EwsAllowedAppIDs)) {
+        $currentAppIdList = $ewsPolicy.EwsAllowedAppIDs -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }
+    } elseif (-not (Read-YesNo "`nEwsAllowedAppIDs came back empty. Confirm this Exchange Online organization genuinely has no allow list entries yet (answering 'n' aborts without changing anything)" -Color Magenta)) {
+        Write-Warning "Aborting: EwsAllowedAppIDs read as empty and this was not confirmed as genuine. Refusing to write, since that could silently wipe out an existing allow list."
+        return
+    }
 
-if ($currentAppIdList -contains $appId) {
-    Write-Host "`nThe VB365 organization Application ID is already added to EwsAllowedAppIDs." -ForegroundColor Green
-} else {
-    if (Read-YesNo "`nApplication ID $appId was not found in EwsAllowedAppIDs. Add it?" -Color Magenta) {
-        $newAppIdsString = (@($currentAppIdList) + $appId) -join ','
-        Set-OrganizationConfig -EwsAllowedAppIDs $newAppIdsString
-        Write-Host "EwsAllowedAppIDs updated." -ForegroundColor Green
+    if ($currentAppIdList -contains $appId) {
+        Write-Host "`nThe VB365 organization Application ID is already added to EwsAllowedAppIDs." -ForegroundColor Green
     } else {
-        Write-Host "Skipped adding the Application ID."
+        if (Read-YesNo "`nApplication ID $appId was not found in EwsAllowedAppIDs. Add it?" -Color Magenta) {
+            $newAppIdsString = (@($currentAppIdList) + $appId) -join ','
+            Set-OrganizationConfig -EwsAllowedAppIDs $newAppIdsString -ErrorAction Stop
+            Write-Host "EwsAllowedAppIDs updated." -ForegroundColor Green
+        } else {
+            Write-Host "Skipped adding the Application ID."
+        }
     }
+
+    Write-Host "`nEwsAllowedAppIDs after update (verification):"
+    (Get-OrganizationConfig -RetrieveEwsOperationAccessPolicy -ErrorAction Stop) | Format-List EwsAllowedAppIDs
+} finally {
+    Disconnect-ExchangeOnline -Confirm:$false -ErrorAction SilentlyContinue
+    Disconnect-VBOServer -ErrorAction SilentlyContinue
 }
-
-Write-Host "`nEwsAllowedAppIDs after update (verification):"
-(Get-OrganizationConfig -RetrieveEwsOperationAccessPolicy) | Format-List EwsAllowedAppIDs
-
-Disconnect-VBOServer
 
 Write-Host "`nScript completed." -ForegroundColor Cyan
