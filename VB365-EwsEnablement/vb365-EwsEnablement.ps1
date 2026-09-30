@@ -162,8 +162,28 @@ try {
     } else {
         if (Read-YesNo "`nApplication ID $appId was not found in EwsAllowedAppIDs. Add it?" -Color Magenta) {
             $newAppIdsString = (@($currentAppIdList) + $appId) -join ','
-            Set-OrganizationConfig -EwsAllowedAppIDs $newAppIdsString -ErrorAction Stop
-            Write-Host "EwsAllowedAppIDs updated." -ForegroundColor Green
+
+            $setFailed = $false
+            try {
+                Set-OrganizationConfig -EwsAllowedAppIDs $newAppIdsString -ErrorAction Stop
+            } catch {
+                $setFailed = $true
+                Write-Warning "Set-OrganizationConfig failed to update EwsAllowedAppIDs: $($_.Exception.Message)"
+            }
+
+            if (-not $setFailed) {
+                $verifyPolicy = Get-OrganizationConfig -RetrieveEwsOperationAccessPolicy -ErrorAction Stop
+                $verifyList = @()
+                if (-not [string]::IsNullOrWhiteSpace($verifyPolicy.EwsAllowedAppIDs)) {
+                    $verifyList = $verifyPolicy.EwsAllowedAppIDs -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }
+                }
+
+                if ($verifyList -contains $appId) {
+                    Write-Host "EwsAllowedAppIDs updated." -ForegroundColor Green
+                } else {
+                    Write-Warning "Set-OrganizationConfig did not report an error, but Application ID $appId is not present in EwsAllowedAppIDs. It can take some time for the update to take effect or the was an issue during updating - verify manually."
+                }
+            }
         } else {
             Write-Host "Skipped adding the Application ID."
         }
