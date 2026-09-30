@@ -9,7 +9,7 @@
 
 .NOTES
     Author: David Bewernick
-    Last Modification Date: 2026-09-17
+    Last Modification Date: 2026-09-30
     License: MIT
 
 .PARAMETER ArchiverModulePath

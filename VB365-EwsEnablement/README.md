@@ -33,6 +33,10 @@ adds it if needed.
 7. Displays the tenant's current `EwsEnabled` status. If it isn't `$true`, asks whether to
    enable it and, if confirmed, runs `Set-OrganizationConfig -EwsEnabled $true`.
 8. Displays the tenant's current `EwsAllowedAppIDs` list.
+   - If the read comes back empty, the script does not assume the allow list is genuinely
+     empty. It asks you to confirm that's really the case; answering "n" aborts with a
+     warning and makes no changes, since a failed/empty read could otherwise cause the
+     next step to silently wipe out an existing allow list.
 9. Checks whether the VB365 organization's application ID is already in that list:
    - If it is, reports that no change is needed.
    - If it isn't, asks for confirmation and, if confirmed, **appends** the ID to the
@@ -88,5 +92,5 @@ If VB365 is installed to a non-default path:
 ## Author
 
 - **Author:** David Bewernick
-- **Last Modification Date:** 2026-09-17
+- **Last Modification Date:** 2026-09-30
 - **License:** MIT
