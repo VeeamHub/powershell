@@ -139,7 +139,7 @@ Write-Host "`nSelected organization: $($org.Name)" -ForegroundColor Cyan
 Write-Host "Application ID: $appId" -ForegroundColor Yellow
 
 # Prompt user to confirm continuation of adding the Application ID to EwsAllowedAppIDs
-if (-not (Read-YesNo "`nContinue enabling EwsEnabled and adding this Application ID to the Exchange Online configuration?")) {
+if (-not (Read-YesNo "`nContinue enabling EwsEnabled and adding this Application ID to the Exchange Online configuration?" -Color Magenta)) {
     Write-Host "Disconnecting from VB365..."
     Disconnect-VBOServer
     return
