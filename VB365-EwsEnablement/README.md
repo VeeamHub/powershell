@@ -26,7 +26,7 @@ adds it if needed.
 3. Prompts you to select an organization by number.
 4. Reads that organization's Exchange Online application ID from
    `$org.Office365ExchangeConnectionSettings.ApplicationId` and displays it.
-5. Asks for confirmation before making any changes to Exchange Online. Answering "n" disconnects from VB365 and exits without touching Exchange Online.
+5. Asks for confirmation before making any changes to Exchange Online. Answering "n" exits without touching Exchange Online.
 6. Disconnects from VB365 and connects to Exchange Online (`Connect-ExchangeOnline`).
 7. Displays the tenant's current `EwsEnabled` status. If it isn't `$true`, asks whether to enable it and, if confirmed, runs `Set-OrganizationConfig -EwsEnabled $true`.
 8. Displays the tenant's current `EwsAllowedAppIDs` list.
@@ -73,7 +73,6 @@ If VB365 is installed to a non-default path:
 
 - The script only reads from VB365 (no VB365 configuration is changed) and disconnects from the VB365 server before connecting to Exchange Online.
 - No changes are made to Exchange Online unless you confirm each prompt.
-- The script does not disconnect the Exchange Online session (`Disconnect-ExchangeOnline`) at the end; close it yourself if needed.
 
 ## Author
 
