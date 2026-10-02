@@ -50,21 +50,38 @@ if ($loadedExo -and $loadedExo.Path -match $vb365ExoPathPattern) {
     $loadedExo = $null
 }
 
-if (-not $loadedExo) {
-    $genuineExo = Get-Module -Name ExchangeOnlineManagement -ListAvailable |
+$exoMaxVersion = $null
+if ($PSVersionTable.PSVersion -lt [version]'7.6.0') {
+    $exoMaxVersion = [version]'3.9.99'
+    Write-Host "PowerShell $($PSVersionTable.PSVersion) detected. ExchangeOnlineManagement 3.10+ needs 7.6, so a 3.9.x release will be used." -ForegroundColor Yellow
+}
+function Get-GenuineExoModule {
+    # Newest standalone copy that this pwsh can actually load. Skips the VB365-bundled copies and, on pwsh older than 7.6, any 3.10+ copy that may already be installed.
+    Get-Module -Name ExchangeOnlineManagement -ListAvailable |
         Where-Object { $_.Path -notmatch $vb365ExoPathPattern } |
+        Where-Object { -not $exoMaxVersion -or $_.Version -le $exoMaxVersion } |
         Sort-Object Version -Descending |
         Select-Object -First 1
-
+}
+if (-not $loadedExo) {
+    $genuineExo = Get-GenuineExoModule
     if (-not $genuineExo) {
-        Write-Host "No standalone ExchangeOnlineManagement module found (only the copy bundled with VB365). Installing the official module from PSGallery..." -ForegroundColor Yellow
-        Install-Module -Name ExchangeOnlineManagement -Scope CurrentUser -AllowClobber -Force -ErrorAction Stop
-        $genuineExo = Get-Module -Name ExchangeOnlineManagement -ListAvailable |
-            Where-Object { $_.Path -notmatch $vb365ExoPathPattern } |
-            Sort-Object Version -Descending |
-            Select-Object -First 1
+        Write-Host "No usable standalone ExchangeOnlineManagement module found (only the copy bundled with VB365, or only a version this PowerShell cannot load). Installing from PSGallery..." -ForegroundColor Yellow
+        $installParams = @{
+            Name         = 'ExchangeOnlineManagement'
+            Scope        = 'CurrentUser'
+            AllowClobber = $true
+            Force        = $true
+            ErrorAction  = 'Stop'
+        }
+        if ($exoMaxVersion) { $installParams.MaximumVersion = $exoMaxVersion.ToString() }
+        Install-Module @installParams
+        $genuineExo = Get-GenuineExoModule
     }
-
+    if (-not $genuineExo) {
+        throw "ExchangeOnlineManagement could not be found after installation."
+    }
+    Write-Host "Importing ExchangeOnlineManagement $($genuineExo.Version) from '$($genuineExo.ModuleBase)'."
     Import-Module $genuineExo.Path -ErrorAction Stop
 }
 
