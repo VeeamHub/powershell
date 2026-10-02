@@ -17,10 +17,12 @@ adds it if needed.
 
 ## What it does
 
-1. Loads both required modules up front (see [Requirements](#requirements)): imports
-   `Veeam.Archiver.PowerShell` by module manifest path, then installs
-   `ExchangeOnlineManagement` (if missing) and imports it. Verifies both modules actually
-   loaded and prints a confirmation; if either failed to load, the script stops with an
+1. Loads both required modules up front (see [Requirements](#requirements)): 
+   imports `Veeam.Archiver.PowerShell` by module manifest path, then installs
+   `ExchangeOnlineManagement` (if missing) and imports it. 
+   It is checked which PowerShell version is used and the correct selection for ExchangeOnlineManagement module version is made.
+   ExchangeOnlineManagement version 3.10+ needs PowerShell 7.6.x, for older PowerShell versions a ExchangeOnlineManagement version 3.9.x release will be used.
+   Verifies both modules actually loaded and prints a confirmation; if either failed to load, the script stops with an
    error before doing anything else.
 2. Connects to the VB365 server (prompting for a server name if not already connected) and lists all configured organizations.
 3. Prompts you to select an organization by number.
