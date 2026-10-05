@@ -17,42 +17,37 @@ adds it if needed.
 
 ## What it does
 
-1. Loads both required modules up front (see [Requirements](#requirements)): imports
-   `Veeam.Archiver.PowerShell` by module manifest path, then installs
-   `ExchangeOnlineManagement` (if missing) and imports it. Verifies both modules actually
-   loaded and prints a confirmation; if either failed to load, the script stops with an
+1. Loads both required modules up front (see [Requirements](#requirements)): 
+   imports `Veeam.Archiver.PowerShell` by module manifest path, then installs
+   `ExchangeOnlineManagement` (if missing) and imports it. 
+   It is checked which PowerShell version is used and the correct selection for ExchangeOnlineManagement module version is made.
+   ExchangeOnlineManagement version 3.10+ needs PowerShell 7.6.x, for older PowerShell versions a ExchangeOnlineManagement version 3.9.x release will be used.
+   Verifies both modules actually loaded and prints a confirmation; if either failed to load, the script stops with an
    error before doing anything else.
-2. Connects to the VB365 server (prompting for a server name if not already connected) and
-   lists all configured organizations.
+2. Connects to the VB365 server (prompting for a server name if not already connected) and lists all configured organizations.
 3. Prompts you to select an organization by number.
 4. Reads that organization's Exchange Online application ID from
    `$org.Office365ExchangeConnectionSettings.ApplicationId` and displays it.
-5. Asks for confirmation before making any changes to Exchange Online. Answering "n"
-   disconnects from VB365 and exits without touching Exchange Online.
+5. Asks for confirmation before making any changes to Exchange Online. Answering "n" exits without touching Exchange Online.
 6. Disconnects from VB365 and connects to Exchange Online (`Connect-ExchangeOnline`).
-7. Displays the tenant's current `EwsEnabled` status. If it isn't `$true`, asks whether to
-   enable it and, if confirmed, runs `Set-OrganizationConfig -EwsEnabled $true`.
+7. Displays the tenant's current `EwsEnabled` status. If it isn't `$true`, asks whether to enable it and, if confirmed, runs `Set-OrganizationConfig -EwsEnabled $true`.
 8. Displays the tenant's current `EwsAllowedAppIDs` list.
+   - If the read comes back empty, the script does not assume the allow list is genuinely empty. It asks you to confirm that's really the case; answering "n" aborts with a warning and makes no changes, since a failed/empty read could otherwise cause the next step to silently wipe out an existing allow list.
 9. Checks whether the VB365 organization's application ID is already in that list:
    - If it is, reports that no change is needed.
-   - If it isn't, asks for confirmation and, if confirmed, **appends** the ID to the
-     existing list (never overwrites it) and writes the result back with
+   - If it isn't, asks for confirmation and, if confirmed, **appends** the ID to the existing list (never overwrites it) and writes the result back with
      `Set-OrganizationConfig -EwsAllowedAppIDs`.
+   - After writing, the script doesn't just trust that the write worked: if
+     `Set-OrganizationConfig` throws, it reports the actual error instead of a false "updated" message. If the cmdlet reports no error but the application ID still isn't present when re-read, it warns that the update may not have taken effect rather than assuming success.
 10. Re-reads and displays `EwsAllowedAppIDs` again so you can verify the change.
 
-`Set-OrganizationConfig -EwsAllowedAppIDs` replaces the entire value rather than appending
-to it, so the script always merges the new ID into the existing comma-separated list
-in-memory before writing it back — existing application IDs are never lost.
+`Set-OrganizationConfig -EwsAllowedAppIDs` replaces the entire value rather than appending to it, so the script always merges the new ID into the existing comma-separated list in-memory before writing it back — existing application IDs are never lost.
 
 ## Requirements
 
 - PowerShell 7 (enforced via `#Requires -Version 7.0`)
-- The `ExchangeOnlineManagement` module (installed automatically for the current user if
-  not already present)
-- The `Veeam.Archiver.PowerShell` module (part of the VB365 console install), imported by
-  its module manifest (`.psd1`) path rather than by module name — this avoids a pwsh 7
-  issue where the Windows PowerShell compatibility/implicit-remoting layer silently drops
-  `-Confirm:$false` on some VB365 cmdlets
+- The `ExchangeOnlineManagement` module (installed automatically for the current user if not already present)
+- The `Veeam.Archiver.PowerShell` module (part of the VB365 console install), imported by its module manifest (`.psd1`) path rather than by module name — this avoids a pwsh 7 issue where the Windows PowerShell compatibility/implicit-remoting layer silently drops `-Confirm:$false` on some VB365 cmdlets
 - Permissions to connect to both the VB365 server and Exchange Online (Exchange
   administrator or equivalent role)
 
@@ -68,8 +63,7 @@ in-memory before writing it back — existing application IDs are never lost.
 ./vb365-EwsEnablement.ps1
 ```
 
-Run interactively; the script prompts for the VB365 server (if not already connected),
-the organization to process, and confirmation (y/n) before each change to Exchange Online.
+Run interactively; the script prompts for the VB365 server (if not already connected), the organization to process, and confirmation (y/n) before each change to Exchange Online.
 
 If VB365 is installed to a non-default path:
 
@@ -79,14 +73,11 @@ If VB365 is installed to a non-default path:
 
 ## Notes
 
-- The script only reads from VB365 (no VB365 configuration is changed) and disconnects
-  from the VB365 server before connecting to Exchange Online.
+- The script only reads from VB365 (no VB365 configuration is changed) and disconnects from the VB365 server before connecting to Exchange Online.
 - No changes are made to Exchange Online unless you confirm each prompt.
-- The script does not disconnect the Exchange Online session (`Disconnect-ExchangeOnline`)
-  at the end; close it yourself if needed.
 
 ## Author
 
 - **Author:** David Bewernick
-- **Last Modification Date:** 2026-09-17
+- **Last Modification Date:** 2026-09-30
 - **License:** MIT
