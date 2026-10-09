@@ -41,7 +41,7 @@ Connects to a VBR server via the REST API and validates all pre-upgrade
       15. System drive free disk space (>= 10 GB recommended for installer)
       16. Port 443 availability (VBR 13 REST service requires port 443 — skipped for 13.1 target)
       17. SQL Server version (2016 or later required; PostgreSQL is fine)
-      18. PowerShell 7 installed (required for Veeam PS module in VBR 13)
+      18. [PowerShell 7 installed](https://helpcenter.veeam.com/docs/vbr/powershell/running_ps_sessions_windows.html?ver=13) (required for Veeam PS module in VBR 13)
       19. CPU core count (minimum 8 logical cores required)
       20. RAM (minimum 16 GB required)
 [Download Example Report](http://htmlpreview.github.io/powershell/BR-VBR13-PreUpgradeCheck/VBR13_PreUpgrade_Report_20260629_121002.html)

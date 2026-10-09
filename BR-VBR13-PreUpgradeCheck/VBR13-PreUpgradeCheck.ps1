@@ -33,7 +33,7 @@
      15.  System drive free disk space on VBR server (>= 10 GB required)
      16.  Port 443 availability on VBR server (VBR 13 REST service requires port 443)
      17.  SQL Server version on VBR server (2016 or later required; PostgreSQL is fine)
-     18.  PowerShell 7 installed on VBR server (required for Veeam PS module in VBR 13)
+     18.  PowerShell 7 installed on VBR server (required for Veeam PS module in VBR 13) - https://helpcenter.veeam.com/docs/vbr/powershell/running_ps_sessions_windows.html?ver=13
      19.  CPU core count on VBR server (minimum 8 logical cores required for VBR 13)
      20.  RAM on VBR server (minimum 16 GB required for VBR 13)
 
