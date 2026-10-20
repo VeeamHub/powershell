@@ -2,6 +2,7 @@
 ###[26.04] - v 1.0 . Script for SQL Plugin logs collection
 ###[02.12.2024] - v 2.0 . Logs folder was changed from "Case_logs" to "Veeam_Case_logs". Added the collection of system info (mount vol, OS info, ipconfig, firewall settings, etc.)
 ###[19.11.2025] - v 2.1 . Added "filters" output" and replaced "wmic" with "Get-CimInstance"
+###[14.10.2026] - v 2.2 . Fixed ERRORLOG path lookup (instance ID + -e startup parameter). Added SQL Agent logs. Default instance now gets a connection test. Fixed output path fallback, cluster event typo, and folder removal after a failed zip.
 
 Start-Sleep 1
 Write-Warning -Message "This script is provided as is as a courtesy for collecting logs from the Guest Machine. Please be aware that due to certain Microsoft Operations, there may be a short burst of high CPU activity, and that some 
@@ -26,6 +27,8 @@ $date = Get-Date -f yyyy-MM-ddTHHmmss_
 $hostname = HOSTNAME.EXE
 $item = Get-ItemProperty -Path "HKLM:\SOFTWARE\Veeam\Veeam Endpoint Backup" -Name "LogDirectory" -ErrorAction SilentlyContinue
 $logvolume = Split-Path -Path $item.LogDirectory -Parent -ErrorAction SilentlyContinue #<---- "-ErrorAction SilentlyContinue was added"
+#If the Veeam Agent key is missing, use ProgramData\Veeam instead of the drive root
+if ([string]::IsNullOrEmpty($logvolume)) { $logvolume = "$env:ProgramData\Veeam" }
 $veeamlogs = "$logvolume\Veeam_Case_Logs"
 $directory = "$veeamlogs\$date$hostname"
 $Execution = "$directory\Execution.log"
@@ -381,21 +384,45 @@ $CheckInstanses = (Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Serv
 #Creating folder for each Instance
 $CheckInstanses| ForEach-Object -Begin $null -Process {New-Item -ItemType Directory -Force -Path "$SQL_Err_Log_Folder\$_" -ErrorAction SilentlyContinue > $null} -End $null
 
-#Appendix for the SQL log path
-$SQLLog_app = "\Log"
-
+#Map each instance name (e.g. MSSQLSERVER) to its instance ID (e.g. MSSQL17.MSSQLSERVER)
+$SQLRoot = 'HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server'
+$InstanceMap = Get-ItemProperty "$SQLRoot\Instance Names\SQL" -ErrorAction SilentlyContinue
 
 foreach ($Instance in $CheckInstanses) {
-	
-	$SQLLog = $Instance | ForEach-Object -Begin $null -Process {(Get-ItemProperty "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\$($_)\Setup").SQLPath } -End $null  -ErrorAction SilentlyContinue
-	
-	$SQLLog_path = $SQLLog | ForEach-Object -Begin $null -Process {Join-Path -Path "$($_)" -ChildPath "$SQLLog_app" } -End $null  -ErrorAction SilentlyContinue	
-	
-	$SQLLog_error = Get-ChildItem -Path $SQLLog_path  -Recurse -Include ERRORLOG, ERRORLOG.* -ErrorAction SilentlyContinue
 
 	$destinationFolder = "$SQL_Err_Log_Folder\$Instance"
-	
-	Copy-Item $SQLLog_error $destinationFolder -ErrorAction SilentlyContinue
+	$InstanceId = $InstanceMap.$Instance
+	if ([string]::IsNullOrEmpty($InstanceId)) {
+		Write-Warning "Could not find the instance ID for $Instance. Copy its ERRORLOG files by hand."
+		continue
+	}
+
+	#Use the -e startup parameter. It holds the real ERRORLOG path, also for custom paths and cluster disks.
+	$SQLLog_path = $null
+	$StartupParams = Get-ItemProperty "$SQLRoot\$InstanceId\MSSQLServer\Parameters" -ErrorAction SilentlyContinue
+	if ($StartupParams) {
+		$eArg = $StartupParams.PSObject.Properties | Where-Object { $_.Name -like 'SQLArg*' -and $_.Value -like '-e*' } | Select-Object -First 1
+		if ($eArg) { $SQLLog_path = Split-Path -Path $eArg.Value.Substring(2) -Parent }
+	}
+
+	#Fall back to the default path: <SQLPath>\Log
+	if ([string]::IsNullOrEmpty($SQLLog_path)) {
+		$SQLPath = (Get-ItemProperty "$SQLRoot\$InstanceId\Setup" -ErrorAction SilentlyContinue).SQLPath
+		if ($SQLPath) { $SQLLog_path = Join-Path -Path $SQLPath -ChildPath 'Log' }
+	}
+
+	if ([string]::IsNullOrEmpty($SQLLog_path) -or !(Test-Path $SQLLog_path)) {
+		Write-Warning "Could not find the log folder for $Instance ($InstanceId). Copy its ERRORLOG files by hand."
+		continue
+	}
+
+	Write-Host "$Instance logs: $SQLLog_path"
+	Add-Content -Path "$destinationFolder\log_path.txt" -Value "$Instance ($InstanceId): $SQLLog_path"
+
+	#Copy SQL Server ERRORLOG and SQL Agent logs
+	Get-ChildItem -Path $SQLLog_path -File -ErrorAction SilentlyContinue |
+		Where-Object { $_.Name -like 'ERRORLOG*' -or $_.Name -like 'SQLAGENT*' } |
+		Copy-Item -Destination $destinationFolder -Force -ErrorAction SilentlyContinue
 	Write-Host -ForegroundColor Yellow "Done"
 	Start-Sleep 1
 }
@@ -411,9 +438,11 @@ $providers = (New-Object system.data.oledb.oledbenumerator).GetElements() | sele
 
 # Get a list of SQL Server instances
 $servers = @()
-$serverNames = (Get-WmiObject -Class Win32_Service -Filter "Name LIKE 'MSSQL$%' AND Started = 'True'").Name
+#Include the default instance (service MSSQLSERVER) and named instances (service MSSQL$<name>)
+$serverNames = (Get-CimInstance -ClassName Win32_Service -Filter "(Name = 'MSSQLSERVER' OR Name LIKE 'MSSQL$%') AND Started = 'True'").Name
 foreach ($serverName in $serverNames) {
-    $serverInstance = $serverName.Substring(6)
+    if ($serverName -eq 'MSSQLSERVER') { $serverInstance = $null }
+    else { $serverInstance = $serverName.Substring(6) }
     $servers += New-Object PSObject -Property @{
         ServerName = $env:COMPUTERNAME
         InstanceName = $serverInstance
@@ -424,7 +453,8 @@ foreach ($serverName in $serverNames) {
 foreach ($provider in $providers) {
 
     foreach ($server in $servers) {
-        $dataSource = $server.ServerName + '\' + $server.InstanceName
+        if ($server.InstanceName) { $dataSource = $server.ServerName + '\' + $server.InstanceName }
+        else { $dataSource = $server.ServerName }
 
         $auth = "Integrated Security=SSPI;Persist Security Info=False"
         $connectionString = "Provider=$($provider.SOURCES_NAME);" + "Data Source=$dataSource;" + "$auth;"
@@ -486,7 +516,7 @@ $GetClusterEv = Get-WinEvent -listLog * | ? LogName -like "*failover*" -ErrorAct
 		}
 	else
 	{
-		$GetClusterEv.Logname | ForEach-Object -Begin $null -Process {wevtutil epl "$_" "$Events\$($_.replace("/", "_")).evtx" /q:"*[System[TimeCreated[timediff(@SystemTime) <= 1209600000 ]]]" /ow:true}, {wevutil al "$Events\$($_.replace("/", "_")).evtx" -ErrorAction SilentlyContinue} -End $null
+		$GetClusterEv.Logname | ForEach-Object -Begin $null -Process {wevtutil epl "$_" "$Events\$($_.replace("/", "_")).evtx" /q:"*[System[TimeCreated[timediff(@SystemTime) <= 1209600000 ]]]" /ow:true}, {wevtutil al "$Events\$($_.replace("/", "_")).evtx" -ErrorAction SilentlyContinue} -End $null
 	}
 		
 #Compress folder containing data
@@ -501,7 +531,7 @@ Start-Sleep 1
 
 #Get large files count
 $largefiles = (Get-ChildItem -Path $directory -Recurse | Where-Object { ($_.Length /1GB) -gt 2 } ).count
-Write-Host 'Number of files larger than 1GB is:' $largefiles 
+Write-Host 'Number of files larger than 2GB is:' $largefiles 
 
 if (($PS -gt '4') -and ($largefiles -lt '1'))
 	{
@@ -515,8 +545,13 @@ elseif (($PS -lt '5') -or ($largefiles -gt '0'))
 Write-Host -ForegroundColor Yellow "Done"
 Start-Sleep 1
 
-#Remove temporary log folder
-Remove-Item "$directory" -Recurse -Force -Confirm:$false
+#Remove temporary log folder only if the zip exists
+if (Test-Path "$directory.zip") {
+	Remove-Item "$directory" -Recurse -Force -Confirm:$false
+}
+else {
+	Write-Warning "Could not create $directory.zip. The unzipped logs are still in $directory"
+}
 
 
 #Summary
