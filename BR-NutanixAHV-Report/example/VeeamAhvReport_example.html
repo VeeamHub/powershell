@@ -1,0 +1,158 @@
+<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>Veeam AHV Report - server-01.example.local</title>
+<style>
+:root{
+  --bg:#f5f6f8; --card:#ffffff; --ink:#1b1f24; --muted:#5b6570; --line:#dfe3e8;
+  --accent:#00b336; --warn:#b8860b; --bad:#c0392b; --good:#1e7e34; --chip:#eef1f4;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#14171a; --card:#1c2024; --ink:#e6e9ec; --muted:#9aa4ae; --line:#2c3238;
+         --accent:#3ddc6b; --warn:#e0a92b; --bad:#ef6a5a; --good:#4cc36b; --chip:#242a30; }
+}
+*{box-sizing:border-box}
+body{margin:0;padding:28px;background:var(--bg);color:var(--ink);
+     font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+h1{font-size:23px;margin:0 0 4px}
+h2{font-size:17px;margin:34px 0 12px;padding-bottom:7px;border-bottom:2px solid var(--line)}
+h3{font-size:14px;margin:22px 0 8px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.sub{color:var(--muted);margin:0 0 22px;font-size:13px}
+.cards{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:14px 18px;min-width:150px;flex:1}
+.card .v{font-size:26px;font-weight:640;line-height:1.15}
+.card .l{color:var(--muted);font-size:12px;margin-top:3px}
+.card.bad .v{color:var(--bad)} .card.warn .v{color:var(--warn)} .card.good .v{color:var(--good)}
+.wrap{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:9px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:top}
+th{background:var(--chip);font-weight:620;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);position:sticky;top:0}
+tr:last-child td{border-bottom:none}
+td.wrapcell{white-space:normal;min-width:280px;max-width:620px}
+.pill{display:inline-block;padding:1px 9px;border-radius:11px;font-size:11.5px;font-weight:620}
+.p-ok{background:rgba(30,126,52,.15);color:var(--good)}
+.p-warn{background:rgba(184,134,11,.17);color:var(--warn)}
+.p-bad{background:rgba(192,57,43,.15);color:var(--bad)}
+.p-mute{background:var(--chip);color:var(--muted)}
+tr.r-bad td{background:rgba(192,57,43,.06)}
+tr.r-warn td{background:rgba(184,134,11,.06)}
+.note{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--warn);
+      border-radius:7px;padding:13px 17px;margin:14px 0}
+.note.ok{border-left-color:var(--good)}
+.note.bad{border-left-color:var(--bad)}
+.note p{margin:0 0 7px} .note p:last-child{margin:0}
+.note ul{margin:7px 0 0 18px;padding:0} .note li{margin:3px 0}
+code{background:var(--chip);padding:1px 5px;border-radius:4px;font-size:12.5px}
+footer{margin-top:38px;padding-top:14px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+.empty{padding:18px;color:var(--muted);font-style:italic}
+details.sec{margin:0}
+details.sec>summary{list-style:none;cursor:pointer;user-select:none}
+details.sec>summary::-webkit-details-marker{display:none}
+details.sec>summary h2{display:flex;align-items:center;gap:8px}
+details.sec>summary h2::before{content:'\25B8';font-size:13px;color:var(--muted);transition:transform .15s}
+details.sec[open]>summary h2::before{transform:rotate(90deg)}
+details.sec>summary:hover h2{color:var(--accent)}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.btn{font:inherit;font-size:12.5px;padding:5px 12px;border:1px solid var(--line);border-radius:6px;
+     background:var(--card);color:var(--ink);cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+@media print{.toolbar,.btn{display:none}}
+</style>
+</head><body>
+<h1>Veeam Plug-in for Nutanix AHV &mdash; Configuration &amp; Session Report</h1>
+<p class='sub'>Server <strong>server-01.example.local</strong> &nbsp;&middot;&nbsp; Generated 2026-10-22 11:18:27 (local time) &nbsp;&middot;&nbsp; Session window: last 7 day(s)</p>
+<div class='toolbar'><button class='btn' type='button' onclick='setAll(true)'>Expand all</button><button class='btn' type='button' onclick='setAll(false)'>Collapse all</button></div>
+<div class='cards'>
+<div class='card '><div class='v'>1</div><div class='l'>Workers configured</div></div>
+<div class='card '><div class='v'>1</div><div class='l'>Workers enabled</div></div>
+<div class='card good'><div class='v'>4</div><div class='l'>Total concurrent tasks</div></div>
+<div class='card '><div class='v'>1</div><div class='l'>AHV jobs</div></div>
+<div class='card '><div class='v'>4</div><div class='l'>Sessions in window</div></div>
+<div class='card good'><div class='v'>0</div><div class='l'>Failed</div></div>
+<div class='card good'><div class='v'>0</div><div class='l'>Warnings</div></div>
+<div class='card good'><div class='v'>0</div><div class='l'>Rate-limited</div></div>
+<div class='card '><div class='v'>7.7m</div><div class='l'>Mean per VM</div></div>
+<div class='card warn'><div class='v'>Source</div><div class='l'>Top bottleneck</div></div>
+</div>
+<div class='note ok'><p><strong>Rescan sessions hidden.</strong> 377 infrastructure rescan session(s) were left out of every count and table in this report. Add <code>-IncludeRescans</code> to show them. All of them succeeded.</p></div>
+<details class='sec' open><summary><h2>API rate-limit analysis</h2></summary>
+<div class='note ok'><p><strong>No rate-limit errors detected</strong> in the last 7 day(s).</p><p>Sessions were scanned for <code>TooManyRequests</code>, <code>API rate limit exceeded</code> and HTTP 429.</p></div>
+</details>
+<details class='sec' open><summary><h2>Workers &mdash; concurrency and sizing</h2></summary>
+<div class='wrap'><table><thead><tr><th>Worker</th><th>Cluster</th><th>Enabled</th><th>Status</th><th>Max concurrent tasks</th><th>vCPU</th><th>Memory (GB)</th><th>IP</th><th>Host affinity</th><th>Affinity host</th><th>Description</th></tr></thead><tbody>
+<tr><td><strong>worker-01</strong></td><td>cluster-01</td><td><span class='pill p-ok'>True</span></td><td><span class='pill p-mute'>TurnedOff</span></td><td><strong>4</strong></td><td>6</td><td>6</td><td>192.0.2.10</td><td>No</td><td>&mdash;</td><td class='wrapcell'>Created by [redacted] at [redacted].</td></tr>
+</tbody></table></div>
+<h3>Concurrency by cluster (enabled workers)</h3><div class='wrap'><table><thead><tr><th>Cluster</th><th>Workers</th><th>Total concurrent tasks</th><th>Total vCPU</th><th>Total memory (GB)</th></tr></thead><tbody>
+<tr><td>cluster-01</td><td>1</td><td><strong>4</strong></td><td>6</td><td>6</td></tr>
+</tbody></table></div>
+</details>
+<details class='sec' open><summary><h2>Job settings</h2></summary>
+<div class='wrap'><table><thead><tr><th>Job</th><th>Mode</th><th>Enabled</th><th>Status</th><th>VMs</th><th>Repository</th><th>Schedule</th><th>Retry</th><th>Retention</th><th>GFS</th><th>Active full</th><th>Synthetic full</th><th>Health check</th><th>Compression</th><th>Block size</th><th>Deleted VM ret.</th><th>Last run</th><th>Next run</th></tr></thead><tbody>
+<tr><td><strong>Backup job 01</strong></td><td>Backup</td><td><span class='pill p-ok'>True</span></td><td><span class='pill p-ok'>Success</span></td><td>2</td><td>Repository 01</td><td>Monthly at 22:00 - ThirdWeek Wednesday</td><td>3 x 10min</td><td>7 days</td><td>Off</td><td>Off</td><td>Off</td><td>Off</td><td>Lz4</td><td>Kb1024</td><td>Off</td><td>2026-10-22 01:00:21</td><td>2026-11-19 01:00:00</td></tr>
+</tbody></table></div>
+</details>
+<details class='sec' open><summary><h2>Per-VM duration &mdash; window sizing</h2></summary>
+<div class='wrap'><table><thead><tr><th>Distinct VMs</th><th>VM backup runs</th><th>Min</th><th>Median</th><th>Mean</th><th>P90</th><th>P95</th><th>Max</th></tr></thead><tbody>
+<tr><td><strong>2</strong></td><td>2</td><td>7.7 min</td><td>7.7 min</td><td><strong>7.7 min</strong></td><td>7.7 min</td><td>7.7 min</td><td>7.7 min</td></tr>
+</tbody></table></div>
+<div class='note ok'><p><strong>How to read these numbers.</strong></p><ul>
+<li><strong>Median</strong> &mdash; the middle VM. Half of the VM backups finished in 7.7 min or less, half took longer.</li>
+<li><strong>Mean</strong> &mdash; the average (7.7 min). One very slow VM can pull it up, so on its own it can make things look better or worse than a typical run.</li>
+<li><strong>P90</strong> &mdash; 9 out of 10 VM backups finished within 7.7 min. Only the slowest 10% took longer.</li>
+<li><strong>P95</strong> &mdash; 19 out of 20 VM backups finished within 7.7 min. Only the slowest 5% took longer.</li>
+<li><strong>Max</strong> &mdash; the single slowest VM (7.7 min). A job cannot finish before its slowest VM does, however many workers you add.</li>
+</ul><p>Think of it like a queue at the checkout: the average tells you a typical wait, but P90 and P95 tell you how long the slow customers hold things up &mdash; and they decide when the shop can close. Plan the backup window on P90 rather than the average, so the slower VMs are allowed for.</p>
+<p><strong>Small sample:</strong> only 2 VM backup run(s) were measured. With this few, P90, P95 and Max are often the same run, so treat them as rough. Use <code>-DaysBack</code> to cover more runs.</p>
+</div>
+<div class='note'><p><strong>Projection for one backup window.</strong> 2 VMs &times; mean 7.7 min &divide; 4 concurrent tasks &asymp; <strong>4 min</strong> (using P90: 4 min). The window can never be shorter than the slowest single VM, 8 min.</p>
+<p>Formula: distinct VMs &times; per-VM duration &divide; concurrent tasks. It assumes every enabled worker can take any VM; if jobs are split across clusters, apply it per cluster using that cluster's task total.</p>
+<p>Watch the gap between mean and P95 &mdash; a long tail means stragglers, and stragglers are what overrun a fixed window.</p></div>
+<div class='note ok'><p>Counts completed backup runs only (session type matching <code>backup</code>, result Success or Warning). Included session types: <code>BackupVm</code>. Excluded per-VM sessions: Not a backup (PrepareWorker) &times; 1.</p></div>
+</details>
+<details class='sec' open><summary><h2>Bottleneck analysis</h2></summary>
+<div class='wrap'><table><thead><tr><th>Limiting stage</th><th>Sessions</th><th>Share</th></tr></thead><tbody>
+<tr><td><strong>Source</strong></td><td>1</td><td>100%</td></tr>
+</tbody></table></div>
+<div class='note'><p><strong>Reading this.</strong> <code>Proxy</code> dominant means worker CPU is the limit &mdash; fewer concurrent tasks per worker across more workers gives each task more vCPU. <code>Source</code> means the read from the hypervisor is the limit, where worker placement on the VM's own host matters. <code>Target</code> points at repository ingest or the repository task limit. <code>Network</code> is rarely the constraint on AHV.</p></div>
+</details>
+<details class='sec' open><summary><h2>Per-job session rollup (last 7 day(s))</h2></summary>
+<div class='wrap'><table><thead><tr><th>Job</th><th>Sessions</th><th>Success</th><th>Warning</th><th>Failed</th><th>Rate-limited</th><th>Success rate</th></tr></thead><tbody>
+<tr ><td><strong>Backup job 01</strong></td><td>3</td><td>3</td><td>0</td><td>0</td><td>0</td><td>100%</td></tr>
+<tr ><td><strong>Test worker worker-01</strong></td><td>1</td><td>1</td><td>0</td><td>0</td><td>0</td><td>100%</td></tr>
+</tbody></table></div>
+</details>
+<details class='sec' id='sessions'><summary><h2>Session detail (last 7 day(s))</h2></summary>
+<div class='toolbar'><button class='btn' type='button' onclick="downloadCsv('sessionTable','VeeamAhvReport_server-01_anonymized_sessions.csv')">Download CSV</button></div>
+<div class='wrap'><table id='sessionTable'><thead><tr><th>Job</th><th>VM</th><th>Type</th><th>Start (local)</th><th>Duration</th><th>Result</th><th>Objects</th><th>Read</th><th>Transferred</th><th>Avg rate</th><th>Bottleneck</th><th>Rate limited</th><th>Reason / error</th></tr></thead><tbody>
+<tr ><td><strong>Test worker worker-01</strong></td><td>worker-01</td><td>PrepareWorker</td><td>2026-10-22 01:00:22</td><td>00:06:10</td><td><span class='pill p-ok'>Success</span></td><td>0</td><td>-</td><td>-</td><td>-</td><td>-</td><td></td><td class='wrapcell'></td></tr>
+<tr ><td><strong>Backup job 01</strong></td><td>vm-01</td><td>BackupVm</td><td>2026-10-22 01:00:22</td><td>00:07:43</td><td><span class='pill p-ok'>Success</span></td><td>1</td><td>-</td><td>4.47 KB</td><td>-</td><td>-</td><td></td><td class='wrapcell'></td></tr>
+<tr ><td><strong>Backup job 01</strong></td><td>vm-02</td><td>BackupVm</td><td>2026-10-22 01:00:22</td><td>00:07:43</td><td><span class='pill p-ok'>Success</span></td><td>1</td><td>996.00 MB</td><td>680.28 MB</td><td>402.34 MB/s</td><td>-</td><td></td><td class='wrapcell'></td></tr>
+<tr ><td><strong>Backup job 01</strong></td><td>-</td><td>BackupVmJob</td><td>2026-10-22 01:00:21</td><td>00:07:47</td><td><span class='pill p-ok'>Success</span></td><td>2</td><td>996.00 MB</td><td>680.28 MB</td><td>-</td><td>Source 81% &gt; Proxy 27% &gt; Network 44% &gt; Target 77%</td><td></td><td class='wrapcell'></td></tr>
+</tbody></table></div>
+</details>
+<footer>Generated by <code>New-VeeamAhvReport.ps1 v1.9.3</code>. Source: Veeam Plug-in for Nutanix AHV REST API <strong>v10</strong> at <code>https://server-01.example.local/extension/799a5a3e-ae1e-4eaf-86eb-8a9acc2670e2/api/v10</code>. Session detail scanned for all sessions. Times shown in local time; the API returns UTC. Read-only report &mdash; no configuration was changed.</footer>
+<script>
+function setAll(open){document.querySelectorAll('details.sec').forEach(function(d){d.open=open;});}
+// Open everything for printing, then restore what the reader had.
+var _printState=null;
+window.addEventListener('beforeprint',function(){_printState=[];document.querySelectorAll('details.sec').forEach(function(d){_printState.push(d.open);d.open=true;});});
+window.addEventListener('afterprint',function(){if(!_printState)return;document.querySelectorAll('details.sec').forEach(function(d,i){d.open=_printState[i];});_printState=null;});
+function csvCell(t){
+  t=(t||'').replace(/\s+/g,' ').trim();
+  if(/^[=+@]/.test(t)){t="'"+t;}            // stop Excel treating text as a formula
+  return '"'+t.replace(/"/g,'""')+'"';
+}
+function downloadCsv(tableId,fileName){
+  var tbl=document.getElementById(tableId); if(!tbl)return;
+  var lines=[];
+  tbl.querySelectorAll('tr').forEach(function(r){
+    var cells=[]; r.querySelectorAll('th,td').forEach(function(c){cells.push(csvCell(c.textContent));});
+    lines.push(cells.join(','));
+  });
+  var blob=new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fileName;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
+}
+</script>
+</body></html>
+
