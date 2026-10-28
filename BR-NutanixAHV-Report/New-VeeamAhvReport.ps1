@@ -82,8 +82,8 @@
 
 .NOTES
     Script  : New-VeeamAhvReport.ps1
-    Version : 1.9.4
-    Updated : 2026-10-21
+    Version : 1.10.1
+    Updated : 2026-10-26
     Author  : Jason Berry
     Assisted: Written with assistance from Claude (Anthropic). Reviewed and tested by
               the author.
@@ -93,6 +93,27 @@
 
     VERSION HISTORY
     ---------------
+    1.10.1 2026-10-26  Fixed "The property 'CertificatePolicy' cannot be found" on
+                       PowerShell 7. The property only exists on Windows PowerShell 5.1, so
+                       it is now saved and restored only there.
+
+    1.10.0 2026-10-26  Fixes from PR #302 review.
+                       - Windows PowerShell 5.1: the certificate policy and TLS settings are
+                         saved and restored in a finally block, so -SkipCertificateCheck no
+                         longer persists in the session after the script ends or fails.
+                         TLS 1.2 is added to the enabled protocols instead of replacing them.
+                       - Workers, jobs and the session list are required: if they cannot be
+                         retrieved the run stops with an error instead of reporting them as
+                         empty. Optional lookups and session detail stay best-effort.
+                       - CSV formula protection now covers '-' (and tab / CR) in the
+                         Download CSV button, and is applied to -ExportCsv as well.
+                       - Rate-limit detection: 429 must be a whole number (vm1429 no longer
+                         matches).
+                       - Durations of an hour or less no longer show the hour rounded up
+                         (45 min showed as 01:45:00).
+                       - -OutputPath is resolved through PowerShell, so the HTML and CSV
+                         always land in the same folder after Set-Location.
+
     1.9.4  2026-10-21  API error text now includes the plug-in's traceId, which identifies
                        the matching exception in the plug-in logs on the VBR server.
 
@@ -336,7 +357,7 @@ function Step-Phase {
 }
 
 # Bumped with every change - see VERSION HISTORY in the help block above.
-$ScriptVersion = '1.9.4'
+$ScriptVersion = '1.10.1'
 Write-Host "New-VeeamAhvReport.ps1 v$ScriptVersion" -ForegroundColor DarkGray
 
 # --- Constants -------------------------------------------------------------
@@ -352,7 +373,8 @@ $VbrBase = "https://${VbrServer}:${RestPort}/api/v1"
 $AhvBase = $null
 
 # Patterns that indicate Nutanix API throttling
-$RateLimitPattern = 'TooManyRequests|rate limit|429\b|too many requests'
+# 429 is bounded on both sides so IDs and names such as vm1429 do not match.
+$RateLimitPattern = 'TooManyRequests|rate limit|\b429\b|too many requests'
 
 # Check the server name resolves before prompting for credentials or trying API versions.
 # A typo otherwise surfaces only after five failed logins with a blank status table.
@@ -377,11 +399,29 @@ if (-not $OutputPath) {
     $safeServer = ($VbrServer -split '\.')[0]
     $OutputPath = Join-Path (Get-Location) "VeeamAhvReport_${safeServer}_${stamp}.html"
 }
+# Resolve once through PowerShell so the HTML (Out-File) and the CSV (.NET path APIs) land in
+# the same folder. [IO.Path]::GetFullPath uses the process directory, which Set-Location
+# does not change.
+$OutputPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutputPath)
 
 # --- Certificate handling --------------------------------------------------
+# On Windows PowerShell 5.1 the certificate policy and TLS settings are process-wide.
+# Save them here and restore them in the finally block at the end of the script, so a run
+# with -SkipCertificateCheck cannot leave later requests in this session accepting invalid
+# certificates - including when the script fails part-way.
+# CertificatePolicy only exists on .NET Framework (Windows PowerShell 5.1); PowerShell 7
+# uses -SkipCertificateCheck per request and has no such property, so only touch it there.
+$IsWindowsPowerShell      = $PSVersionTable.PSEdition -ne 'Core'
+$OriginalCertPolicy       = if ($IsWindowsPowerShell) { [System.Net.ServicePointManager]::CertificatePolicy } else { $null }
+$OriginalSecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol
+
+# The rest of the script runs inside this try (not indented, to keep the diff readable).
+# try/finally does not create a new scope, so functions and variables behave as before.
+try {
+
 $irmExtra = @{}
 if ($SkipCertificateCheck) {
-    if ($PSVersionTable.PSVersion.Major -ge 6) {
+    if (-not $IsWindowsPowerShell) {
         $irmExtra['SkipCertificateCheck'] = $true
     }
     else {
@@ -400,7 +440,8 @@ public class VeeamAhvCertPolicy : ICertificatePolicy {
         [System.Net.ServicePointManager]::CertificatePolicy = New-Object VeeamAhvCertPolicy
     }
 }
-[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+# Add TLS 1.2 to what is already enabled rather than replacing it (restored in finally).
+[System.Net.ServicePointManager]::SecurityProtocol = $OriginalSecurityProtocol -bor [System.Net.SecurityProtocolType]::Tls12
 
 # --- Helpers ---------------------------------------------------------------
 function ConvertTo-HtmlText {
@@ -421,7 +462,8 @@ function Get-DurationString {
     try {
         $span = ([datetime]$FinishUtc) - ([datetime]$StartUtc)
         if ($span.TotalSeconds -lt 0) { return '-' }
-        '{0:00}:{1:00}:{2:00}' -f [int]$span.TotalHours, $span.Minutes, $span.Seconds
+        # Floor, not [int]: casting rounds, so 45 min would show as 01:45:00.
+        '{0:00}:{1:00}:{2:00}' -f [math]::Floor($span.TotalHours), $span.Minutes, $span.Seconds
     }
     catch { '-' }
 }
@@ -691,7 +733,9 @@ $script:ApiStats = [pscustomobject]@{ Calls = 0; Failed = 0; TotalMs = 0.0; Slow
 $script:LastApiError = $null   # { Status; Detail } of the most recent failed GET
 
 function Invoke-AhvGet {
-    param([string]$Path, [switch]$Quiet)
+    # -Required: the report cannot be trusted without this collection, so fail the run
+    # instead of returning $null (which Get-ResultArray would treat as "none configured").
+    param([string]$Path, [switch]$Quiet, [switch]$Required)
     # Windows PowerShell 5.1 draws a progress bar for every web call, which slows each one
     # noticeably. Suppress it for this call only (function scope).
     $ProgressPreference = 'SilentlyContinue'
@@ -717,8 +761,11 @@ function Invoke-AhvGet {
         }
         if (-not $detail) { $detail = $err.Exception.Message }
         $script:LastApiError = [pscustomobject]@{ Status = $status; Detail = $detail }
-        if (-not $Quiet) { Write-Warning "GET $Path failed: $detail" }
         Write-Verbose ("GET {0} failed: HTTP {1} - {2}" -f $Path, $status, $detail)
+        if ($Required) {
+            throw "Could not retrieve '$Path' (HTTP $status): $detail. The report needs this data, so it was not generated rather than showing it as empty."
+        }
+        if (-not $Quiet) { Write-Warning "GET $Path failed: $detail" }
         $null
     }
     finally {
@@ -876,7 +923,7 @@ foreach ($c in (Get-ResultArray $clusters)) {
 # Only query hosts if a worker actually uses affinity, and only fall back to one call per
 # cluster when the cheaper sources returned nothing.
 # Workers are fetched here (not in the Workers step) so the affinity check can use them.
-$workersRaw = Invoke-AhvGet -Path 'workers?limit=-1'
+$workersRaw = Invoke-AhvGet -Path 'workers?limit=-1' -Required
 # Only workers with affinity ENABLED need host names - the settings block is present (with
 # enabled=false) on every worker. /clusters/{id}/hosts is the documented endpoint; there is
 # no top-level /hosts in the v10 API.
@@ -983,7 +1030,7 @@ $workers = @(
 
 Step-Phase 'Jobs and repositories'
 Write-Host "Collecting jobs ..." -ForegroundColor Cyan
-$jobsRaw = Invoke-AhvGet -Path 'jobs?limit=-1'
+$jobsRaw = Invoke-AhvGet -Path 'jobs?limit=-1' -Required
 
 # Optional: resolve repository names via the main VBR REST API
 $repoMap = @{}
@@ -1047,7 +1094,8 @@ $sessionsRaw  = Invoke-AhvGet -Path "sessions?from=$fromIso&limit=-1" -Quiet
 if ($null -eq $sessionsRaw) {
     # Older plug-in builds may not accept the from filter. Pull everything and window it here.
     Write-Verbose "from= filter rejected; retrieving all sessions and filtering client-side."
-    $sessionsRaw = Invoke-AhvGet -Path 'sessions?limit=-1'
+    # Last option for the session list - if this fails too, stop rather than report zero sessions.
+    $sessionsRaw = Invoke-AhvGet -Path 'sessions?limit=-1' -Required
     $sessionList = @(Get-ResultArray $sessionsRaw | Where-Object {
         $_.startTimeUtc -and ([datetime]$_.startTimeUtc) -ge $fromUtc
     })
@@ -1606,7 +1654,9 @@ window.addEventListener('beforeprint',function(){_printState=[];document.querySe
 window.addEventListener('afterprint',function(){if(!_printState)return;document.querySelectorAll('details.sec').forEach(function(d,i){d.open=_printState[i];});_printState=null;});
 function csvCell(t){
   t=(t||'').replace(/\s+/g,' ').trim();
-  if(/^[=+@]/.test(t)){t="'"+t;}            // stop Excel treating text as a formula
+  // Stop spreadsheets treating text as a formula (= + - @ tab CR). A lone '-' placeholder
+  // and plain numbers such as -5 are left alone.
+  if(/^[=+\-@\t\r]/.test(t) && !/^-$|^-?\d+(\.\d+)?$/.test(t)){t="'"+t;}
   return '"'+t.replace(/"/g,'""')+'"';
 }
 function downloadCsv(tableId,fileName){
@@ -1634,9 +1684,22 @@ $null = $sb.AppendLine("</body></html>")
 $sb.ToString() | Out-File -FilePath $OutputPath -Encoding UTF8
 
 if ($ExportCsv) {
+    # Job names, VM names and error text come from the infrastructure. Prefix string values
+    # that a spreadsheet would read as a formula (= + - @ tab CR) with an apostrophe.
+    # Select-Object makes copies, so the returned session objects are unchanged; numbers,
+    # booleans, a lone '-' placeholder and plain numeric strings are left as they are.
     $sessions | Select-Object JobName, ObjectName, IsChild, SessionType, BackupMode, State, Result,
         StartLocal, StartUtcRaw, Duration, DurationMin, Objects, Processed, ReadBytes, Read,
         Transferred, AvgRate, BnStage, Bottleneck, BnDetail, RateLimited, Reason, DetailError |
+        ForEach-Object {
+            foreach ($prop in $_.PSObject.Properties) {
+                $v = $prop.Value
+                if ($v -is [string] -and $v -match '^[=+\-@\t\r]' -and $v -notmatch '^-$|^-?\d+(\.\d+)?$') {
+                    $prop.Value = "'" + $v
+                }
+            }
+            $_
+        } |
         Export-Csv -Path $csvPath -NoTypeInformation -Encoding UTF8
 }
 
@@ -1673,4 +1736,13 @@ if ($Show) { Start-Process $OutputPath }
     CsvPath            = if ($ExportCsv) { $csvPath } else { $null }
     Timings            = $script:PhaseTimes
     ApiStats           = $script:ApiStats
+}
+
+}
+finally {
+    # Always undo the process-wide changes made under "Certificate handling".
+    if ($IsWindowsPowerShell) {
+        [System.Net.ServicePointManager]::CertificatePolicy = $OriginalCertPolicy
+    }
+    [System.Net.ServicePointManager]::SecurityProtocol = $OriginalSecurityProtocol
 }
