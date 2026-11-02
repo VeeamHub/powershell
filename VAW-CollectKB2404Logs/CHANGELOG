@@ -21,11 +21,15 @@
     - if Veeam Agent is installed -> the logs will be saved to C:\ProgramData\Veeam\Veeam_Case_Logs
     - if Veeam Agent is not installed and logs collection was confirmed -> the logs will be saved to C:\Veeam_Case_Logs
 
-13.05.2023 update:
+13.05.2025 update:
 
   - changed method for collection installed software from Get-WmiObject to faster and more reliable one
   - added information about ciphers
 
-22.07.2023 update:
+22.07.2025 update:
 
   - command "wevtutil" was fixed on line 603
+
+02.11.2026:
+
+  -small changes in the notification messages
