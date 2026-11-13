@@ -41,6 +41,19 @@
     and duration in minutes, which the HTML table does not show. The HTML report also has a
     Download CSV button on the Session detail section, which exports the table as shown.
 
+.PARAMETER SessionSource
+    Where job sessions and per-VM detail come from.
+      Auto    (default) VBR REST API when connected to VBR v13, plug-in API otherwise.
+      Vbr     Always VBR: /api/v1/sessions for each AHV job, /taskSessions for each VM, and
+              /logs for warnings, rate-limit text and the bottleneck line. Not available
+              with -ApplianceServer.
+      Plugin  Always the plug-in API (/sessions and /sessions/{id}), as in 1.10.x.
+    VBR mirrors every AHV job run as a session with one task session per VM, which gives
+    per-VM duration, read / transferred size and bottleneck even on plug-in builds where
+    GET /sessions/{id} fails or per-VM sessions are not listed. Non-job plug-in sessions
+    (rescans, worker tests) always come from the plug-in API. A job with no sessions in VBR
+    for the window keeps its plug-in sessions.
+
 .PARAMETER IncludeRescans
     Include infrastructure rescan sessions in the report. By default they are left out of
     every count, table and the CSV, because the plug-in rescans every few minutes and they
@@ -49,17 +62,19 @@
     limits or Prism connectivity, where rescans are part of the picture.
 
 .PARAMETER BackupTypePattern
-    Optional. Regex matched against sessionType to identify backup sessions. Used to pick
-    the per-VM runs for window sizing, and to make sure a backup job is never mistaken for
-    a rescan. Default: backup. Only change it if your plug-in reports backup sessions under
-    a different type.
+    Optional. Regex matched against sessionType to pick the per-VM backup runs used for
+    window sizing. Default: ^Backup(Vm|Pd)$ - the API's per-VM (BackupVm) and per-protection-
+    domain (BackupPd) backup sessions. Job-level sessions (BackupVmJob) are excluded because
+    their duration covers every VM in the job. Only change it if your plug-in build reports
+    per-VM backups under a different type.
 
 .PARAMETER RescanPattern
-    Optional. Regex identifying rescan sessions. Matched against the session's jobName / name, but
-    only for sessions whose sessionType is not a backup type, so a backup job with
-    "rescan" in its name is never treated as a rescan. Default: ^Rescan
-    (matches "Rescan cluster <name>" and "Rescanning the infrastructure", which the plug-in
-    logs with sessionType Internal).
+    Optional. Regex identifying rescan sessions by name. Sessions whose sessionType is one of
+    the API's rescan types (ClusterRescan, MasterServerRescan, RescanBackups,
+    RescanSnapshots) are always treated as rescans. The name pattern is an extra check for
+    sessions logged as 'Internal' (e.g. "Rescanning the infrastructure"), and is never applied
+    to backup or snapshot sessions, so a backup job with "rescan" in its name is not caught.
+    Default: ^Rescan
 
     Successful rescans are never deep-scanned, even with -DeepScanAllSessions: they carry
     no bottleneck, throughput or per-VM data, and on a busy plug-in they can be 99% of all
@@ -82,8 +97,8 @@
 
 .NOTES
     Script  : New-VeeamAhvReport.ps1
-    Version : 1.10.1
-    Updated : 2026-10-26
+    Version : 1.11.0
+    Updated : 2026-11-13
     Author  : Jason Berry
     Assisted: Written with assistance from Claude (Anthropic). Reviewed and tested by
               the author.
@@ -93,6 +108,38 @@
 
     VERSION HISTORY
     ---------------
+    1.11.0 2026-11-13  Job sessions and per-VM detail from the VBR REST API.
+                       - New -SessionSource Auto|Vbr|Plugin (default Auto = VBR on v13).
+                         Each plug-in job's runs come from /api/v1/sessions, with
+                         one row per VM from /sessions/{id}/taskSessions and warnings /
+                         rate-limit / bottleneck text from /logs.
+                       - Per-VM duration, read / transferred size, rate and bottleneck now
+                         populate on plug-in builds where GET /sessions/{id} returns 500 or
+                         per-VM sessions are not listed. The bottleneck comes from VBR's
+                         progress.bottleneck enum, falling back to the log line.
+                       - Rescans and other non-job sessions still come from the plug-in API.
+                       - If VBR cannot be read, Auto falls back to the plug-in API with a
+                         warning; Vbr stops instead.
+                       - Session counts, rate-limit analysis and the per-job rollup count
+                         runs (job rows) only, not per-VM rows. New Source column in the CSV.
+                       - Times from both APIs are normalised to UTC before use.
+                       - VBR API version 1.3-rev2 is tried first at login.
+                       - Jobs are matched to VBR sessions by plug-in job ID, then by name.
+                         VBR's /jobs list does not include AHV plug-in jobs, and reading it
+                         took ~15 s on a large server, so it is not used.
+                       - VBR task-session times carry no offset; they are converted using
+                         the backup server's time zone from /api/v1/serverTime.
+                       - Repository names are read with paging (1.3-rev2 rejects limit=-1).
+
+    1.10.2 2026-11-13  Session type matching aligned with the v10 SessionType enum.
+                       - -BackupTypePattern now defaults to ^Backup(Vm|Pd)$. The old default
+                         'backup' also matched RescanBackups (a rescan) and BackupVmJob (a
+                         job-level session whose duration covers every VM in the job).
+                       - Rescans are identified by their API types (ClusterRescan,
+                         MasterServerRescan, RescanBackups, RescanSnapshots), with the name
+                         match kept for rescans logged as 'Internal'. Backup and snapshot
+                         sessions are never treated as rescans, whatever their name.
+
     1.10.1 2026-10-26  Fixed "The property 'CertificatePolicy' cannot be found" on
                        PowerShell 7. The property only exists on Windows PowerShell 5.1, so
                        it is now saved and restored only there.
@@ -324,10 +371,14 @@ param(
     [switch]$ExportCsv,
 
     [Parameter()]
-    [string]$BackupTypePattern = 'backup',
+    [string]$BackupTypePattern = '^Backup(Vm|Pd)$',
 
     [Parameter()]
     [switch]$IncludeRescans,
+
+    [Parameter()]
+    [ValidateSet('Auto', 'Vbr', 'Plugin')]
+    [string]$SessionSource = 'Auto',
 
     [Parameter()]
     [string]$RescanPattern = '^Rescan',
@@ -357,7 +408,7 @@ function Step-Phase {
 }
 
 # Bumped with every change - see VERSION HISTORY in the help block above.
-$ScriptVersion = '1.10.1'
+$ScriptVersion = '1.11.0'
 Write-Host "New-VeeamAhvReport.ps1 v$ScriptVersion" -ForegroundColor DarkGray
 
 # --- Constants -------------------------------------------------------------
@@ -628,7 +679,9 @@ Step-Phase 'Authenticate'
 # The x-api-version value is also version-specific and a wrong one returns HTTP 400:
 #   VBR 13 = 1.3-rev1, 12.3 = 1.2-rev1, 12.2 = 1.2-rev0, 12.1 = 1.1-rev1, 12.0 = 1.1-rev0
 
-$VbrApiVersionCandidates = @('1.3-rev1', '1.2-rev1', '1.2-rev0', '1.1-rev1', '1.1-rev0')
+# Newest first. 1.3-rev2 is VBR 13.x with current updates; a server that does not know it
+# rejects the header with 400 and the next one is tried.
+$VbrApiVersionCandidates = @('1.3-rev2', '1.3-rev1', '1.2-rev1', '1.2-rev0', '1.1-rev1', '1.1-rev0')
 
 function Connect-ApplianceMode {
     param([string]$Server, [System.Management.Automation.PSCredential]$Cred)
@@ -775,6 +828,159 @@ function Invoke-AhvGet {
         $script:ApiStats.TotalMs += $ms
         if ($ms -gt $script:ApiStats.SlowestMs) { $script:ApiStats.SlowestMs = $ms; $script:ApiStats.SlowestPath = $Path }
         Write-Verbose ("GET {0}  {1:N0} ms" -f $Path, $ms)
+    }
+}
+
+function Invoke-VbrGet {
+    <#
+      GET against the main VBR REST API (/api/v1), counted in the same API statistics as
+      the plug-in calls. Best effort: returns $null on failure and records the error in
+      $script:LastApiError, so callers can tell "failed" from "empty".
+    #>
+    param([string]$Path, [hashtable]$Query)
+    $ProgressPreference = 'SilentlyContinue'
+    $uri = "$VbrBase/$Path"
+    if ($Query -and $Query.Count -gt 0) {
+        $qs  = ($Query.GetEnumerator() | ForEach-Object { '{0}={1}' -f $_.Key, [uri]::EscapeDataString([string]$_.Value) }) -join '&'
+        $uri = "${uri}?${qs}"
+    }
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $script:LastApiError = $null
+    try {
+        Invoke-RestMethod -Method Get -Uri $uri -Headers $headers @irmExtra
+    }
+    catch {
+        $err = $_
+        $script:ApiStats.Failed++
+        $status = Get-HttpStatus $err
+        $detail = if ($err.ErrorDetails -and $err.ErrorDetails.Message) { [string]$err.ErrorDetails.Message } else { $err.Exception.Message }
+        $script:LastApiError = [pscustomobject]@{ Status = $status; Detail = $detail }
+        Write-Verbose ("VBR GET {0} failed: HTTP {1} - {2}" -f $Path, $status, $detail)
+        $null
+    }
+    finally {
+        $sw.Stop()
+        $ms = $sw.Elapsed.TotalMilliseconds
+        $script:ApiStats.Calls++
+        $script:ApiStats.TotalMs += $ms
+        if ($ms -gt $script:ApiStats.SlowestMs) { $script:ApiStats.SlowestMs = $ms; $script:ApiStats.SlowestPath = "vbr:$Path" }
+        Write-Verbose ("VBR GET {0}  {1:N0} ms" -f $Path, $ms)
+    }
+}
+
+function Get-VbrPaged {
+    <#
+      Reads every page of a VBR collection ({ data, pagination }) using skip / limit.
+      Returns an array (possibly empty), or $null if any page failed.
+    #>
+    param([string]$Path, [hashtable]$Query = @{}, [int]$PageSize = 500, [int]$MaxPages = 50)
+    $all  = New-Object System.Collections.Generic.List[object]
+    $skip = 0
+    for ($page = 0; $page -lt $MaxPages; $page++) {
+        $q = $Query.Clone()
+        $q['skip']  = $skip
+        $q['limit'] = $PageSize
+        $r = Invoke-VbrGet -Path $Path -Query $q
+        if ($null -eq $r) { return $null }
+        $items = @($r.data | Where-Object { $null -ne $_ })
+        foreach ($i in $items) { $all.Add($i) }
+        $skip += $items.Count
+        $total = Get-PropValue $r.pagination 'total'
+        if ($items.Count -eq 0 -or ($null -ne $total -and $skip -ge [int]$total)) { break }
+    }
+    , $all.ToArray()
+}
+
+function ConvertFrom-ServerLocal {
+    # A time without an offset is the backup server's local time (VBR task sessions return
+    # these). Convert with the server's time zone from /api/v1/serverTime when known, else
+    # the offset measured from serverTime, else this machine's zone.
+    param([datetime]$Value)
+    $v = [datetime]::SpecifyKind($Value, [DateTimeKind]::Unspecified)
+    if ($script:VbrTimeZone) {
+        try { return [TimeZoneInfo]::ConvertTimeToUtc($v, $script:VbrTimeZone) } catch { }
+    }
+    if ($null -ne $script:VbrUtcOffset) { return [datetime]::SpecifyKind($v - $script:VbrUtcOffset, [DateTimeKind]::Utc) }
+    [datetime]::SpecifyKind($v, [DateTimeKind]::Local).ToUniversalTime()
+}
+
+function ConvertTo-UtcDate {
+    <#
+      Normalises API times to a UTC [datetime] so sorting, windows and durations agree.
+        - With an offset or Z: converted exactly.
+        - Without one: the plug-in's *Utc fields are UTC (-AssumeUtc); VBR times are the
+          backup server's local time, which can differ from this machine's.
+      PowerShell 7 turns JSON dates into [datetime] (Kind Unspecified when there was no
+      offset); Windows PowerShell 5.1 leaves them as strings. Both are handled.
+    #>
+    param([AllowNull()]$Value, [switch]$AssumeUtc)
+    if ($null -eq $Value -or "$Value" -eq '') { return $null }
+    if ($Value -is [datetime]) {
+        if ($Value.Kind -ne [DateTimeKind]::Unspecified) { return $Value.ToUniversalTime() }
+        if ($AssumeUtc) { return [datetime]::SpecifyKind($Value, [DateTimeKind]::Utc) }
+        return ConvertFrom-ServerLocal $Value
+    }
+    $str = [string]$Value
+    try {
+        if ($str -match '(Z|[+-]\d{2}:?\d{2})$') {
+            return ([datetimeoffset]::Parse($str, [Globalization.CultureInfo]::InvariantCulture)).UtcDateTime
+        }
+        $dt = [datetime]::Parse($str, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None)
+        if ($AssumeUtc) { return [datetime]::SpecifyKind($dt, [DateTimeKind]::Utc) }
+        ConvertFrom-ServerLocal $dt
+    }
+    catch { $null }
+}
+
+function ConvertFrom-VbrBottleneck {
+    # VBR reports the bottleneck as an enum (ESessionBottleneckType) - same shape as
+    # Get-BottleneckInfo so both sources feed the same columns and tally.
+    param([AllowNull()][string]$Value)
+    if ([string]::IsNullOrEmpty($Value) -or $Value -in @('NotDefined', 'None')) {
+        return [pscustomobject]@{ Stage = ''; Primary = ''; Detail = '' }
+    }
+    [pscustomobject]@{ Stage = $Value; Primary = $Value; Detail = "Bottleneck: $Value" }
+}
+
+function New-VbrSessionRow {
+    # One report row built from a VBR session or task session. Property set matches the
+    # plug-in rows so every table, statistic and the CSV treat both sources the same.
+    param(
+        [string]$JobName, [string]$ObjectName, [bool]$IsChild, [string]$SessionType,
+        [string]$State, [string]$Result, $StartUtc, $EndUtc, $RunStartUtc,
+        [int]$Objects, [int]$Processed, $Progress, $Bn, [bool]$RateLimited,
+        [string]$Reason, [string]$DetailError
+    )
+    $read = Get-PropValue $Progress 'readSize'
+    $xfer = Get-PropValue $Progress 'transferredSize'
+    $rate = [string](Get-PropValue $Progress 'processingRate')
+    [pscustomobject]@{
+        JobName     = $JobName
+        ObjectName  = $ObjectName
+        BackupMode  = ''
+        IsChild     = $IsChild
+        SessionType = $SessionType
+        State       = $State
+        Result      = $Result
+        StartLocal  = Get-LocalTimeString $StartUtc
+        StartUtcRaw = $StartUtc
+        RunStartUtc = $RunStartUtc
+        Duration    = Get-DurationString $StartUtc $EndUtc
+        DurationMin = Get-DurationMinutes $StartUtc $EndUtc
+        Objects     = $Objects
+        Processed   = $Processed
+        ReadBytes   = if ($read) { [double]$read } else { 0 }
+        Read        = if ($null -ne $read) { Format-Bytes $read } else { '-' }
+        Transferred = if ($null -ne $xfer) { Format-Bytes $xfer } else { '-' }
+        # VBR returns e.g. "180 MB" for an average rate; show it as a rate.
+        AvgRate     = if (-not $rate) { '-' } elseif ($rate -match '/') { $rate } else { "$rate/s" }
+        BnStage     = $Bn.Stage
+        Bottleneck  = $Bn.Primary
+        BnDetail    = $Bn.Detail
+        RateLimited = $RateLimited
+        Reason      = $Reason
+        DetailError = $DetailError
+        Source      = 'VBR'
     }
 }
 
@@ -1036,16 +1242,14 @@ $jobsRaw = Invoke-AhvGet -Path 'jobs?limit=-1' -Required
 $repoMap = @{}
 if ($ConnMode -eq 'Vbr') {
     # Main VBR REST API, which appliance-mode credentials cannot reach.
-    try {
-        $repos = Invoke-RestMethod -Method Get -Uri "$VbrBase/backupInfrastructure/repositories?limit=-1" `
-            -Headers $headers @irmExtra
-        foreach ($r in @($repos.data | Where-Object { $null -ne $_ })) {
-            $rid = Get-PropValue $r 'id'
-            if ($rid) { $repoMap[[string]$rid] = Get-PropValue $r 'name' }
-        }
+    # Paged: 1.3-rev2 rejects limit=-1 with HTTP 400.
+    $repos = Get-VbrPaged -Path 'backupInfrastructure/repositories'
+    if ($null -eq $repos) {
+        Write-Verbose "Repository name lookup unavailable (HTTP $($script:LastApiError.Status))."
     }
-    catch {
-        Write-Verbose "Repository name lookup unavailable: $($_.Exception.Message)"
+    foreach ($r in @($repos | Where-Object { $null -ne $_ })) {
+        $rid = Get-PropValue $r 'id'
+        if ($rid) { $repoMap[[string]$rid] = Get-PropValue $r 'name' }
     }
 }
 else {
@@ -1109,13 +1313,20 @@ else {
 Write-Host ("  {0} session(s) returned." -f $sessionList.Count)
 
 # Optional: drop infrastructure rescan sessions before any detail is fetched.
-# Rescans are logged with sessionType 'Internal' and the description in jobName, e.g.
-# "Rescan cluster <cluster name>" / "Rescanning the infrastructure". Match on the name, but
-# never for a backup-type session, so a backup job called "Rescan..." is not caught.
+# Rescan detection, from the v10 SessionType enum:
+#   1. The dedicated rescan types are always rescans.
+#   2. Some rescans are logged as 'Internal' with the description in the name, e.g.
+#      "Rescanning the infrastructure" - match those on -RescanPattern.
+#   The name match is never applied to backup / snapshot sessions (types starting Backup,
+#   Snapshot or VeeamZip), so a backup job called "Rescan..." is not caught.
+$RescanSessionTypes = @('ClusterRescan', 'MasterServerRescan', 'RescanBackups', 'RescanSnapshots')
 $isRescan = {
     param($x)
+    $type = [string]$x.sessionType
+    if ($type -in $RescanSessionTypes) { return $true }
+    if ($type -match '^(Backup|Snapshot|VeeamZip)') { return $false }
     $label = if ($x.jobName) { [string]$x.jobName } else { [string]$x.name }
-    ([string]$x.sessionType -notmatch $BackupTypePattern) -and ($label -match $RescanPattern)
+    $label -match $RescanPattern
 }
 $rescanTotal = @($sessionList | Where-Object { & $isRescan $_ }).Count
 if ($rescanTotal -gt 0) {
@@ -1136,6 +1347,103 @@ if (-not $IncludeRescans) {
     }
 }
 $excludedRescanIssues = @($excludedRescans | Where-Object { $_.result -and $_.result -ne 'Success' })
+
+# --- Job sessions from VBR ---------------------------------------------------
+# The plug-in's GET /sessions/{id} can fail (HTTP 500) for job sessions, and some builds do
+# not list per-VM sessions at all. VBR mirrors every AHV job run as its own session with one
+# task session per VM, so in VBR-hosted mode job and per-VM data come from /api/v1.
+# Plug-in jobs are matched to VBR jobs (type NutanixAHVBackupJob) by ID, then by name.
+$jobSessionTypes = @('BackupVmJob', 'SnapshotVmJob', 'SnapshotPdJob', 'BackupVm', 'BackupPd', 'SnapshotVm', 'SnapshotPd')
+$useVbrSessions  = $false
+$vbrJobSessions  = @()
+$vbrUnmatched    = @()
+$vbrSessionNote  = $null
+
+if ($SessionSource -eq 'Vbr' -and $ConnMode -ne 'Vbr') {
+    throw "-SessionSource Vbr needs the VBR REST API, which is not reachable with -ApplianceServer (VBR 12.x). Use -SessionSource Auto or Plugin."
+}
+if ($ConnMode -eq 'Vbr' -and $SessionSource -ne 'Plugin') {
+    Write-Host "Collecting job sessions from VBR ..." -ForegroundColor Cyan
+    $vbrFail = $null
+
+    # Backup server time zone, for VBR times that carry no offset (task sessions).
+    $script:VbrTimeZone  = $null
+    $script:VbrUtcOffset = $null
+    $st = Invoke-VbrGet -Path 'serverTime'
+    if ($st) {
+        foreach ($tzId in @($st.ianaTimeZoneId, $st.timeZone) | Where-Object { $_ }) {
+            try { $script:VbrTimeZone = [TimeZoneInfo]::FindSystemTimeZoneById([string]$tzId); break } catch { }
+        }
+        if (-not $script:VbrTimeZone -and $st.serverTime) {
+            $stv = $st.serverTime
+            if ($stv -isnot [datetime]) {
+                try { $stv = [datetime]::Parse([string]$stv, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None) } catch { $stv = $null }
+            }
+            if ($stv -and $stv.Kind -eq [DateTimeKind]::Unspecified) {
+                $script:VbrUtcOffset = [timespan]::FromMinutes([math]::Round(($stv - [datetime]::UtcNow).TotalMinutes / 15) * 15)
+            }
+        }
+    }
+    Write-Verbose ("Backup server time zone: {0}" -f $(if ($script:VbrTimeZone) { $script:VbrTimeZone.Id } elseif ($null -ne $script:VbrUtcOffset) { "UTC offset $($script:VbrUtcOffset)" } else { 'unknown - using this machine''s zone' }))
+
+    # Map each plug-in job to its VBR sessions. VBR's /jobs list does not include AHV
+    # plug-in jobs (and is slow on large servers), so query sessions directly:
+    #   1. jobIdFilter with the plug-in job ID - the IDs match on builds that share them.
+    #   2. nameFilter with the job name, keeping exact matches and retries ("<job> (Retry 1)").
+    $collected = New-Object System.Collections.Generic.List[object]
+    foreach ($pj in (Get-ResultArray $jobsRaw)) {
+        $pjName = [string]$pj.name
+        $js = Get-VbrPaged -Path 'sessions' -Query @{ jobIdFilter = [string]$pj.id; createdAfterFilter = $fromIso }
+        if ($null -ne $js -and @($js).Count -gt 0) {
+            Write-Verbose "Job '$pjName': $(@($js).Count) VBR session(s) by job ID."
+        }
+        else {
+            $js = Get-VbrPaged -Path 'sessions' -Query @{ nameFilter = $pjName; createdAfterFilter = $fromIso }
+            if ($null -ne $js) {
+                $retryPrefix = "$pjName ("
+                $js = @($js | Where-Object {
+                    ([string]$_.name -eq $pjName -or ([string]$_.name).StartsWith($retryPrefix)) -and
+                    [string]$_.sessionType -ne 'Infrastructure'
+                })
+                Write-Verbose "Job '$pjName': $($js.Count) VBR session(s) by name."
+            }
+        }
+        if ($null -eq $js) {
+            $vbrFail = "VBR session list for job '$pjName' unavailable (HTTP $($script:LastApiError.Status))"
+            break
+        }
+        if (@($js).Count -eq 0) { $vbrUnmatched += $pjName }
+        foreach ($x in $js) { $collected.Add([pscustomobject]@{ Session = $x; PluginJobName = $pjName }) }
+    }
+
+    # A job with no VBR sessions keeps its plug-in sessions (it may simply not have run, or
+    # VBR may list it differently); everything else switches to VBR.
+    if (-not $vbrFail) {
+        $useVbrSessions = $true
+        $vbrJobSessions = $collected.ToArray()
+    }
+
+    if ($useVbrSessions) {
+        # Drop the plug-in's copies of the same job runs; keep jobs VBR could not match.
+        $before      = $sessionList.Count
+        $sessionList = @($sessionList | Where-Object {
+            -not (([string]$_.sessionType -in $jobSessionTypes) -and ([string]$_.jobName -notin $vbrUnmatched))
+        })
+        Write-Host ("  {0} job session(s) from VBR; {1} plug-in job session(s) replaced." -f $vbrJobSessions.Count, ($before - $sessionList.Count))
+        $vbrSessionNote = "Job sessions and per-VM task sessions come from the VBR REST API (<code>/api/v1/sessions</code>, <code>/taskSessions</code>, <code>/logs</code>)."
+        if ($vbrUnmatched.Count -gt 0) {
+            Write-Warning ("No VBR sessions found for: {0}. Their sessions come from the plug-in API." -f ($vbrUnmatched -join ', '))
+            $vbrSessionNote += " No VBR sessions found for <strong>$(ConvertTo-HtmlText ($vbrUnmatched -join ', '))</strong>; those come from the plug-in API."
+        }
+    }
+    elseif ($SessionSource -eq 'Vbr') {
+        throw "$vbrFail. -SessionSource Vbr was requested, so the report was not generated."
+    }
+    else {
+        Write-Warning "$vbrFail - using the plug-in API for job sessions."
+        $vbrSessionNote = "$(ConvertTo-HtmlText $vbrFail); job sessions come from the plug-in API."
+    }
+}
 
 # --- 3. Enrich sessions ----------------------------------------------------
 Step-Phase 'Session detail'
@@ -1226,7 +1534,7 @@ $sessions = @(
             State       = [string]$s.state
             Result      = [string]$s.result
             StartLocal  = Get-LocalTimeString $s.startTimeUtc
-            StartUtcRaw = $s.startTimeUtc
+            StartUtcRaw = ConvertTo-UtcDate $s.startTimeUtc -AssumeUtc
             Duration    = Get-DurationString $s.startTimeUtc $s.finishTimeUtc
             DurationMin = $durMin
             Objects     = [int]$s.objectsCount
@@ -1241,11 +1549,110 @@ $sessions = @(
             RateLimited = $rateLimit
             Reason      = if ($dErr) { (@($joined, "(session detail unavailable - $dErr)") | Where-Object { $_ }) -join ' | ' } else { $joined }
             DetailError = $dErr
+            RunStartUtc = ConvertTo-UtcDate $s.startTimeUtc -AssumeUtc
+            Source      = 'Plug-in'
         }
     }
 )
 # Re-wrap in @() so .Count stays reliable when 0 or 1 session comes back.
-$sessions = @($sessions | Sort-Object { if ($_.StartUtcRaw) { [datetime]$_.StartUtcRaw } else { [datetime]::MinValue } } -Descending)
+
+if ($useVbrSessions -and $vbrJobSessions.Count -gt 0) {
+    Write-Host ("Fetching VBR task sessions for {0} job session(s) ..." -f $vbrJobSessions.Count) -ForegroundColor Cyan
+    $vbrRows = New-Object System.Collections.Generic.List[object]
+    $n = 0
+    foreach ($entry in $vbrJobSessions) {
+        $n++
+        $vs = $entry.Session
+        if ($vbrJobSessions.Count -gt 10) {
+            Write-Progress -Activity 'Fetching VBR task sessions' -Status $entry.PluginJobName `
+                           -PercentComplete ([math]::Min(100, ($n / $vbrJobSessions.Count) * 100))
+        }
+        $vResult = [string](Get-PropValue $vs.result 'result')
+        $vMsg    = [string](Get-PropValue $vs.result 'message')
+        $vStart  = ConvertTo-UtcDate $vs.creationTime
+        $vEnd    = ConvertTo-UtcDate $vs.endTime
+
+        # Session log: warnings / errors for Reason, plus the text scanned for rate limiting
+        # and the "Load: Source x% > Proxy y% ..." line. Fetched for problem sessions, or for
+        # every session with -DeepScanAllSessions.
+        $logAll = New-Object System.Collections.Generic.List[string]
+        $logErr = New-Object System.Collections.Generic.List[string]
+        if ($vMsg) { $logAll.Add($vMsg) }
+        if ($DeepScanAllSessions -or $vResult -ne 'Success') {
+            $lg = Invoke-VbrGet -Path "sessions/$($vs.id)/logs"
+            foreach ($rec in @($lg.records | Where-Object { $null -ne $_ })) {
+                $txt = (@($rec.title, $rec.description) | Where-Object { $_ }) -join ' - '
+                if (-not $txt) { continue }
+                $logAll.Add($txt)
+                if ([string]$rec.status -in @('Warning', 'Failed')) { $logErr.Add($txt) }
+            }
+        }
+
+        $tasks   = Get-VbrPaged -Path "sessions/$($vs.id)/taskSessions"
+        $taskErr = $null
+        if ($null -eq $tasks) {
+            $e = $script:LastApiError
+            $taskErr = if ($e) { "HTTP $($e.Status): $($e.Detail)" } else { 'no response' }
+            $tasks = @()
+        }
+
+        # Job-level row
+        $jobText = ($logAll | Select-Object -Unique) -join ' | '
+        $jobBn   = Get-BottleneckInfo $jobText
+        if (-not $jobBn.Stage) { $jobBn = ConvertFrom-VbrBottleneck (Get-PropValue $vs.progress 'bottleneck') }
+        $jobReason = New-Object System.Collections.Generic.List[string]
+        # result.message often just repeats the result ("Warning"); keep it only if it says more.
+        if ($vResult -ne 'Success' -and $vMsg -and $vMsg -notin @('Success', 'Warning', 'Failed', 'None')) { $jobReason.Add($vMsg) }
+        foreach ($m in $logErr) { $jobReason.Add($m) }
+        if ($taskErr) { $jobReason.Add("(task sessions unavailable - $taskErr)") }
+
+        $vbrRows.Add((New-VbrSessionRow -JobName $entry.PluginJobName -ObjectName '' -IsChild $false `
+            -SessionType ([string]$vs.sessionType) -State ([string]$vs.state) -Result $vResult `
+            -StartUtc $vStart -EndUtc $vEnd -RunStartUtc $vStart `
+            -Objects $tasks.Count -Processed (@($tasks | Where-Object { $_.endTime }).Count) `
+            -Progress $vs.progress -Bn $jobBn -RateLimited ([bool]($jobText -match $RateLimitPattern)) `
+            -Reason (($jobReason | Select-Object -Unique) -join ' | ') -DetailError $taskErr))
+
+        # One row per VM (task session). SessionType is reported as BackupVm - the plug-in's
+        # per-VM type - so the per-VM window-sizing filter treats both sources alike.
+        foreach ($t in $tasks) {
+            $tResult = [string](Get-PropValue $t.result 'result')
+            $tMsg    = [string](Get-PropValue $t.result 'message')
+            $tText   = New-Object System.Collections.Generic.List[string]
+            $tReason = New-Object System.Collections.Generic.List[string]
+            if ($tMsg) { $tText.Add($tMsg) }
+            if ($tResult -ne 'Success' -and $tMsg -and $tMsg -notin @('Success', 'Warning', 'Failed', 'None')) { $tReason.Add($tMsg) }
+            if ($tResult -in @('Warning', 'Failed')) {
+                $tl = Invoke-VbrGet -Path "taskSessions/$($t.id)/logs"
+                foreach ($rec in @($tl.records | Where-Object { $null -ne $_ })) {
+                    $txt = (@($rec.title, $rec.description) | Where-Object { $_ }) -join ' - '
+                    if (-not $txt) { continue }
+                    $tText.Add($txt)
+                    if ([string]$rec.status -in @('Warning', 'Failed')) { $tReason.Add($txt) }
+                }
+            }
+            $tJoined = ($tText | Select-Object -Unique) -join ' | '
+            $tBn     = ConvertFrom-VbrBottleneck (Get-PropValue $t.progress 'bottleneck')
+            if (-not $tBn.Stage) { $tBn = Get-BottleneckInfo $tJoined }
+            $tType   = if ([string]$t.type -eq 'Backup') { 'BackupVm' } else { [string]$t.type }
+
+            $vbrRows.Add((New-VbrSessionRow -JobName $entry.PluginJobName -ObjectName ([string]$t.name) -IsChild $true `
+                -SessionType $tType -State ([string]$t.state) -Result $tResult `
+                -StartUtc (ConvertTo-UtcDate $t.creationTime) -EndUtc (ConvertTo-UtcDate $t.endTime) -RunStartUtc $vStart `
+                -Objects 1 -Processed ([int][bool]$t.endTime) `
+                -Progress $t.progress -Bn $tBn -RateLimited ([bool]($tJoined -match $RateLimitPattern)) `
+                -Reason (($tReason | Select-Object -Unique) -join ' | ') -DetailError $null))
+        }
+    }
+    Write-Progress -Activity 'Fetching VBR task sessions' -Completed
+    $sessions = @($sessions) + $vbrRows.ToArray()
+}
+
+# Newest run first; within a VBR run the job row comes first, then its VMs by name.
+$sessions = @($sessions | Sort-Object -Property `
+    @{ Expression = { if ($_.RunStartUtc) { [datetime]$_.RunStartUtc } elseif ($_.StartUtcRaw) { [datetime]$_.StartUtcRaw } else { [datetime]::MinValue } }; Descending = $true },
+    @{ Expression = { [int][bool]$_.IsChild }; Descending = $false },
+    @{ Expression = { $_.ObjectName }; Descending = $false })
 
 # --- 4. Aggregate ----------------------------------------------------------
 $detailCalls = $script:ApiStats.Calls - $detailCallsBefore
@@ -1259,12 +1666,15 @@ $consistent     = ($distinctTasks.Count -le 1)
 
 # The AHV API reports failures as 'Error'; VBR-style results use 'Failed'. Count both.
 $FailResults    = @('Failed', 'Error')
-$failedSessions = @($sessions | Where-Object { $_.Result -in $FailResults })
-$warnSessions   = @($sessions | Where-Object { $_.Result -eq 'Warning' })
-$rlSessions     = @($sessions | Where-Object { $_.RateLimited })
+# Counts, rate-limit analysis and the per-job rollup are per session run, so per-VM rows
+# (IsChild) are left out - otherwise a 10-VM job would count as 11 sessions.
+$jobLevel       = @($sessions | Where-Object { -not $_.IsChild })
+$failedSessions = @($jobLevel | Where-Object { $_.Result -in $FailResults })
+$warnSessions   = @($jobLevel | Where-Object { $_.Result -eq 'Warning' })
+$rlSessions     = @($jobLevel | Where-Object { $_.RateLimited })
 
 $jobRollup = @(
-    $sessions | Group-Object JobName | ForEach-Object {
+    $jobLevel | Group-Object JobName | ForEach-Object {
         $g = $_.Group
         [pscustomobject]@{
             JobName     = $_.Name
@@ -1315,7 +1725,10 @@ if ($durSorted.Count -gt 0) {
 }
 
 # --- Bottleneck tally ------------------------------------------------------
-$bnSessions = @($sessions | Where-Object { $_.BnStage })
+# Prefer per-VM bottlenecks (VBR task sessions); fall back to job-level rows when there are
+# none, so a job and its VMs are not counted twice.
+$bnSessions = @($sessions | Where-Object { $_.BnStage -and $_.IsChild })
+if ($bnSessions.Count -eq 0) { $bnSessions = @($sessions | Where-Object { $_.BnStage }) }
 $bnTally = @(
     $bnSessions | Group-Object BnStage | Sort-Object Count -Descending | ForEach-Object {
         [pscustomobject]@{ Stage = $_.Name; Sessions = $_.Count }
@@ -1449,7 +1862,7 @@ $null = $sb.AppendLine((New-Card $workers.Count 'Workers configured'))
 $null = $sb.AppendLine((New-Card $enabledWorkers.Count 'Workers enabled'))
 $null = $sb.AppendLine((New-Card $totalTasks 'Total concurrent tasks' $(if ($totalTasks -ge 20) { 'warn' } else { 'good' })))
 $null = $sb.AppendLine((New-Card $jobs.Count 'AHV jobs'))
-$null = $sb.AppendLine((New-Card $sessions.Count 'Sessions in window'))
+$null = $sb.AppendLine((New-Card $jobLevel.Count 'Sessions in window'))
 $null = $sb.AppendLine((New-Card $failedSessions.Count 'Failed' $(if ($failedSessions.Count -gt 0) { 'bad' } else { 'good' })))
 $null = $sb.AppendLine((New-Card $warnSessions.Count 'Warnings' $(if ($warnSessions.Count -gt 0) { 'warn' } else { 'good' })))
 $null = $sb.AppendLine((New-Card $rlSessions.Count 'Rate-limited' $(if ($rlSessions.Count -gt 0) { 'bad' } else { 'good' })))
@@ -1476,9 +1889,9 @@ if ($rlSessions.Count -eq 0) {
     $null = $sb.AppendLine("<div class='note ok'><p><strong>No rate-limit errors detected</strong> in the last $DaysBack day(s).</p><p>Sessions were scanned for <code>TooManyRequests</code>, <code>API rate limit exceeded</code> and HTTP 429.$(if (-not $DeepScanAllSessions) { ' Only non-successful sessions were inspected in detail &mdash; re-run with <code>-DeepScanAllSessions</code> to also scan successful sessions for suppressed warnings.' })</p></div>")
 }
 else {
-    $pct = if ($sessions.Count -gt 0) { [math]::Round(($rlSessions.Count / $sessions.Count) * 100, 1) } else { 0 }
+    $pct = if ($jobLevel.Count -gt 0) { [math]::Round(($rlSessions.Count / $jobLevel.Count) * 100, 1) } else { 0 }
     $null = $sb.AppendLine("<div class='note bad'>")
-    $null = $sb.AppendLine("<p><strong>$($rlSessions.Count) of $($sessions.Count) sessions ($pct%) hit Nutanix API rate limiting.</strong></p>")
+    $null = $sb.AppendLine("<p><strong>$($rlSessions.Count) of $($jobLevel.Count) sessions ($pct%) hit Nutanix API rate limiting.</strong></p>")
     $null = $sb.AppendLine("<p>This is a Prism Central limitation, not a Veeam defect. Current total concurrent tasks across enabled workers: <strong>$totalTasks</strong>.</p>")
     $null = $sb.AppendLine("<ul>")
     $null = $sb.AppendLine("<li>Upgrade Prism Central to <code>7.3.1.7</code>, <code>7.5.1.2</code> or <code>7.6</code> &mdash; these contain the fix for the IAM auth-caching regression (Nutanix ENG-897683).</li>")
@@ -1624,6 +2037,10 @@ else {
 
 # --- Sessions
 Start-Section "Session detail (last $DaysBack day(s))" -Collapsed -Id 'sessions'
+if ($vbrSessionNote) {
+    $cls = if ($useVbrSessions) { 'note ok' } else { 'note' }
+    $null = $sb.AppendLine("<div class='$cls'><p>$vbrSessionNote Per-VM rows show the VM name in the VM column and follow their job row.</p></div>")
+}
 if ($detailErrors.Count -gt 0) {
     $null = $sb.AppendLine("<div class='note bad'><p><strong>Session detail unavailable for $($detailErrors.Count) of $toScanCount scanned session(s).</strong> The plug-in API returned an error for <code>GET /sessions/{id}</code>, so VM name, read / transferred, rate, bottleneck and event text are missing for those rows, and they cannot contribute to the per-VM duration or bottleneck sections. The error is shown in each row's Reason column. This is a server-side error; reproduce it in the plug-in Swagger UI and raise it with Veeam Support if it persists.</p></div>")
 }
@@ -1675,6 +2092,7 @@ function downloadCsv(tableId,fileName){
 '@
 
 $scanNote = if ($DeepScanAllSessions) { 'all sessions' } else { 'non-successful sessions only' }
+$scanNote += if ($useVbrSessions) { '; job and per-VM sessions from the VBR REST API' } else { '; job sessions from the plug-in API' }
 $detectedVer = if ($AhvBase -match '/api/(v\d+)$') { $Matches[1] } else { 'unknown' }
 $null = $sb.AppendLine("<footer>Generated by <code>New-VeeamAhvReport.ps1 v$ScriptVersion</code>. Source: Veeam Plug-in for Nutanix AHV REST API <strong>$detectedVer</strong> at <code>$(ConvertTo-HtmlText $AhvBase)</code>. Session detail scanned for $scanNote. Times shown in local time; the API returns UTC. Read-only report &mdash; no configuration was changed.</footer>")
 $null = $sb.AppendLine($js)
@@ -1690,7 +2108,7 @@ if ($ExportCsv) {
     # booleans, a lone '-' placeholder and plain numeric strings are left as they are.
     $sessions | Select-Object JobName, ObjectName, IsChild, SessionType, BackupMode, State, Result,
         StartLocal, StartUtcRaw, Duration, DurationMin, Objects, Processed, ReadBytes, Read,
-        Transferred, AvgRate, BnStage, Bottleneck, BnDetail, RateLimited, Reason, DetailError |
+        Transferred, AvgRate, BnStage, Bottleneck, BnDetail, RateLimited, Reason, DetailError, Source |
         ForEach-Object {
             foreach ($prop in $_.PSObject.Properties) {
                 $v = $prop.Value
@@ -1708,7 +2126,7 @@ Write-Host "Report written to: $OutputPath" -ForegroundColor Green
 if ($ExportCsv) { Write-Host "Session CSV written to: $csvPath" -ForegroundColor Green }
 Write-Host ("  Workers {0} ({1} enabled, {2} total concurrent tasks)" -f $workers.Count, $enabledWorkers.Count, $totalTasks)
 Write-Host ("  Jobs    {0}" -f $jobs.Count)
-Write-Host ("  Sessions {0}  ({1} failed, {2} warning, {3} rate-limited)" -f $sessions.Count, $failedSessions.Count, $warnSessions.Count, $rlSessions.Count)
+Write-Host ("  Sessions {0}  ({1} failed, {2} warning, {3} rate-limited)" -f $jobLevel.Count, $failedSessions.Count, $warnSessions.Count, $rlSessions.Count)
 if (-not $IncludeRescans -and $excludedRescans.Count -gt 0) {
     Write-Host ("  Rescans hidden {0}  ({1} not successful)" -f $excludedRescans.Count, $excludedRescanIssues.Count)
 }
