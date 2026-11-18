@@ -35,17 +35,19 @@
 	GITHUB: https://github.com/d-works
 
 .PARAMETER ArchiverModulePath
-    Path to the Veeam.Archiver.PowerShell module manifest (.psd1). Importing by manifest
-    path (instead of by module name) avoids the pwsh 7 Windows PowerShell compatibility/
-    implicit-remoting layer, which is known to silently drop -Confirm:$false on some
-    VB365 cmdlets.
+    Path to Veeam.Archiver.PowerShell.dll in the VB365 install root
+    (default: C:\Program Files\Veeam\Backup365\Veeam.Archiver.PowerShell.dll).
+    Importing the DLL directly loads the current module natively in pwsh 7. The .psd1
+    manifest in the Veeam.Archiver.PowerShell subfolder loads an older module version
+    (6.0) that lacks newer cmdlets, and importing by module name goes through the
+    Windows PowerShell compatibility layer, which drops -Confirm:$false.
 #>
 
 #Requires -Version 7.0
 
 [CmdletBinding()]
 param(
-    [string]$ArchiverModulePath = 'C:\Program Files\Veeam\Backup365\Veeam.Archiver.PowerShell\Veeam.Archiver.PowerShell.psd1'
+    [string]$ArchiverModulePath = 'C:\Program Files\Veeam\Backup365\Veeam.Archiver.PowerShell.dll'
 )
 
 ### If needed, import PowerShell modules for VB365 and ExchangeOnline
@@ -54,7 +56,7 @@ Write-Host "Checking, installing and importing Veeam.Archiver.PowerShell module 
 
 if (-not (Get-Module -Name Veeam.Archiver.PowerShell)) {
     if (-not (Test-Path $ArchiverModulePath)) {
-        throw "Veeam.Archiver.PowerShell.psd1 not found at '$ArchiverModulePath'. Set -ArchiverModulePath to its location."
+        throw "Veeam.Archiver.PowerShell module not found at '$ArchiverModulePath'. Set -ArchiverModulePath to its location."
     }
     Import-Module $ArchiverModulePath
 }
