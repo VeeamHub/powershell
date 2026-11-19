@@ -6,7 +6,7 @@ Please be aware that the provided code is only seen as examples and is not offic
 
 **This is an advanced manual process. If you are unsure what to do, it is recommended to contact your technical Veeam partner for assistance.**
 
-Always check the Veeam Backup for Microsoft 365 PowerShell Reference in this limited access [Helpcenter](https://helpcenter.veeam.com/archive/vbo365/8.5/powershell_private/backup_data.html) version, which includes  the hidden comdlets.
+Always check the Veeam Backup for Microsoft 365 PowerShell Reference in this limited access [Helpcenter](https://helpcenter.veeam.com/archive/vbo365/8.5/powershell_private/backup_data.html) version, which includes  the hidden cmdlets.
 
 ## Hint for commands
 Most commands require some objects to run. For example, the Start-VBODataMigration cmdlet requires objects like job, repositories or proxy, depending on the run mode. These objects can be created with Get-VBORepository and Get-VBOProxy etc.
@@ -14,7 +14,8 @@ Most commands require some objects to run. For example, the Start-VBODataMigrati
 ## Important to know
 - **Veeam Backup for Microsoft 365** will be called **VB365** as an acronym in this document.
 - the commands must be run in **PowerShell v7**, which is default if started from the VB365 GUI.
-- It is highly recommended to run migrations with **VB365 v8.5 or newer**.
+- It is highly recommended to run migrations with **VB365 v8.6 or newer**.
+- Import the VB365 PowerShell module by its **DLL path** in PowerShell 7: `Import-Module 'C:\Program Files\Veeam\Backup365\Veeam.Archiver.PowerShell.dll'`. The `.psd1` manifest in the `Veeam.Archiver.PowerShell` subfolder loads an older module version that is missing newer cmdlets (e.g. *Get-VBORepositoryInventoryReport*), and importing by module name drops `-Confirm:$false`. The scripts in this folder use the DLL path by default (parameter *-ArchiverModulePath*).
 - Migration job logfiles are stored on the acting target Proxy only. If the target Object Storage Repository is bound to a Proxy Pool, please check for logs on all related Proxies.
 - This migration option is only supported from **Jet to Object Storage Repositories**.
 - You can migrate from Jet Repositories with item-based retention to Object Storage Repositories with snapshot-based retention. Be aware that the target Repository retention settings will be used, once the Repository Lock has been removed. Additionally take into consideration, that the first backup job run on the Object Storage Repository might download new data to fulfill the snapshot-based retention. It is recommended to get familiar with the two different types of retention: [Helpcenter - Retention](https://helpcenter.veeam.com/docs/vbo365/guide/retention_policy.html)
@@ -115,7 +116,7 @@ Start-VBODataMigration -Organization <VBOOrganization> -From <VBORepository> -To
 #### Outcome
 Returns a migration session ID (JobId) for tracking progress if run with *-RunAsync*
 #### Notes
-If you use the *-SwitchJobToTargetRepository* parameter, the job switches only after a successful migration. If themigration finishes with errors or warnings, the switch does not occur. After switching, the job remains disabled until you perform the migration verification check and remove migration lock.
+If you use the *-SwitchJobToTargetRepository* parameter, the job switches only after a successful migration. If the migration finishes with errors or warnings, the switch does not occur. After switching, the job remains disabled until you perform the migration verification check and remove migration lock.
 
 ### 4. Monitor status
 #### Purpose
@@ -161,11 +162,28 @@ Managing migration jobs with these commands might take a moment to complete.
 
 ### 6. Verify Data Consistency
 #### Purpose
-Export inventory reports from both the source and target repositories for comparison, in order to verify that all items were successfully migrated. The Verification PowerShell Script *VB365-JetToOsrVerification-GUI.ps1* in this folder can be used to compare the data.
+Export inventory reports from both the source and target repositories for comparison, in order to verify that all items were successfully migrated. The Verification PowerShell Script *VB365-JetToOsrVerification.ps1* in this folder can be used to compare the data.
 #### Outcome 
 No differences should be found between source and target. If any differences are detected, it could indicate a data loss during the migration process. In such case, try to run the migration again and if the issue persists, open a support ticket.
 #### Execute
-Run the *VB365-JetToOsrVerification-GUI.ps1* and perform the selections as needed before starting the verification.
+Run the *VB365-JetToOsrVerification.ps1* and perform the selections as needed before starting the verification.
+```
+.\VB365-JetToOsrVerification.ps1 [-ReportPath <String>] [-ArchiverModulePath <String>]
+```
+- *-ReportPath*: base folder for the reports (default: `C:\VBOMigrationVerificationReports`). It is created if it does not exist.
+- *-ArchiverModulePath*: path to the VB365 PowerShell module DLL (default: `C:\Program Files\Veeam\Backup365\Veeam.Archiver.PowerShell.dll`).
+
+The manual equivalent uses the *Get-VBORepositoryInventoryReport* cmdlet for the source and the target repository:
+```
+Get-VBORepositoryInventoryReport -OutputPath <String> -BackupTime <DateTime> -Repository <VBORepository> -Organization <VBOOrganization> [-IncludeDeleted] [-IncludeAllVersions]
+Get-VBORepositoryInventoryReport -OutputPath <String> -BackupTime <DateTime> -Repository <VBORepository> -Job <VBOJob> [-IncludeDeleted] [-IncludeAllVersions]
+```
+#### Output
+Each run writes into its own subfolder named after the run start time, e.g. `C:\VBOMigrationVerificationReports\20261118_150211\`:
+- Inventory report CSV files (Mailboxes, SharePoint sites, Teams, OneDrive) for source and target.
+- *MismatchSummary.txt* (only if mismatches are found): organization, validation scope, source/target repository, restore point and the mismatching records per data type.
+
+Exit code: `0` if no differences were found, `1` if mismatches were found (shown as a warning in the console).
 #### Notes
 The provided script in this folder is provided to ease the process for data verification.
 
