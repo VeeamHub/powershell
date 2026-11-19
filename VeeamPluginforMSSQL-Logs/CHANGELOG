@@ -1,0 +1,16 @@
+26.04.2024:
+
+v 1.0 . Script for SQL Plugin logs collection
+
+02.12.2024: 
+
+v 2.0 . Logs folder was changed from "Case_logs" to "Veeam_Case_logs". Added the collection of system info (mount vol, OS info, ipconfig, firewall settings, etc.)
+
+19.11.2025:
+
+v 2.1 . Added "filters" output" and replaced "wmic" with "Get-CimInstance"
+
+14.10.2026:
+
+v 2.2 . Fixed ERRORLOG path lookup (instance ID + -e startup parameter). Added SQL Agent logs. 
+Default instance now gets a connection test. Fixed output path fallback, cluster event typo, and folder removal after a failed zip.

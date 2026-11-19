@@ -9,6 +9,7 @@
 ###[10.12.2024] v 2.0.9 - added additional files and folder to collect (C:\ProgramData\Veeam\Backup\BackupSearch) for FLR troubleshooting
 ###[08.07.2025] v 2.0.10 - workflow improvements
 ###[21.08.2025] v 2.0.11 - "wmic" was replaced with "Get-CimInstance" 
+###[02.11.2026] v 2.0.12 - small changes in the notification messages
 
 Start-Sleep 1
 Write-Warning -Message "This script is provided as is as a courtesy for collecting logs from the Guest Machine. Please be aware that due to certain Microsoft Operations, there may be a short burst of high CPU activity, and that some 
@@ -333,7 +334,7 @@ Write-Host "Collected logs will be located at:" $veeamlogs -ForegroundColor Whit
 Write-Host 'Copying Veeam Agent for Windows software logs' -ForegroundColor White -BackgroundColor Black -ErrorAction SilentlyContinue 
 	if ($item.LogDirectory -eq $null)
 		{
-		Write-Warning "Could not copy Endpoint folder. Veeam Agent for Windows log directory was not found" -ErrorAction SilentlyContinue 
+		Write-Warning "Could not copy Endpoint folder. Veeam Agent for Windows log directory was not found.Skipping this step..." -ErrorAction SilentlyContinue 
 		}
 	else
 		{
@@ -346,7 +347,7 @@ Write-Host 'Copying Veeam Agent for Windows software logs' -ForegroundColor Whit
 Write-Host 'Copying Veeam Agent for Windows Setup logs' -ForegroundColor White -BackgroundColor Black -ErrorAction SilentlyContinue 
 	if ($SetupFolExists -eq $False )
 		{
-		Write-Warning "Could not copy Setup logs. Veeam Agent for Windows log directory was not found" -ErrorAction SilentlyContinue 
+		Write-Warning "Could not copy Setup logs. Veeam Agent for Windows log directory was not found. Skipping this step..." -ErrorAction SilentlyContinue 
 		}
 	else
 		{
@@ -357,7 +358,7 @@ Write-Host 'Copying Veeam Agent for Windows Setup logs' -ForegroundColor White -
 		
 	if ($SetupMNGExists -eq $False )
 		{
-		Write-Warning "Could not copy Setup logs. Veeam Agent for Windows version is lower than v6" -ErrorAction SilentlyContinue 
+		Write-Warning "Could not copy Setup logs. Veeam Agent for Windows log directory was not found. Skippling this step..." -ErrorAction SilentlyContinue 
 		}
 	else
 		{
@@ -371,7 +372,7 @@ Write-Host 'Copying Veeam Agent for Windows Snapshot provider and Installer logs
 
 	if ($SnapProvExists -eq $False )
 		{
-		Write-Warning "Could not copy provider logs folder. Veeam Agent for Windows log directory was not found" -ErrorAction SilentlyContinue 
+		Write-Warning "Could not copy provider logs folder. Veeam Agent for Windows log directory was not found. Skipping this step..." -ErrorAction SilentlyContinue 
 		}
 	else
 		{
@@ -382,7 +383,7 @@ Write-Host 'Copying Veeam Agent for Windows Snapshot provider and Installer logs
 
 if ($CloudFolExists -eq $False )
 		{
-		Write-Warning "Could not copy Setup logs. Veeam Agent for Windows is not Cloud-based" -ErrorAction SilentlyContinue
+		Write-Warning "Could not copy Setup logs. Veeam Agent for Windows is not Cloud-based. Skipping this step..." -ErrorAction SilentlyContinue
 		}
 	else
 		{
@@ -393,7 +394,7 @@ if ($CloudFolExists -eq $False )
 
 if ($VCSP_FLR_FolExists -eq $False )
 		{
-		Write-Warning "Could not copy FLR logs." -ErrorAction SilentlyContinue
+		Write-Warning "Could not copy FLR logs. Skipping this step..." -ErrorAction SilentlyContinue
 		}
 	else
 		{
@@ -417,7 +418,7 @@ $writersProcs=Start-Process -FilePath powershell.exe -ArgumentList '-Command "vs
 	}
 	catch
 	{
-		Write-Host 'Collecting VSS Writers data has taken more than expected - there can be an issue with the VSS subsystem. Skipping VSS...' 
+		Write-Host 'Collecting VSS Writers data has taken more than expected - there can be an issue with the VSS subsystem. Skipping VSS step...' 
 		$writersProcs | Stop-Process -Force
 	}
 if (Test-Path C:\Temp\vss_writers.log) {Move-Item C:\Temp\vss_writers.log -Destination  $VSS}
@@ -598,7 +599,7 @@ $GetClusterEv = Get-WinEvent -listLog * | ? LogName -like "*failover*" -ErrorAct
 
 	if ($CheckCluEvents -eq $False )
 		{
-		Write-Host "INFO: This is not a cluster node. Skipping this step" -ErrorAction SilentlyContinue 
+		Write-Host "INFO: This is not a cluster node. Skipping this step..." -ErrorAction SilentlyContinue 
 		}
 	else
 	{
