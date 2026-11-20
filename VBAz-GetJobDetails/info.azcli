@@ -1,4 +1,0 @@
-az group list --query "[].name"
-az snapshot list --resource-group "dabew-vbaz-private" --query "[].{name:name,networkAccessPolicy:networkAccessPolicy,source:creationData.sourceUniqueId}" -o table
-
-
