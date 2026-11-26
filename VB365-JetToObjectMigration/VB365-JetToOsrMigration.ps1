@@ -7,40 +7,19 @@
   After the selections have been made, the related proxy is getting modified and the migration started.
 
 .OUTPUTS
-	Start the Start-VBODataMigration process for a specific selected job, switch over to the new target and leaves the job disabled. 
+	Starts the Start-VBODataMigration process for the selected organization or job.
+	If you choose to switch the job, it moves to the target repository and stays disabled until the migration lock is removed.
     Before re-enabling the job, the migration needs to be verified by using the verification script.
 
 .NOTES
-	NAME:  VB365-JetToObjectMigration.ps1
-	VERSION: 0.6
-	AUTHOR: David Bewernick
-	GITHUB: https://github.com/d-works
-
-<#
-.SYNOPSIS
-	Start the job based migration of Jet Repositories to Object Storage Repositories
-
-.DESCRIPTION
-  This script need to be run on the VB365 Controller. It reads the configuration to make a selection for a certain job possible.
-  After the selections have been made, the related proxy is getting modified and the migration started.
-
-.OUTPUTS
-	Start the Start-VBODataMigration process for a specific selected job, switch over to the new target and leaves the job disabled. 
-    Before re-enabling the job, the migration needs to be verified by using the verification script.
-
-.NOTES
-	NAME:  VB365-JetToObjectMigration.ps1
-	VERSION: 0.6
+	VERSION: 0.7
 	AUTHOR: David Bewernick
 	GITHUB: https://github.com/d-works
 
 .PARAMETER ArchiverModulePath
     Path to Veeam.Archiver.PowerShell.dll in the VB365 install root
     (default: C:\Program Files\Veeam\Backup365\Veeam.Archiver.PowerShell.dll).
-    Importing the DLL directly loads the current module natively in pwsh 7. The .psd1
-    manifest in the Veeam.Archiver.PowerShell subfolder loads an older module version
-    (6.0) that lacks newer cmdlets, and importing by module name goes through the
-    Windows PowerShell compatibility layer, which drops -Confirm:$false.
+    The DLL is imported directly so that all cmdlets used in this migration process are available, including the ones that are not part of the standard module.
 #>
 
 #Requires -Version 7.0
@@ -95,9 +74,6 @@ if ($migrationTypeNum -eq "1") {
     for($i=0; $i -lt $jobs.count; $i++) { Write-Host $i. $jobs[$i].name }
     $jobNum = Read-Host "Enter job number"
     $selectedJob = $jobs[$jobNum]
-    $migrationTarget = $selectedJob
-    $migrationType = "Job"
-    $inventoryDataIdColumnName = "Backup Job Id"
     Write-Host
 
 	# get the proxy object (holding the Jet based repository)
@@ -135,7 +111,7 @@ $switchJob = Read-Host
 Set-VBOConfigurationParameter -XPath "/Veeam/Archiver/RepositoryConfig" -Key "RetentionDisabled" -Value "True" -Proxy $proxy
 
 if ($migrationTypeNum -eq "0") {
-	# start the job mode migration process
+	# start the organization mode migration process
 	if($switchJob -eq "y") { 
 		Start-VBODataMigration -Organization $organization -From $sourceRepository -To $targetRepository -SwitchJobToTargetRepository -RunAsync 
 	}
@@ -162,7 +138,7 @@ if ($migrationTypeNum -eq "1") {
 # Get-VBODataMigration
 # -------------------
 
-# !! validate source and target with script  "Jet to OSR migration script.ps1"!!
+# !! validate source and target with script "VB365-JetToOsrVerification.ps1"!!
 
 # Remove taget repository lock
 # Remove-VBODataMigrationLock -Repository $targetRepository

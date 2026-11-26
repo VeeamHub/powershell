@@ -196,7 +196,7 @@ $repository = Get-VBORepository -Id <RepositoryID>
 Remove-VBODataMigrationLock -Repository $repository
 ```
 #### Notes
-Once the lock is removed, you cannot repeat the migration for the same data set. You can use the *Remove-VBODataMigrationLock-GUI.ps1* script to do this using a graphical interface.
+Once the lock is removed, you cannot start any further data migration into this repository. You can use the *Remove-VBODataMigrationLock-GUI.ps1* script to do this using a graphical interface.
 
 ### 8. (Optional) Enable retention on the source proxy
 #### Purpose

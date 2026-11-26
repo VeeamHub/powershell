@@ -52,10 +52,7 @@
 .PARAMETER ArchiverModulePath
     Path to Veeam.Archiver.PowerShell.dll in the VB365 install root
     (default: C:\Program Files\Veeam\Backup365\Veeam.Archiver.PowerShell.dll).
-    Importing the DLL directly loads the current module natively in pwsh 7. The .psd1
-    manifest in the Veeam.Archiver.PowerShell subfolder loads an older module version
-    (6.0) that lacks Get-VBORepositoryInventoryReport, and importing by module name goes
-    through the Windows PowerShell compatibility layer, which drops -Confirm:$false.
+    The DLL needs to be imported directly because Get-VBORepositoryInventoryReport is only available when the module is imported this way.
 
 .PARAMETER ReportPath
     Base folder for the inventory report CSV files. Each run writes into its own
